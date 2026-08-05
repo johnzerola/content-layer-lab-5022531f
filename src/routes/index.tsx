@@ -1006,6 +1006,23 @@ function Home() {
                         >
                           remover
                         </button>
+                        <button
+                          className="font-mono text-[11px] text-muted-foreground underline"
+                          onClick={() =>
+                            downloadBlob(
+                              new Blob([cuesToSrt(selected.captions!)], { type: "text/plain" }),
+                              `${selected.file.name.replace(/\.[^.]+$/, "")}.srt`,
+                            )
+                          }
+                        >
+                          baixar .srt
+                        </button>
+                        <button
+                          className="font-mono text-[11px] text-muted-foreground underline"
+                          onClick={() => void navigator.clipboard.writeText(cuesToText(selected.captions!))}
+                        >
+                          <Copy className="inline size-3" /> copiar texto
+                        </button>
                       </div>
                     )}
                   </div>
