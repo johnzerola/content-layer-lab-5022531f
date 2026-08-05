@@ -90,7 +90,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
   if (!videoConfig) throw new Error("H.264 não suportado neste navegador");
 
   const url = URL.createObjectURL(opts.file);
-  const video = document.createElement("video");
+  const video = document.createElement("video") as VideoWithRvfc;
   video.src = url;
   video.muted = true;
   video.playsInline = true;
