@@ -281,8 +281,23 @@ function Home() {
           progress: 0,
           ...(item.autoFrameSource ? { autoFrameSource: item.autoFrameSource } : {}),
         }));
-        setItems((prev) => [...prev.filter((p) => p.id !== item.id), ...created]);
+        setItems((prev) =>
+          modeRef.current === "clip"
+            ? // no estúdio o vídeo longo continua na lista para novas gerações
+              [...prev.filter((p) => !(p.clip && p.file === item.file)), ...created]
+            : [...prev.filter((p) => p.id !== item.id), ...created],
+        );
         setSelectedId(created[0]?.id ?? null);
+        // miniatura no início de cada corte
+        for (const c of created) {
+          try {
+            const meta = await grabPoster(item.file, (c.clip?.start ?? 0) + 0.5);
+            setItems((prev) => prev.map((p) => (p.id === c.id ? { ...p, poster: meta.url } : p)));
+          } catch {
+            /* mantém a miniatura do vídeo original */
+          }
+        }
+
       } catch (err) {
         setLinkMsg(`falha na clipagem: ${String((err as Error)?.message ?? err)}`);
       } finally {
