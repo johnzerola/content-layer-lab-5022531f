@@ -212,8 +212,17 @@ function Home() {
 
 
   const addVideos = useCallback(async (list: File[]) => {
-    const vids = list.filter((f) => f.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(f.name));
+    const vids = list.filter(isVideoFile);
+    const ignored = list.length - vids.length;
+    if (ignored > 0) toast.warning(`${ignored} arquivo(s) ignorado(s): não são vídeos.`);
+    const undecodable = vids.filter((f) => !canBrowserDecode(f));
+    if (undecodable.length) {
+      toast.warning(
+        `${undecodable.length} arquivo(s) em formato que o navegador pode não decodificar (ex: .avi, .mkv, .wmv). Se o preview ficar preto, converta para MP4/MOV/WebM.`,
+      );
+    }
     const created: Item[] = vids.map((file) => ({
+
       id: crypto.randomUUID(),
       file,
       poster: null,
