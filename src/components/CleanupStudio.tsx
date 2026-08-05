@@ -123,18 +123,73 @@ export function CleanupStudio({
         <p className="mono-label flex items-center gap-1.5">
           <Eraser className="size-3.5" /> Remover legenda / marca d'água / texto
         </p>
-        <button
-          type="button"
-          onClick={() => {
-            const r = makeCleanupRegion({ label: `Área ${regions.length + 1}` });
-            onChange([...regions, r]);
-            setSel(r.id);
-          }}
-          className="flex items-center gap-1 rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:border-primary/60 hover:text-foreground"
-        >
-          <Plus className="size-3" /> nova área
-        </button>
+        <div className="flex items-center gap-1">
+          {onDetect && (
+            <button
+              type="button"
+              disabled={detecting}
+              onClick={onDetect}
+              className="flex items-center gap-1 rounded-md border border-primary/50 bg-primary/10 px-2 py-1 font-mono text-[10px] text-primary disabled:opacity-60"
+            >
+              <ScanSearch className="size-3" /> {detecting ? "analisando…" : "detectar automático"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              const r = makeCleanupRegion({ label: `Área ${regions.length + 1}` });
+              onChange([...regions, r]);
+              setSel(r.id);
+            }}
+            className="flex items-center gap-1 rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:border-primary/60 hover:text-foreground"
+          >
+            <Plus className="size-3" /> nova área
+          </button>
+        </div>
       </div>
+
+      {(detectMsg || suggestions.length > 0) && (
+        <div className="rounded-lg border border-warn/50 bg-warn/10 p-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-mono text-[10px] text-warn">
+              {detectMsg ?? `${suggestions.length} área(s) encontrada(s)`}
+            </p>
+            {suggestions.length > 0 && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={onUseAllSuggestions}
+                  className="rounded border border-primary/60 bg-primary/15 px-2 py-0.5 font-mono text-[10px] text-primary"
+                >
+                  usar todas
+                </button>
+                <button
+                  type="button"
+                  onClick={onClearSuggestions}
+                  className="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+                >
+                  descartar
+                </button>
+              </div>
+            )}
+          </div>
+          {suggestions.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {suggestions.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => onUseSuggestion?.(s)}
+                  className="rounded border border-border bg-background px-2 py-0.5 font-mono text-[10px] text-foreground hover:border-primary/60"
+                >
+                  + {s.label} · {Math.round(s.w * 100)}×{Math.round(s.h * 100)}%
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
 
       <div className="flex flex-wrap gap-1">
         {CLEANUP_PRESETS.map((p) => (
