@@ -158,6 +158,8 @@ function Home() {
   const [clipMax, setClipMax] = useState(6);
   const [clipMinScore, setClipMinScore] = useState(60);
   const [variants, setVariants] = useState(1);
+  const [previewVariant, setPreviewVariant] = useState(0);
+
   const [capLang, setCapLang] = useState("pt");
   const [capBusyId, setCapBusyId] = useState<string | null>(null);
 
@@ -384,8 +386,10 @@ function Home() {
     [active],
   );
 
-  // reflete a anti-duplicidade no preview em tempo real
-  const previewVariation = selected ? variationOf(selected) : null;
+  // reflete a anti-duplicidade no preview em tempo real (mesma seed usada na exportação)
+  const variantIdx = Math.min(previewVariant, Math.max(0, variants - 1));
+  const previewVariation = selected ? variationOf(selected, variantIdx) : null;
+
   const capStyle = active.captions ?? defaultCaptions();
 
   // sem transcrição ainda? mostra legenda de exemplo pra ver o estilo na prévia
@@ -405,6 +409,19 @@ function Home() {
     }
     return out;
   }, [selected?.captions, capStyle.visible]);
+
+  // mesma janela calculada pelo encoder (clipe + corte anti-duplicidade)
+  const previewLoop = useMemo(() => {
+    const v = previewVariation;
+    const dur = selected?.duration || 0;
+    if (!v || !dur) return { start: 0, end: undefined as number | undefined };
+    const clipStart = Math.max(0, Math.min(selected?.clip?.start ?? 0, Math.max(0, dur - 0.5)));
+    const clipEnd = Math.min(dur, selected?.clip?.end ?? dur);
+    const clipDur = Math.max(0.5, clipEnd - clipStart);
+    const start = clipStart + Math.min(v.trimStart, Math.max(0, clipDur - 0.5));
+    const effDur = Math.max(0.2, clipDur - (start - clipStart) - v.trimEnd);
+    return { start, end: start + effDur };
+  }, [previewVariation?.trimStart, previewVariation?.trimEnd, selected?.duration, selected?.clip?.start, selected?.clip?.end]);
 
   const previewDrawOpts = useMemo(
     () =>
@@ -888,7 +905,22 @@ function Home() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <p className="mono-label">Preview final</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="mono-label">Preview final</p>
+                      {variants > 1 && (
+                        <select
+                          value={variantIdx}
+                          onChange={(e) => setPreviewVariant(Number(e.target.value))}
+                          className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[10px]"
+                        >
+                          {Array.from({ length: variants }, (_, k) => (
+                            <option key={k} value={k}>
+                              prévia da variação v{k + 1}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                     <TemplateCanvas
                       template={previewTemplate}
                       interactive={false}
@@ -896,20 +928,24 @@ function Home() {
                       previewFile={selected.file}
                       drawOpts={previewDrawOpts}
                       speed={previewVariation?.speed ?? 1}
-                      trimStart={previewVariation?.trimStart ?? 0}
-                      trimEnd={previewVariation?.trimEnd ?? 0}
+                      loopStart={previewLoop.start}
+                      loopEnd={previewLoop.end}
                     />
                     {previewVariation && (
                       <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+                        {variants > 1 ? `v${variantIdx + 1} · ` : ""}
                         {describeVariation(previewVariation)}
                         {previewCues?.length
                           ? selected.captions?.length
                             ? " · legendas reais"
                             : " · legenda de exemplo (gere a transcrição)"
                           : ""}
+                        {" · idêntico ao arquivo exportado"}
                       </p>
                     )}
                   </div>
+
+
 
                 </div>
               ) : (

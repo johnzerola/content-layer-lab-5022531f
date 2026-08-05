@@ -116,8 +116,8 @@ export function TemplateCanvas({
   drawOpts,
   snap = true,
   speed = 1,
-  trimStart = 0,
-  trimEnd = 0,
+  loopStart = 0,
+  loopEnd,
 }: {
   template: Template;
   selected?: SelId | null;
@@ -130,9 +130,9 @@ export function TemplateCanvas({
   snap?: boolean;
   /** velocidade anti-duplicidade aplicada na prévia */
   speed?: number;
-  /** corte inicial/final (s) aplicado na prévia */
-  trimStart?: number;
-  trimEnd?: number;
+  /** janela exportada (clipagem + corte anti-duplicidade), em segundos do vídeo fonte */
+  loopStart?: number;
+  loopEnd?: number | undefined;
 }) {
 
   const W = template.canvasW ?? CANVAS_W;
@@ -163,10 +163,10 @@ export function TemplateCanvas({
     v.src = url;
     v.muted = true;
     v.playsInline = true;
-    // respeita o corte inicial/final da anti-duplicidade no loop da prévia
+    // repete exatamente a janela que será exportada (clipe + corte anti-duplicidade)
     const onLoop = () => {
-      const end = v.duration ? v.duration - trimEnd : Infinity;
-      if (v.currentTime < trimStart || v.currentTime >= end) v.currentTime = trimStart;
+      const end = Math.min(loopEnd ?? Infinity, v.duration || Infinity);
+      if (v.currentTime < loopStart - 0.05 || v.currentTime >= end) v.currentTime = loopStart;
     };
     v.addEventListener("loadedmetadata", onLoop);
     v.addEventListener("timeupdate", onLoop);
@@ -179,7 +179,8 @@ export function TemplateCanvas({
       videoEl.current = null;
       URL.revokeObjectURL(url);
     };
-  }, [previewFile, trimStart, trimEnd]);
+  }, [previewFile, loopStart, loopEnd]);
+
 
   // velocidade anti-duplicidade em tempo real
   useEffect(() => {
