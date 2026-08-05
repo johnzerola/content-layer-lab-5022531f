@@ -1324,6 +1324,16 @@ function Home() {
                         exibir no vídeo
                       </label>
                     </div>
+                    <label className="mt-2 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={autoCap}
+                        onChange={(e) => setAutoCap(e.target.checked)}
+                        className="size-4 accent-[var(--primary)]"
+                      />
+                      transcrever automaticamente ao clicar em Processar
+                    </label>
+
                     <div className="mt-3">
                       <CaptionStudio
                         style={active.captions ?? defaultCaptions()}
