@@ -284,10 +284,13 @@ function Home() {
         return;
       }
       const blob = await dl.blob();
+      const urlExt = new URL(res.videoUrl).pathname.match(VIDEO_EXT_RE)?.[1]?.toLowerCase() ?? "mp4";
       const base =
-        (res.title ?? "video").replace(/\.(mp4|mov|webm|m4v)$/i, "").replace(/[^\w\-. ]+/g, "").trim().slice(0, 60) ||
+        (res.title ?? "video").replace(VIDEO_EXT_RE, "").replace(/[^\w\-. ]+/g, "").trim().slice(0, 60) ||
         "video";
-      const file = new File([blob], `${base}.mp4`, { type: blob.type || "video/mp4" });
+      const name = `${base}.${urlExt}`;
+      const file = new File([blob], name, { type: blob.type || guessMime(name) });
+
       await addVideos([file]);
       setLinkMsg(`importado: ${file.name} (${(file.size / 1e6).toFixed(1)} MB)`);
       setLinkUrl("");
