@@ -47,6 +47,8 @@ export interface VideoLayer extends BoxLayer {
 export interface Template {
   id: string;
   name: string;
+  version?: number;
+  updatedAt?: number;
   background: string;
   video: VideoLayer;
   watermark: ImageLayer;
@@ -79,6 +81,8 @@ export function createTemplate(name = "Novo template"): Template {
   return {
     id: crypto.randomUUID(),
     name,
+    version: 1,
+    updatedAt: Date.now(),
     background: "#0a0a0a",
     video: {
       x: 60,
@@ -160,17 +164,101 @@ export const LAYER_LABELS: Record<LayerId, string> = {
 };
 
 const KEY = "vv.templates";
+const VKEY = "vv.template-versions";
+const MAX_VERSIONS = 20;
+
+export interface TemplateVersion {
+  version: number;
+  savedAt: number;
+  note: string;
+  snapshot: Template;
+}
+
+function read<T>(key: string, fallback: T): T {
+  if (typeof window === "undefined") return fallback;
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
 
 export function loadTemplates(): Template[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as Template[]) : [];
-  } catch {
-    return [];
-  }
+  return read<Template[]>(KEY, []);
 }
 
 export function saveTemplates(list: Template[]) {
   localStorage.setItem(KEY, JSON.stringify(list));
 }
+
+type VersionMap = Record<string, TemplateVersion[]>;
+
+export function loadVersions(templateId: string): TemplateVersion[] {
+  return read<VersionMap>(VKEY, {})[templateId] ?? [];
+}
+
+function writeVersions(map: VersionMap) {
+  localStorage.setItem(VKEY, JSON.stringify(map));
+}
+
+/** Salva o template criando uma nova versão no histórico. */
+export function commitTemplate(
+  list: Template[],
+  template: Template,
+  note = "",
+): { list: Template[]; template: Template } {
+  const map = read<VersionMap>(VKEY, {});
+  const history = map[template.id] ?? [];
+  const nextVersion = (history[0]?.version ?? template.version ?? 0) + 1;
+  const saved: Template = { ...template, version: nextVersion, updatedAt: Date.now() };
+
+  map[template.id] = [
+    { version: nextVersion, savedAt: saved.updatedAt!, note, snapshot: saved },
+    ...history,
+  ].slice(0, MAX_VERSIONS);
+  writeVersions(map);
+
+  const nextList = list.some((t) => t.id === saved.id)
+    ? list.map((t) => (t.id === saved.id ? saved : t))
+    : [...list, saved];
+  saveTemplates(nextList);
+  return { list: nextList, template: saved };
+}
+
+export function deleteTemplate(list: Template[], id: string): Template[] {
+  const next = list.filter((t) => t.id !== id);
+  saveTemplates(next);
+  const map = read<VersionMap>(VKEY, {});
+  delete map[id];
+  writeVersions(map);
+  return next;
+}
+
+export function duplicateTemplate(template: Template, name?: string): Template {
+  return {
+    ...structuredClone(template),
+    id: crypto.randomUUID(),
+    name: name ?? `${template.name} (cópia)`,
+    version: 1,
+    updatedAt: Date.now(),
+  };
+}
+
+export function exportTemplate(template: Template) {
+  const blob = new Blob([JSON.stringify(template, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${template.name.replace(/\s+/g, "-").toLowerCase()}.vaiviral.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+export async function importTemplateFile(file: File): Promise<Template> {
+  const parsed = JSON.parse(await file.text()) as Partial<Template>;
+  if (!parsed || !parsed.video || !parsed.headline) throw new Error("Arquivo de template inválido");
+  const base = createTemplate(parsed.name ?? "Template importado");
+  return { ...base, ...parsed, id: base.id, version: 1, updatedAt: Date.now() };
+}
+

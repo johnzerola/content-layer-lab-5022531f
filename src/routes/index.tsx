@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Upload, X, Play, Download, Pencil, Repeat } from "lucide-react";
+import { Upload, X, Play, Download, Pencil, Repeat, Library, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
 import { TemplateEditor } from "@/components/TemplateEditor";
-import { createTemplate, loadTemplates, saveTemplates, type Template } from "@/lib/template";
+import { TemplateLibrary } from "@/components/TemplateLibrary";
+import { commitTemplate, createTemplate, loadTemplates, type Template } from "@/lib/template";
 import { downloadBlob, grabPoster, renderVideo } from "@/lib/render";
 
 export const Route = createFileRoute("/")({
@@ -50,11 +51,24 @@ function Home() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
   const [editing, setEditing] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
+
+  const commit = useCallback((t: Template, note?: string) => {
+    setTemplates((list) => {
+      const res = commitTemplate(list, t, note);
+      setActive(res.template);
+      return res.list;
+    });
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 1800);
+  }, []);
+
 
   useEffect(() => {
     const list = loadTemplates();
@@ -164,8 +178,13 @@ function Home() {
           <div>
             <p className="mono-label">Template ativo</p>
             <p className="text-lg font-semibold">{active.name}</p>
+            <p className="font-mono text-[11px] text-muted-foreground">
+              v{active.version ?? 1}
+              {templates.some((t) => t.id === active.id) ? "" : " · não salvo"}
+              {savedFlash && <span className="ml-2 text-primary">● salvo</span>}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {templates.length > 0 && (
               <select
                 className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm"
@@ -180,7 +199,7 @@ function Home() {
                 </option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name}
+                    {t.name} · v{t.version ?? 1}
                   </option>
                 ))}
               </select>
@@ -188,11 +207,18 @@ function Home() {
             <Button variant="outline" onClick={() => setActive(createTemplate("Novo template"))}>
               Novo
             </Button>
+            <Button variant="outline" onClick={() => setLibraryOpen(true)}>
+              <Library className="size-4" /> Biblioteca
+            </Button>
+            <Button variant="outline" onClick={() => commit(active, "salvo manualmente")}>
+              <Save className="size-4" /> Salvar versão
+            </Button>
             <Button onClick={() => setEditing(true)}>
               <Pencil className="size-4" /> Editar template
             </Button>
           </div>
         </section>
+
 
         <section
           onDragOver={(e) => e.preventDefault()}
@@ -409,14 +435,23 @@ function Home() {
             setEditing(false);
           }}
           onSave={(t) => {
-            const list = templates.some((x) => x.id === t.id)
-              ? templates.map((x) => (x.id === t.id ? t : x))
-              : [...templates, t];
-            setTemplates(list);
-            saveTemplates(list);
-            setActive(t);
+            commit(t, "editado no editor");
             setEditing(false);
           }}
+        />
+      )}
+
+      {libraryOpen && (
+        <TemplateLibrary
+          templates={templates}
+          activeId={active.id}
+          onClose={() => setLibraryOpen(false)}
+          onChangeList={setTemplates}
+          onUse={(t) => {
+            setActive(t);
+            setLibraryOpen(false);
+          }}
+          onCommit={commit}
         />
       )}
     </main>
