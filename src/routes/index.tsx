@@ -892,7 +892,22 @@ function Home() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <p className="mono-label">Preview final</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="mono-label">Preview final</p>
+                      {variants > 1 && (
+                        <select
+                          value={variantIdx}
+                          onChange={(e) => setPreviewVariant(Number(e.target.value))}
+                          className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[10px]"
+                        >
+                          {Array.from({ length: variants }, (_, k) => (
+                            <option key={k} value={k}>
+                              prévia da variação v{k + 1}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                     <TemplateCanvas
                       template={previewTemplate}
                       interactive={false}
@@ -900,20 +915,24 @@ function Home() {
                       previewFile={selected.file}
                       drawOpts={previewDrawOpts}
                       speed={previewVariation?.speed ?? 1}
-                      trimStart={previewVariation?.trimStart ?? 0}
-                      trimEnd={previewVariation?.trimEnd ?? 0}
+                      loopStart={previewLoop.start}
+                      loopEnd={previewLoop.end}
                     />
                     {previewVariation && (
                       <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+                        {variants > 1 ? `v${variantIdx + 1} · ` : ""}
                         {describeVariation(previewVariation)}
                         {previewCues?.length
                           ? selected.captions?.length
                             ? " · legendas reais"
                             : " · legenda de exemplo (gere a transcrição)"
                           : ""}
+                        {" · idêntico ao arquivo exportado"}
                       </p>
                     )}
                   </div>
+
+
 
                 </div>
               ) : (
