@@ -60,7 +60,7 @@ export async function detectOverlays(
 
     const dur = Number.isFinite(v.duration) ? v.duration : 0;
     const start = Math.max(0, opts.clip?.start ?? 0);
-    const end = Math.min(dur || 1e9, opts.clip?.end ?? dur || 1);
+    const end = Math.min(dur || 1e9, opts.clip?.end ?? (dur || 1));
     const span = Math.max(0.2, end - start);
     const n = Math.max(4, Math.min(12, opts.frames ?? 8));
 
