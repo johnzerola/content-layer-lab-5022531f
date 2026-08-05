@@ -187,6 +187,20 @@ export function cuesToText(cues: CaptionCue[]) {
   return cues.map((c) => c.words.map((w) => w.text).join(" ")).join(" ");
 }
 
+/** Legenda de exemplo pra prévia enquanto não há transcrição real. */
+export function demoCues(text = "isso aqui muda o seu jogo agora mesmo"): CaptionCue[] {
+  const words = text.split(" ");
+  const step = 0.42;
+  return [
+    {
+      start: 0,
+      end: words.length * step,
+      words: words.map((t, i) => ({ text: t, start: i * step, end: (i + 1) * step - 0.02 })),
+    },
+  ];
+}
+
+
 /** Exporta as legendas em SRT (útil pra subir junto no editor de terceiros). */
 export function cuesToSrt(cues: CaptionCue[]) {
   const fmt = (s: number) => {

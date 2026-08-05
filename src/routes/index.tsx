@@ -43,7 +43,7 @@ import { autoFrame } from "@/lib/autoframe";
 import { findClips, formatTime } from "@/lib/clips";
 import { resolveVideoLink } from "@/lib/import.functions";
 import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
-import { cuesToSrt, cuesToText, generateCaptions, type CaptionCue } from "@/lib/captions";
+import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } from "@/lib/captions";
 import { registerFonts } from "@/lib/fonts";
 import { CaptionStudio } from "@/components/CaptionStudio";
 
@@ -385,6 +385,26 @@ function Home() {
 
   // reflete a anti-duplicidade no preview em tempo real
   const previewVariation = selected ? variationOf(selected) : null;
+  const capStyle = active.captions ?? defaultCaptions();
+
+  // sem transcrição ainda? mostra legenda de exemplo pra ver o estilo na prévia
+  const previewCues = useMemo(() => {
+    if (selected?.captions?.length) return selected.captions;
+    if (!capStyle.visible) return undefined;
+    const base = demoCues();
+    const span = base[0]!.end;
+    const out: CaptionCue[] = [];
+    for (let k = 0; k < Math.ceil(120 / span); k++) {
+      const off = k * span;
+      out.push({
+        start: base[0]!.start + off,
+        end: base[0]!.end + off,
+        words: base[0]!.words.map((w) => ({ ...w, start: w.start + off, end: w.end + off })),
+      });
+    }
+    return out;
+  }, [selected?.captions, capStyle.visible]);
+
   const previewDrawOpts = useMemo(
     () =>
       previewVariation
@@ -397,7 +417,7 @@ function Home() {
             rotate: previewVariation.rotate,
             border: previewVariation.border,
             borderColor: previewVariation.borderColor,
-            ...(selected?.captions?.length ? { captions: selected.captions } : {}),
+            ...(previewCues?.length ? { captions: previewCues } : {}),
           }
         : undefined,
     [
@@ -409,9 +429,10 @@ function Home() {
       previewVariation?.rotate,
       previewVariation?.border,
       previewVariation?.borderColor,
-      selected?.captions,
+      previewCues,
     ],
   );
+
 
 
 
@@ -873,9 +894,22 @@ function Home() {
                       poster={selected.poster}
                       previewFile={selected.file}
                       drawOpts={previewDrawOpts}
+                      speed={previewVariation?.speed ?? 1}
+                      trimStart={previewVariation?.trimStart ?? 0}
+                      trimEnd={previewVariation?.trimEnd ?? 0}
                     />
-
+                    {previewVariation && (
+                      <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+                        {describeVariation(previewVariation)}
+                        {previewCues?.length
+                          ? selected.captions?.length
+                            ? " · legendas reais"
+                            : " · legenda de exemplo (gere a transcrição)"
+                          : ""}
+                      </p>
+                    )}
                   </div>
+
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">Selecione um vídeo na lista.</p>
