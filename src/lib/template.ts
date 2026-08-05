@@ -294,6 +294,9 @@ export interface Template {
   mirror: boolean;
   speed: number;
   antiDup?: AntiDupConfig;
+  /** máscaras de remoção de legenda/marca d'água/texto do vídeo original */
+  cleanup?: CleanupRegion[];
+
 }
 
 const text = (o: Partial<TextLayer>): TextLayer => ({
