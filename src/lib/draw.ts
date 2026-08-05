@@ -128,15 +128,45 @@ export interface FrameSource {
   height: number;
 }
 
+let noiseTile: HTMLCanvasElement | null = null;
+function getNoiseTile() {
+  if (noiseTile) return noiseTile;
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 128;
+  const cx = c.getContext("2d")!;
+  const img = cx.createImageData(128, 128);
+  for (let i = 0; i < img.data.length; i += 4) {
+    const v = 110 + Math.random() * 36;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+    img.data[i + 3] = 255;
+  }
+  cx.putImageData(img, 0, 0);
+  noiseTile = c;
+  return c;
+}
+
+export interface DrawOpts {
+  mirror?: boolean;
+  offsetX?: number;
+  offsetY?: number;
+  brightness?: number;
+  saturation?: number;
+  zoom?: number;
+  noise?: number;
+}
+
 export function drawFrame(
   ctx: CanvasRenderingContext2D,
   t: Template,
   source?: FrameSource | null,
-  opts?: { mirror?: boolean; offsetX?: number; offsetY?: number },
+  opts?: DrawOpts,
 ) {
+  const W = t.canvasW ?? CANVAS_W;
+  const H = t.canvasH ?? CANVAS_H;
   ctx.save();
   ctx.fillStyle = t.background;
-  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.fillRect(0, 0, W, H);
 
   const v = t.video;
   if (v.visible) {
@@ -144,7 +174,8 @@ export function drawFrame(
     roundRect(ctx, v.x, v.y, v.w, v.h, v.radius);
     ctx.clip();
     if (source && source.width) {
-      const scale = Math.max(v.w / source.width, v.h / source.height);
+      const zoom = opts?.zoom ?? 1;
+      const scale = Math.max(v.w / source.width, v.h / source.height) * zoom;
       const dw = source.width * scale;
       const dh = source.height * scale;
       const ox = (opts?.offsetX ?? v.offsetX) * (dw - v.w) * 0.5;
@@ -155,7 +186,22 @@ export function drawFrame(
         ctx.translate(v.x * 2 + v.w, 0);
         ctx.scale(-1, 1);
       }
+      const b = opts?.brightness ?? 1;
+      const s = opts?.saturation ?? 1;
+      if (b !== 1 || s !== 1) ctx.filter = `brightness(${b}) saturate(${s})`;
       ctx.drawImage(source.el, dx, dy, dw, dh);
+      ctx.filter = "none";
+      if (opts?.noise) {
+        ctx.globalAlpha = Math.min(0.12, opts.noise);
+        ctx.globalCompositeOperation = "overlay";
+        const pat = ctx.createPattern(getNoiseTile(), "repeat");
+        if (pat) {
+          ctx.fillStyle = pat;
+          ctx.fillRect(v.x, v.y, v.w, v.h);
+        }
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 1;
+      }
     } else {
       ctx.fillStyle = "rgba(255,255,255,0.06)";
       ctx.fillRect(v.x, v.y, v.w, v.h);
@@ -169,5 +215,10 @@ export function drawFrame(
   drawText(ctx, t.handle);
   drawText(ctx, t.headline);
   drawText(ctx, t.cta);
+  for (const extra of t.extras ?? []) {
+    if ("src" in extra) drawImageLayer(ctx, extra);
+    else drawText(ctx, extra);
+  }
   ctx.restore();
 }
+

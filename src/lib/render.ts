@@ -1,13 +1,18 @@
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import { drawFrame } from "./draw";
+import { encodeMp4, webCodecsSupported } from "./encode";
+import type { Variation } from "./variation";
 
 export interface RenderOptions {
-  mirror: boolean;
-  speed: number;
+  variation: Variation;
   offsetX: number;
   offsetY: number;
   headline?: string | undefined;
-  onProgress?: (p: number) => void;
+  fps?: number | undefined;
+  bitrate?: number | undefined;
+  turbo?: number | undefined;
+  onProgress?: ((p: number) => void) | undefined;
+  signal?: AbortSignal | undefined;
 }
 
 function pickMime() {
@@ -23,17 +28,18 @@ function pickMime() {
   return "video/webm";
 }
 
-export async function renderVideo(
+/** Fallback em tempo real (navegadores sem WebCodecs). */
+async function recordVideo(
   file: File,
   template: Template,
   opts: RenderOptions,
 ): Promise<{ blob: Blob; ext: string }> {
   const url = URL.createObjectURL(file);
   const video = document.createElement("video");
+  const v = opts.variation;
   video.src = url;
-  video.muted = false;
   video.playsInline = true;
-  video.playbackRate = opts.speed;
+  video.playbackRate = v.speed;
 
   await new Promise<void>((res, rej) => {
     video.onloadedmetadata = () => res();
@@ -41,11 +47,12 @@ export async function renderVideo(
   });
 
   const canvas = document.createElement("canvas");
-  canvas.width = CANVAS_W;
-  canvas.height = CANVAS_H;
+  canvas.width = template.canvasW ?? CANVAS_W;
+  canvas.height = template.canvasH ?? CANVAS_H;
   const ctx = canvas.getContext("2d")!;
 
-  const stream = canvas.captureStream(30);
+  const fps = opts.fps ?? 30;
+  const stream = canvas.captureStream(fps);
   try {
     const media = (video as HTMLVideoElement & { captureStream?: () => MediaStream }).captureStream?.();
     media?.getAudioTracks().forEach((t) => stream.addTrack(t));
@@ -54,7 +61,10 @@ export async function renderVideo(
   }
 
   const mimeType = pickMime();
-  const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+  const recorder = new MediaRecorder(stream, {
+    mimeType,
+    videoBitsPerSecond: opts.bitrate ?? 10_000_000,
+  });
   const chunks: BlobPart[] = [];
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
 
@@ -66,23 +76,35 @@ export async function renderVideo(
     recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
   });
 
+  const endAt = Math.max(0.2, video.duration - v.trimEnd);
   let raf = 0;
   const loop = () => {
     drawFrame(ctx, tpl, { el: video, width: video.videoWidth, height: video.videoHeight }, {
-      mirror: opts.mirror,
+      mirror: v.mirror,
       offsetX: opts.offsetX,
       offsetY: opts.offsetY,
+      brightness: v.brightness,
+      saturation: v.saturation,
+      zoom: v.zoom,
+      noise: v.noise,
     });
-    if (video.duration) opts.onProgress?.(Math.min(1, video.currentTime / video.duration));
+    if (video.duration) opts.onProgress?.(Math.min(1, video.currentTime / endAt));
+    if (video.currentTime >= endAt) video.pause();
     raf = requestAnimationFrame(loop);
   };
 
+  video.currentTime = v.trimStart;
   recorder.start(1000);
   await video.play();
   loop();
 
   await new Promise<void>((res) => {
-    video.onended = () => res();
+    const check = setInterval(() => {
+      if (video.ended || video.paused || video.currentTime >= endAt) {
+        clearInterval(check);
+        res();
+      }
+    }, 120);
   });
 
   cancelAnimationFrame(raf);
@@ -91,6 +113,35 @@ export async function renderVideo(
   URL.revokeObjectURL(url);
   opts.onProgress?.(1);
   return { blob, ext: mimeType.startsWith("video/mp4") ? "mp4" : "webm" };
+}
+
+export async function renderVideo(
+  file: File,
+  template: Template,
+  opts: RenderOptions,
+): Promise<{ blob: Blob; ext: string }> {
+  if (webCodecsSupported()) {
+    try {
+      const blob = await encodeMp4({
+        file,
+        template,
+        variation: opts.variation,
+        offsetX: opts.offsetX,
+        offsetY: opts.offsetY,
+        headline: opts.headline,
+        fps: opts.fps ?? 30,
+        bitrate: opts.bitrate ?? 10_000_000,
+        turbo: opts.turbo ?? 4,
+        onProgress: opts.onProgress,
+        signal: opts.signal,
+      });
+      return { blob, ext: "mp4" };
+    } catch (err) {
+      if ((err as Error)?.name === "AbortError") throw err;
+      console.warn("WebCodecs falhou, usando fallback:", err);
+    }
+  }
+  return recordVideo(file, template, opts);
 }
 
 export function downloadBlob(blob: Blob, filename: string) {
@@ -102,7 +153,10 @@ export function downloadBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
-export async function grabPoster(file: File, at = 0.5): Promise<{ url: string; w: number; h: number; duration: number }> {
+export async function grabPoster(
+  file: File,
+  at = 0.5,
+): Promise<{ url: string; w: number; h: number; duration: number }> {
   const url = URL.createObjectURL(file);
   const video = document.createElement("video");
   video.src = url;
@@ -128,3 +182,5 @@ export async function grabPoster(file: File, at = 0.5): Promise<{ url: string; w
   URL.revokeObjectURL(url);
   return out;
 }
+
+export { CANVAS_H, CANVAS_W };

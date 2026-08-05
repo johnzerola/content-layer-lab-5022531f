@@ -1,12 +1,39 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Upload, X, Play, Download, Pencil, Repeat, Library, Save } from "lucide-react";
+import {
+  Upload,
+  X,
+  Play,
+  Download,
+  Pencil,
+  Repeat,
+  Library,
+  Save,
+  Pause,
+  StopCircle,
+  RotateCcw,
+  FolderDown,
+  FileArchive,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
 import { TemplateEditor } from "@/components/TemplateEditor";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
-import { commitTemplate, createTemplate, loadTemplates, type Template } from "@/lib/template";
+import {
+  applyRatio,
+  commitTemplate,
+  createTemplate,
+  loadTemplates,
+  RATIO_PRESETS,
+  type Template,
+} from "@/lib/template";
 import { downloadBlob, grabPoster, renderVideo } from "@/lib/render";
+import { webCodecsSupported } from "@/lib/encode";
+import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
+import { autoFrame } from "@/lib/autoframe";
+import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,7 +56,7 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-type Status = "pendente" | "processando" | "pronto" | "erro";
+type Status = "pendente" | "na fila" | "processando" | "pronto" | "erro";
 
 interface Item {
   id: string;
@@ -41,10 +68,18 @@ interface Item {
   headline: string;
   offsetX: number;
   offsetY: number;
+  autoFrameSource?: string | undefined;
   status: Status;
   progress: number;
-  blob?: Blob;
-  ext?: string;
+  blob?: Blob | undefined;
+  ext?: string | undefined;
+  error?: string | undefined;
+}
+
+interface QueueCtrl {
+  paused: boolean;
+  cancelled: boolean;
+  aborts: Map<string, AbortController>;
 }
 
 function Home() {
@@ -56,8 +91,21 @@ function Home() {
   const [items, setItems] = useState<Item[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [zipping, setZipping] = useState(false);
+  const [concurrency, setConcurrency] = useState(2);
+  const [bitrate, setBitrate] = useState(10);
+  const [smartFrame, setSmartFrame] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
+  const ctrlRef = useRef<QueueCtrl>({ paused: false, cancelled: false, aborts: new Map() });
+  const itemsRef = useRef<Item[]>([]);
+  const startedAt = useRef(0);
+  const doneCount = useRef(0);
+  const smartRef = useRef(smartFrame);
+
+  itemsRef.current = items;
+  smartRef.current = smartFrame;
 
   const commit = useCallback((t: Template, note?: string) => {
     setTemplates((list) => {
@@ -100,49 +148,150 @@ function Home() {
         setItems((prev) =>
           prev.map((p) => (p.id === it.id ? { ...p, poster: meta.url, w: meta.w, h: meta.h, duration: meta.duration } : p)),
         );
+        if (smartRef.current) {
+          const af = await autoFrame(it.file);
+          setItems((prev) =>
+            prev.map((p) =>
+              p.id === it.id ? { ...p, offsetX: af.offsetX, offsetY: af.offsetY, autoFrameSource: af.source } : p,
+            ),
+          );
+        }
       } catch {
         setItems((prev) => prev.map((p) => (p.id === it.id ? { ...p, status: "erro" } : p)));
       }
     }
   }, []);
 
+
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
-  const processAll = async () => {
+  const antiDup = active.antiDup ?? defaultAntiDup();
+  const setAntiDup = (patch: Partial<typeof antiDup>) =>
+    setActive((t) => ({ ...t, antiDup: { ...(t.antiDup ?? defaultAntiDup()), ...patch } }));
+
+  const variationOf = useCallback(
+    (item: Item) =>
+      makeVariation(
+        { ...(active.antiDup ?? defaultAntiDup()), mirror: active.mirror, speed: active.speed },
+        `${item.file.name}:${item.file.size}:${item.id}`,
+      ),
+    [active],
+  );
+
+  const processAll = async (onlyIds?: string[]) => {
+    const ctrl = ctrlRef.current;
+    ctrl.paused = false;
+    ctrl.cancelled = false;
+    setPaused(false);
     setRunning(true);
-    for (const item of items) {
-      if (item.status === "pronto") continue;
-      setItems((p) => p.map((x) => (x.id === item.id ? { ...x, status: "processando", progress: 0 } : x)));
-      try {
-        const { blob, ext } = await renderVideo(item.file, active, {
-          mirror: active.mirror,
-          speed: active.speed,
-          offsetX: item.offsetX,
-          offsetY: item.offsetY,
-          headline: item.headline || undefined,
-          onProgress: (p) =>
-            setItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, progress: p } : x))),
-        });
-        setItems((p) => p.map((x) => (x.id === item.id ? { ...x, status: "pronto", blob, ext, progress: 1 } : x)));
-      } catch {
-        setItems((p) => p.map((x) => (x.id === item.id ? { ...x, status: "erro" } : x)));
+    startedAt.current = performance.now();
+    doneCount.current = 0;
+
+    const pending = items
+      .filter((i) => (onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto"))
+      .map((i) => i.id);
+    const queue = [...pending];
+    setItems((p) => p.map((x) => (queue.includes(x.id) ? { ...x, status: "na fila", progress: 0 } : x)));
+
+    const worker = async () => {
+      while (queue.length) {
+        while (ctrl.paused && !ctrl.cancelled) await new Promise((r) => setTimeout(r, 200));
+        if (ctrl.cancelled) return;
+        const id = queue.shift();
+        if (!id) return;
+        const item = itemsRef.current.find((x) => x.id === id);
+        if (!item) continue;
+        const ac = new AbortController();
+        ctrl.aborts.set(id, ac);
+        setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)));
+        try {
+          const { blob, ext } = await renderVideo(item.file, active, {
+            variation: variationOf(item),
+            offsetX: item.offsetX,
+            offsetY: item.offsetY,
+            headline: item.headline || undefined,
+            bitrate: bitrate * 1_000_000,
+            signal: ac.signal,
+            onProgress: (p) => setItems((prev) => prev.map((x) => (x.id === id ? { ...x, progress: p } : x))),
+          });
+          doneCount.current++;
+          setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "pronto", blob, ext, progress: 1 } : x)));
+        } catch (err) {
+          const aborted = (err as Error)?.name === "AbortError";
+          setItems((p) =>
+            p.map((x) =>
+              x.id === id
+                ? { ...x, status: aborted ? "pendente" : "erro", error: aborted ? undefined : String((err as Error)?.message ?? err) }
+                : x,
+            ),
+          );
+        } finally {
+          ctrl.aborts.delete(id);
+        }
       }
-    }
+    };
+
+    await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
     setRunning(false);
   };
 
-  const readyCount = items.filter((i) => i.status === "pronto").length;
+  const togglePause = () => {
+    ctrlRef.current.paused = !ctrlRef.current.paused;
+    setPaused(ctrlRef.current.paused);
+  };
 
-  const downloadAll = () => {
+  const cancelAll = () => {
+    ctrlRef.current.cancelled = true;
+    ctrlRef.current.paused = false;
+    ctrlRef.current.aborts.forEach((a) => a.abort());
+    ctrlRef.current.aborts.clear();
+    setPaused(false);
+    setRunning(false);
+    setItems((p) => p.map((x) => (x.status === "processando" || x.status === "na fila" ? { ...x, status: "pendente" } : x)));
+  };
+
+  const retryErrors = () => {
+    const ids = items.filter((i) => i.status === "erro").map((i) => i.id);
+    if (ids.length) void processAll(ids);
+  };
+
+  const readyCount = items.filter((i) => i.status === "pronto").length;
+  const errorCount = items.filter((i) => i.status === "erro").length;
+  const pendingCount = items.filter((i) => i.status !== "pronto").length;
+
+  const eta = (() => {
+    if (!running || doneCount.current === 0) return null;
+    const per = (performance.now() - startedAt.current) / doneCount.current;
+    const left = (per * pendingCount) / Math.max(1, concurrency);
+    const s = Math.round(left / 1000);
+    return s > 90 ? `${Math.round(s / 60)} min` : `${s}s`;
+  })();
+
+  const outFiles = () =>
     items
       .filter((i) => i.blob)
-      .forEach((i, idx) =>
-        setTimeout(
-          () => downloadBlob(i.blob!, `${active.name.replace(/\s+/g, "-").toLowerCase()}-${idx + 1}.${i.ext}`),
-          idx * 600,
-        ),
-      );
+      .map((i, idx) => ({
+        name: `${active.name.replace(/\s+/g, "-").toLowerCase()}-${String(idx + 1).padStart(3, "0")}.${i.ext}`,
+        blob: i.blob!,
+      }));
+
+  const downloadZipAll = async () => {
+    setZipping(true);
+    try {
+      await downloadAsZip(outFiles(), `${active.name.replace(/\s+/g, "-").toLowerCase()}.zip`);
+    } finally {
+      setZipping(false);
+    }
   };
+
+  const saveFolder = async () => {
+    try {
+      await saveToFolder(outFiles());
+    } catch {
+      /* cancelado */
+    }
+  };
+
 
   const previewTemplate: Template = selected
     ? {
@@ -204,9 +353,24 @@ function Home() {
                 ))}
               </select>
             )}
+            <select
+              className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm"
+              value={`${active.canvasW ?? 1080}x${active.canvasH ?? 1920}`}
+              onChange={(e) => {
+                const p = RATIO_PRESETS.find((r) => `${r.w}x${r.h}` === e.target.value);
+                if (p) setActive(applyRatio(active, p.w, p.h));
+              }}
+            >
+              {RATIO_PRESETS.map((r) => (
+                <option key={r.id} value={`${r.w}x${r.h}`}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
             <Button variant="outline" onClick={() => setActive(createTemplate("Novo template"))}>
               Novo
             </Button>
+
             <Button variant="outline" onClick={() => setLibraryOpen(true)}>
               <Library className="size-4" /> Biblioteca
             </Button>
@@ -318,24 +482,130 @@ function Home() {
                   </div>
                   <div className="space-y-2">
                     <p className="mono-label">Preview final</p>
-                    <TemplateCanvas template={previewTemplate} interactive={false} poster={selected.poster} />
+                    <TemplateCanvas template={previewTemplate} interactive={false} poster={selected.poster} previewFile={selected.file} />
                   </div>
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">Selecione um vídeo na lista.</p>
               )}
 
-              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-                <Button onClick={processAll} disabled={running}>
-                  <Play className="size-4" /> {running ? "Processando…" : "Processar em lote"}
-                </Button>
-                <Button variant="outline" onClick={downloadAll} disabled={readyCount === 0}>
-                  <Download className="size-4" /> Baixar todos ({readyCount})
-                </Button>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {active.mirror ? "espelhado · " : ""}velocidade {active.speed.toFixed(2)}x
-                </span>
+              <div className="space-y-3 border-t border-border pt-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button onClick={() => void processAll()} disabled={running}>
+                    <Play className="size-4" /> {running ? "Processando…" : "Processar em lote"}
+                  </Button>
+                  {running && (
+                    <>
+                      <Button variant="outline" onClick={togglePause}>
+                        <Pause className="size-4" /> {paused ? "Retomar" : "Pausar"}
+                      </Button>
+                      <Button variant="outline" onClick={cancelAll}>
+                        <StopCircle className="size-4" /> Cancelar
+                      </Button>
+                    </>
+                  )}
+                  {errorCount > 0 && !running && (
+                    <Button variant="outline" onClick={retryErrors}>
+                      <RotateCcw className="size-4" /> Tentar de novo ({errorCount})
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => void downloadZipAll()} disabled={readyCount === 0 || zipping}>
+                    <FileArchive className="size-4" /> {zipping ? "Compactando…" : `Baixar ZIP (${readyCount})`}
+                  </Button>
+                  {fsAccessSupported() && (
+                    <Button variant="outline" onClick={() => void saveFolder()} disabled={readyCount === 0}>
+                      <FolderDown className="size-4" /> Salvar na pasta
+                    </Button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 font-mono text-[11px] text-muted-foreground">
+                  <label className="flex items-center gap-2">
+                    paralelo
+                    <input
+                      type="range"
+                      min={1}
+                      max={4}
+                      value={concurrency}
+                      disabled={running}
+                      onChange={(e) => setConcurrency(Number(e.target.value))}
+                      className="w-24 accent-[var(--primary)]"
+                    />
+                    {concurrency}x
+                  </label>
+                  <label className="flex items-center gap-2">
+                    bitrate
+                    <input
+                      type="range"
+                      min={4}
+                      max={20}
+                      value={bitrate}
+                      disabled={running}
+                      onChange={(e) => setBitrate(Number(e.target.value))}
+                      className="w-24 accent-[var(--primary)]"
+                    />
+                    {bitrate} Mbps
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={smartFrame}
+                      onChange={(e) => setSmartFrame(e.target.checked)}
+                      className="accent-[var(--primary)]"
+                    />
+                    <Sparkles className="size-3" /> enquadramento inteligente
+                  </label>
+                  <span>{webCodecsSupported() ? "MP4 H.264 · WebCodecs" : "WebM (fallback)"}</span>
+                  {eta && <span className="text-primary">● restam ~{eta}</span>}
+                </div>
+
+                <div className="rounded-xl border border-border bg-surface-2 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="mono-label">Anti-duplicidade</p>
+                    <label className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={antiDup.auto}
+                        onChange={(e) => setAntiDup({ auto: e.target.checked })}
+                        className="accent-[var(--primary)]"
+                      />
+                      randomizar por vídeo
+                    </label>
+                  </div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {(
+                      [
+                        ["brightness", "brilho", 0.15],
+                        ["saturation", "saturação", 0.2],
+                        ["zoom", "zoom", 0.12],
+                        ["trim", "corte início/fim (s)", 1],
+                        ["noise", "ruído", 0.12],
+                      ] as const
+                    ).map(([key, label, max]) => (
+                      <label key={key} className="font-mono text-[11px] text-muted-foreground">
+                        {label} · {key === "trim" ? `${antiDup[key].toFixed(2)}s` : `${(antiDup[key] * 100).toFixed(0)}%`}
+                        <input
+                          type="range"
+                          min={0}
+                          max={max}
+                          step={max / 50}
+                          value={antiDup[key]}
+                          disabled={!antiDup.auto}
+                          onChange={(e) => setAntiDup({ [key]: Number(e.target.value) })}
+                          className="w-full accent-[var(--primary)]"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  {selected && (
+                    <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                      este vídeo: {describeVariation(variationOf(selected))}
+                    </p>
+                  )}
+                </div>
+
               </div>
+
             </section>
 
             <section className="panel flex max-h-[70vh] flex-col p-5">
