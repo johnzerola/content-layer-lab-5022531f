@@ -812,7 +812,7 @@ function Home() {
               Selecionar pasta
             </Button>
           </div>
-          <input ref={inputRef} type="file" accept="video/*" multiple hidden onChange={(e) => void addFiles(e.target.files)} />
+          <input ref={inputRef} type="file" accept={VIDEO_ACCEPT} multiple hidden onChange={(e) => void addFiles(e.target.files)} />
           <input
             ref={folderRef}
             type="file"
@@ -845,7 +845,7 @@ function Home() {
                 <ol className="mt-2 space-y-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
                   <li>1. baixe o vídeo pelo próprio app (Instagram/TikTok: salvar em vídeos) ou por um downloader</li>
                   <li>2. arraste o arquivo aqui em cima, ou use "Selecionar arquivos"</li>
-                  <li>3. links diretos terminados em .mp4 / .mov / .webm importam normalmente</li>
+                  <li>3. links diretos .mp4 / .mov / .webm / .mkv / .m3u8-não · importam normalmente</li>
                 </ol>
               </div>
             )}
