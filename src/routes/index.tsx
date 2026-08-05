@@ -176,6 +176,10 @@ function Home() {
 
   const [capLang, setCapLang] = useState("pt");
   const [capBusyId, setCapBusyId] = useState<string | null>(null);
+  // transcreve automaticamente no lote quando a legenda está ativa
+  const [autoCap, setAutoCap] = useState(true);
+  // as transcrições rodam em fila (uma por vez) mesmo com render paralelo
+  const capChain = useRef<Promise<unknown>>(Promise.resolve());
 
 
 
