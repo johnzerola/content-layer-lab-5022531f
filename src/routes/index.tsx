@@ -51,6 +51,9 @@ import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } fr
 import { registerFonts } from "@/lib/fonts";
 import { CaptionStudio } from "@/components/CaptionStudio";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
+import { canBrowserDecode, guessMime, isVideoFile, VIDEO_ACCEPT, VIDEO_EXT_RE } from "@/lib/media";
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 
 
 
