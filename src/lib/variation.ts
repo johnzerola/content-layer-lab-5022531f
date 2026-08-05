@@ -86,7 +86,25 @@ export function makeVariation(cfg: AntiDupConfig, seed: string): Variation {
     pitch: 0,
     eq: 0,
   };
-  if (!cfg.auto) return base;
+  // modo manual: os valores dos sliders são aplicados exatamente como estão
+  if (!cfg.auto) {
+    const tintM = 16;
+    return {
+      ...base,
+      brightness: 1 + cfg.brightness,
+      saturation: 1 + cfg.saturation,
+      zoom: 1 + cfg.zoom,
+      trimStart: Number(cfg.trim.toFixed(2)),
+      trimEnd: Number(cfg.trim.toFixed(2)),
+      noise: cfg.noise,
+      rotate: Number((cfg.rotate ?? 0).toFixed(2)),
+      border: Math.round(cfg.border ?? 0),
+      borderColor: `rgb(${tintM},${tintM},${tintM})`,
+      pitch: Math.round(cfg.pitch ?? 0),
+      eq: Number((cfg.eq ?? 0).toFixed(2)),
+    };
+  }
+
 
   const r = rng(seed);
   const spread = (amp: number) => (r() * 2 - 1) * amp;
