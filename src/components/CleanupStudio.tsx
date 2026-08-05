@@ -248,7 +248,7 @@ export function CleanupStudio({ regions, onChange, poster, aspect = 9 / 16 }: Pr
                       copiar pixels
                       <select
                         value={r.from ?? "top"}
-                        onChange={(e) => patch(r.id, { from: e.target.value as CleanupRegion["from"] })}
+                        onChange={(e) => patch(r.id, { from: e.target.value as NonNullable<CleanupRegion["from"]> })}
                         className="mt-1 w-full rounded border border-border bg-background px-2 py-1"
                       >
                         {FROM.map((f) => (
