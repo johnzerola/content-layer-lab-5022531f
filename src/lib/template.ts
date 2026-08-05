@@ -141,6 +141,52 @@ export const CAPTION_PRESETS: { id: string; label: string; style: Partial<Captio
       maxWords: 5, maxLines: 2, size: 56,
     },
   },
+  {
+    id: "typemono",
+    label: "Máquina Terminal",
+    style: {
+      font: "Courier New, monospace", weight: "700", color: "#c6f24e", activeColor: "#ffffff",
+      stroke: 0, bg: "box", boxColor: "#000000", uppercase: true, mode: "line",
+      anim: "typewriter", highlight: "color", maxWords: 6, maxLines: 2, size: 48,
+    },
+  },
+  {
+    id: "popcandy",
+    label: "Pop Candy",
+    style: {
+      font: "Arial Black, sans-serif", weight: "800", color: "#ffffff", activeColor: "#ff4fd8",
+      stroke: 14, strokeColor: "#1a0033", bg: "shadow", uppercase: true, mode: "karaoke",
+      anim: "pop", highlight: "scale", maxWords: 3, maxLines: 2, size: 78,
+    },
+  },
+  {
+    id: "slideup",
+    label: "Slide Cinema",
+    style: {
+      font: "Inter, sans-serif", weight: "700", color: "#f5f5f5", activeColor: "#ffcc00",
+      stroke: 4, strokeColor: "#000000", bg: "shadow", uppercase: false, mode: "line",
+      anim: "slide", highlight: "underline", highlightColor: "#ffcc00",
+      maxWords: 7, maxLines: 2, size: 50,
+    },
+  },
+  {
+    id: "wordbox",
+    label: "Highlight por Palavra",
+    style: {
+      font: "Arial Black, sans-serif", weight: "800", color: "#ffffff", activeColor: "#000000",
+      stroke: 8, strokeColor: "#000000", bg: "none", uppercase: true, mode: "karaoke",
+      anim: "pop", highlight: "box", highlightColor: "#00e5ff", maxWords: 4, maxLines: 2, size: 66,
+    },
+  },
+  {
+    id: "hormozi",
+    label: "Impacto Amarelo",
+    style: {
+      font: "Impact, sans-serif", weight: "800", color: "#ffffff", activeColor: "#ffd400",
+      stroke: 16, strokeColor: "#000000", bg: "shadow", uppercase: true, mode: "karaoke",
+      anim: "bounce", highlight: "scale", maxWords: 3, maxLines: 2, size: 84,
+    },
+  },
 ];
 
 
