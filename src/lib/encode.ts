@@ -10,12 +10,12 @@ export interface EncodeOptions {
   offsetX: number;
   offsetY: number;
   headline?: string | undefined;
-  fps?: number;
-  bitrate?: number;
+  fps?: number | undefined;
+  bitrate?: number | undefined;
   /** aceleração de leitura do vídeo fonte (1 = tempo real) */
-  turbo?: number;
-  onProgress?: (p: number) => void;
-  signal?: AbortSignal;
+  turbo?: number | undefined;
+  onProgress?: ((p: number) => void) | undefined;
+  signal?: AbortSignal | undefined;
 }
 
 type VideoWithRvfc = HTMLVideoElement & {

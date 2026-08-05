@@ -8,11 +8,11 @@ export interface RenderOptions {
   offsetX: number;
   offsetY: number;
   headline?: string | undefined;
-  fps?: number;
-  bitrate?: number;
-  turbo?: number;
-  onProgress?: (p: number) => void;
-  signal?: AbortSignal;
+  fps?: number | undefined;
+  bitrate?: number | undefined;
+  turbo?: number | undefined;
+  onProgress?: ((p: number) => void) | undefined;
+  signal?: AbortSignal | undefined;
 }
 
 function pickMime() {
