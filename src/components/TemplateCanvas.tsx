@@ -55,6 +55,7 @@ export function TemplateCanvas({
   onChange,
   interactive = true,
   poster,
+  previewFile,
 }: {
   template: Template;
   selected?: LayerId | null;
@@ -62,7 +63,10 @@ export function TemplateCanvas({
   onChange?: (t: Template) => void;
   interactive?: boolean;
   poster?: string | null;
+  previewFile?: File | null;
 }) {
+  const W = template.canvasW ?? CANVAS_W;
+  const H = template.canvasH ?? CANVAS_H;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const posterImg = useRef<HTMLImageElement | null>(null);
@@ -77,6 +81,27 @@ export function TemplateCanvas({
     img.src = poster;
   }, [poster]);
 
+  const videoEl = useRef<HTMLVideoElement | null>(null);
+  useEffect(() => {
+    if (!previewFile) {
+      videoEl.current = null;
+      return;
+    }
+    const url = URL.createObjectURL(previewFile);
+    const v = document.createElement("video");
+    v.src = url;
+    v.muted = true;
+    v.loop = true;
+    v.playsInline = true;
+    void v.play().catch(() => undefined);
+    videoEl.current = v;
+    return () => {
+      v.pause();
+      videoEl.current = null;
+      URL.revokeObjectURL(url);
+    };
+  }, [previewFile]);
+
   useEffect(() => {
     for (const src of [template.avatar.src, template.watermark.src]) {
       if (src) void preloadImage(src);
@@ -88,12 +113,14 @@ export function TemplateCanvas({
     const tick = () => {
       const ctx = canvasRef.current?.getContext("2d");
       if (ctx) {
+        const vid = videoEl.current;
         const p = posterImg.current;
-        drawFrame(
-          ctx,
-          template,
-          p ? { el: p, width: p.naturalWidth, height: p.naturalHeight } : null,
-        );
+        const source = vid && vid.videoWidth
+          ? { el: vid, width: vid.videoWidth, height: vid.videoHeight }
+          : p
+            ? { el: p, width: p.naturalWidth, height: p.naturalHeight }
+            : null;
+        drawFrame(ctx, template, source);
       }
       raf = requestAnimationFrame(tick);
     };
@@ -107,7 +134,7 @@ export function TemplateCanvas({
     e.stopPropagation();
     onSelect?.(id);
     const box = wrapRef.current!.getBoundingClientRect();
-    const scale = CANVAS_W / box.width;
+    const scale = W / box.width;
     const start = { mx: e.clientX, my: e.clientY, ...rectOf(template, id) };
     const move = (ev: PointerEvent) => {
       const dx = (ev.clientX - start.mx) * scale;
@@ -132,9 +159,9 @@ export function TemplateCanvas({
     <div
       ref={wrapRef}
       className="relative mx-auto w-full max-w-[320px] overflow-hidden rounded-2xl border border-border bg-black"
-      style={{ aspectRatio: `${CANVAS_W}/${CANVAS_H}` }}
+      style={{ aspectRatio: `${W}/${H}` }}
     >
-      <canvas ref={canvasRef} width={CANVAS_W} height={CANVAS_H} className="block h-full w-full" />
+      <canvas ref={canvasRef} width={W} height={H} className="block h-full w-full" />
       {interactive &&
         ORDER.filter((id) => isVisible(template, id)).map((id) => {
           const r = rectOf(template, id);
@@ -145,10 +172,10 @@ export function TemplateCanvas({
               onPointerDown={drag(id, "move")}
               className={`absolute cursor-move ${sel ? "border-2 border-primary" : "border border-transparent hover:border-primary/40"}`}
               style={{
-                left: `${(r.x / CANVAS_W) * 100}%`,
-                top: `${(r.y / CANVAS_H) * 100}%`,
-                width: `${(r.w / CANVAS_W) * 100}%`,
-                height: `${(r.h / CANVAS_H) * 100}%`,
+                left: `${(r.x / W) * 100}%`,
+                top: `${(r.y / H) * 100}%`,
+                width: `${(r.w / W) * 100}%`,
+                height: `${(r.h / H) * 100}%`,
               }}
             >
               {sel && (
