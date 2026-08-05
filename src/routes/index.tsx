@@ -649,6 +649,8 @@ function Home() {
 
   return (
     <main className="min-h-screen">
+      <Toaster />
+
       <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3">
           <div className="flex items-center gap-3">
