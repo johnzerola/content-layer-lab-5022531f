@@ -153,6 +153,11 @@ function Home() {
   const [zipping, setZipping] = useState(false);
   const [concurrency, setConcurrency] = useState(2);
   const [bitrate, setBitrate] = useState(10);
+  const [autoBitrate, setAutoBitrate] = useState(true);
+  const [platforms, setPlatforms] = useState<string[]>(["reels"]);
+  const togglePlatform = (id: string) =>
+    setPlatforms((p) => (p.includes(id) ? (p.length > 1 ? p.filter((x) => x !== id) : p) : [...p, id]));
+
   const [smartFrame, setSmartFrame] = useState(true);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkBusy, setLinkBusy] = useState(false);
