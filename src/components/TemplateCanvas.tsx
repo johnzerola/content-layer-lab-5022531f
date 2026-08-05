@@ -122,13 +122,13 @@ export function TemplateCanvas({
           : p
             ? { el: p, width: p.naturalWidth, height: p.naturalHeight }
             : null;
-        drawFrame(ctx, template, source);
+        drawFrame(ctx, template, source, drawOpts);
       }
       raf = requestAnimationFrame(tick);
     };
     tick();
     return () => cancelAnimationFrame(raf);
-  }, [template]);
+  }, [template, drawOpts]);
 
   const drag = (id: LayerId, mode: "move" | "resize") => (e: React.PointerEvent) => {
     if (!interactive || !onChange) return;
