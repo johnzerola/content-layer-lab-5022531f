@@ -1252,15 +1252,31 @@ function Home() {
                       <span
                         role="button"
                         tabIndex={0}
+                        title={
+                          (it.outputs?.length ?? 1) > 1 ? `baixar ${it.outputs!.length} variações` : "baixar"
+                        }
                         onClick={(e) => {
                           e.stopPropagation();
-                          downloadBlob(it.blob!, `${it.file.name.replace(/\.\w+$/, "")}-vv.${it.ext}`);
+                          const base = it.file.name.replace(/\.\w+$/, "");
+                          const outs = it.outputs ?? [{ blob: it.blob!, ext: it.ext ?? "mp4", label: "" }];
+                          outs.forEach((o, k) =>
+                            setTimeout(
+                              () => downloadBlob(o.blob, `${base}-vv${o.label ? `-${o.label}` : ""}.${o.ext}`),
+                              k * 250,
+                            ),
+                          );
                         }}
-                        className="rounded-md border border-border p-1.5 hover:border-primary"
+                        className="relative rounded-md border border-border p-1.5 hover:border-primary"
                       >
                         <Download className="size-3.5" />
+                        {(it.outputs?.length ?? 1) > 1 && (
+                          <span className="absolute -right-1 -top-1 rounded-full bg-primary px-1 font-mono text-[9px] text-primary-foreground">
+                            {it.outputs!.length}
+                          </span>
+                        )}
                       </span>
                     )}
+
                     <span
                       role="button"
                       tabIndex={0}
