@@ -392,6 +392,8 @@ export function ClipStudio(props: Props) {
   const [advanced, setAdvanced] = useState(false);
   const [picked, setPicked] = useState<string[]>([]);
   const [sourceId, setSourceId] = useState<string | null>(null);
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
 
   const source = sources.find((s) => s.id === sourceId) ?? sources[0] ?? null;
   const validPicked = picked.filter((id) => clips.some((c) => c.id === id));
