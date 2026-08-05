@@ -29,7 +29,9 @@ import { ClipStudio } from "@/components/ClipStudio";
 
 import {
   applyRatio,
+  CAPTION_PRESETS,
   commitTemplate,
+
   createTemplate,
   defaultCaptions,
   loadTemplates,
