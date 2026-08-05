@@ -6,7 +6,7 @@ export interface RenderOptions {
   speed: number;
   offsetX: number;
   offsetY: number;
-  headline?: string;
+  headline?: string | undefined;
   onProgress?: (p: number) => void;
 }
 
