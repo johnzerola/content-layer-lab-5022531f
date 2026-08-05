@@ -1087,6 +1087,23 @@ function Home() {
                         onChange={(cleanup) => setActive((t) => ({ ...t, cleanup }))}
                         poster={selected.poster ?? undefined}
                         aspect={active.video.w / active.video.h}
+                        onDetect={() => void runDetect()}
+                        detecting={detecting}
+                        detectMsg={detectMsg}
+                        suggestions={suggestions}
+                        onUseSuggestion={(r) => {
+                          setActive((t) => ({ ...t, cleanup: [...(t.cleanup ?? []), r] }));
+                          setSuggestions((s) => s.filter((x) => x.id !== r.id));
+                        }}
+                        onUseAllSuggestions={() => {
+                          setActive((t) => ({ ...t, cleanup: [...(t.cleanup ?? []), ...suggestions] }));
+                          setSuggestions([]);
+                          setDetectMsg(undefined);
+                        }}
+                        onClearSuggestions={() => {
+                          setSuggestions([]);
+                          setDetectMsg(undefined);
+                        }}
                       />
                     </div>
                   </div>
