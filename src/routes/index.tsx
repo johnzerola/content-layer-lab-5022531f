@@ -995,7 +995,16 @@ function Home() {
                         <Repeat className="size-3" /> restaurar auto
                       </button>
                     </div>
+                    <div className="mt-3 border-t border-border pt-3">
+                      <CleanupStudio
+                        regions={active.cleanup ?? []}
+                        onChange={(cleanup) => setActive((t) => ({ ...t, cleanup }))}
+                        poster={selected.poster}
+                        aspect={active.video.w / active.video.h}
+                      />
+                    </div>
                   </div>
+
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <p className="mono-label">Preview final</p>
