@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Upload,
   Link as LinkIcon,
@@ -321,6 +321,29 @@ function Home() {
       ),
     [active],
   );
+
+  // reflete a anti-duplicidade no preview em tempo real
+  const previewVariation = selected ? variationOf(selected) : null;
+  const previewDrawOpts = useMemo(
+    () =>
+      previewVariation
+        ? {
+            mirror: previewVariation.mirror,
+            brightness: previewVariation.brightness,
+            saturation: previewVariation.saturation,
+            zoom: previewVariation.zoom,
+            noise: previewVariation.noise,
+          }
+        : undefined,
+    [
+      previewVariation?.mirror,
+      previewVariation?.brightness,
+      previewVariation?.saturation,
+      previewVariation?.zoom,
+      previewVariation?.noise,
+    ],
+  );
+
 
   const processAll = async (onlyIds?: string[]) => {
     const ctrl = ctrlRef.current;
@@ -734,7 +757,14 @@ function Home() {
                   </div>
                   <div className="space-y-2">
                     <p className="mono-label">Preview final</p>
-                    <TemplateCanvas template={previewTemplate} interactive={false} poster={selected.poster} previewFile={selected.file} />
+                    <TemplateCanvas
+                      template={previewTemplate}
+                      interactive={false}
+                      poster={selected.poster}
+                      previewFile={selected.file}
+                      drawOpts={previewDrawOpts}
+                    />
+
                   </div>
                 </div>
               ) : (

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CANVAS_H, CANVAS_W, LAYER_LABELS, type LayerId, type Template } from "@/lib/template";
-import { drawFrame, preloadImage } from "@/lib/draw";
+import { drawFrame, preloadImage, type DrawOpts } from "@/lib/draw";
 
 type Rect = { x: number; y: number; w: number; h: number };
 
@@ -56,6 +56,7 @@ export function TemplateCanvas({
   interactive = true,
   poster,
   previewFile,
+  drawOpts,
 }: {
   template: Template;
   selected?: LayerId | null;
@@ -64,6 +65,7 @@ export function TemplateCanvas({
   interactive?: boolean;
   poster?: string | null;
   previewFile?: File | null;
+  drawOpts?: DrawOpts | undefined;
 }) {
   const W = template.canvasW ?? CANVAS_W;
   const H = template.canvasH ?? CANVAS_H;
@@ -120,13 +122,13 @@ export function TemplateCanvas({
           : p
             ? { el: p, width: p.naturalWidth, height: p.naturalHeight }
             : null;
-        drawFrame(ctx, template, source);
+        drawFrame(ctx, template, source, drawOpts);
       }
       raf = requestAnimationFrame(tick);
     };
     tick();
     return () => cancelAnimationFrame(raf);
-  }, [template]);
+  }, [template, drawOpts]);
 
   const drag = (id: LayerId, mode: "move" | "resize") => (e: React.PointerEvent) => {
     if (!interactive || !onChange) return;
