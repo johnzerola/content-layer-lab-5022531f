@@ -178,8 +178,13 @@ function Home() {
           <div>
             <p className="mono-label">Template ativo</p>
             <p className="text-lg font-semibold">{active.name}</p>
+            <p className="font-mono text-[11px] text-muted-foreground">
+              v{active.version ?? 1}
+              {templates.some((t) => t.id === active.id) ? "" : " · não salvo"}
+              {savedFlash && <span className="ml-2 text-primary">● salvo</span>}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {templates.length > 0 && (
               <select
                 className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm"
@@ -194,7 +199,7 @@ function Home() {
                 </option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
-                    {t.name}
+                    {t.name} · v{t.version ?? 1}
                   </option>
                 ))}
               </select>
@@ -202,11 +207,18 @@ function Home() {
             <Button variant="outline" onClick={() => setActive(createTemplate("Novo template"))}>
               Novo
             </Button>
+            <Button variant="outline" onClick={() => setLibraryOpen(true)}>
+              <Library className="size-4" /> Biblioteca
+            </Button>
+            <Button variant="outline" onClick={() => commit(active, "salvo manualmente")}>
+              <Save className="size-4" /> Salvar versão
+            </Button>
             <Button onClick={() => setEditing(true)}>
               <Pencil className="size-4" /> Editar template
             </Button>
           </div>
         </section>
+
 
         <section
           onDragOver={(e) => e.preventDefault()}
