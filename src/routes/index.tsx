@@ -894,9 +894,22 @@ function Home() {
                       poster={selected.poster}
                       previewFile={selected.file}
                       drawOpts={previewDrawOpts}
+                      speed={previewVariation?.speed ?? 1}
+                      trimStart={previewVariation?.trimStart ?? 0}
+                      trimEnd={previewVariation?.trimEnd ?? 0}
                     />
-
+                    {previewVariation && (
+                      <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+                        {describeVariation(previewVariation)}
+                        {previewCues?.length
+                          ? selected.captions?.length
+                            ? " · legendas reais"
+                            : " · legenda de exemplo (gere a transcrição)"
+                          : ""}
+                      </p>
+                    )}
                   </div>
+
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">Selecione um vídeo na lista.</p>
