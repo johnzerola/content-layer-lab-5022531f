@@ -11,6 +11,7 @@ export interface RenderOptions {
   fps?: number | undefined;
   bitrate?: number | undefined;
   turbo?: number | undefined;
+  clip?: { start: number; end: number } | undefined;
   onProgress?: ((p: number) => void) | undefined;
   signal?: AbortSignal | undefined;
 }
@@ -76,7 +77,9 @@ async function recordVideo(
     recorder.onstop = () => resolve(new Blob(chunks, { type: mimeType }));
   });
 
-  const endAt = Math.max(0.2, video.duration - v.trimEnd);
+  const clipStart = Math.max(0, Math.min(opts.clip?.start ?? 0, Math.max(0, video.duration - 0.5)));
+  const clipEnd = Math.min(video.duration, opts.clip?.end ?? video.duration);
+  const endAt = Math.max(clipStart + 0.2, clipEnd - v.trimEnd);
   let raf = 0;
   const loop = () => {
     drawFrame(ctx, tpl, { el: video, width: video.videoWidth, height: video.videoHeight }, {
@@ -93,7 +96,7 @@ async function recordVideo(
     raf = requestAnimationFrame(loop);
   };
 
-  video.currentTime = v.trimStart;
+  video.currentTime = clipStart + v.trimStart;
   recorder.start(1000);
   await video.play();
   loop();
@@ -132,6 +135,7 @@ export async function renderVideo(
         fps: opts.fps ?? 30,
         bitrate: opts.bitrate ?? 10_000_000,
         turbo: opts.turbo ?? 4,
+        clip: opts.clip,
         onProgress: opts.onProgress,
         signal: opts.signal,
       });
