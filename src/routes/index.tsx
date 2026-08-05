@@ -253,7 +253,16 @@ function Home() {
       if (clipBusy) return;
       setClipBusy(true);
       try {
-        const clips = await findClips(item.file, { target: clipLen, max: clipMax });
+        const clips = await findClips(item.file, {
+          minLen: Math.min(clipMinLen, clipMaxLen),
+          maxLen: Math.max(clipMinLen, clipMaxLen),
+          max: clipMax,
+          minScore: clipMinScore,
+        });
+        if (!clips.length) {
+          setLinkMsg("nenhum trecho atingiu o score mínimo — reduza a intensidade do score");
+          return;
+        }
         const created: Item[] = clips.map((c) => ({
           id: crypto.randomUUID(),
           file: item.file,
