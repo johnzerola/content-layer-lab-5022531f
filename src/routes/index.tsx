@@ -521,6 +521,45 @@ function Home() {
           const outputs: { blob: Blob; ext: string; label: string }[] = [];
           let step = 0;
           const baseTpl = modeRef.current === "clip" ? stripBranding(active) : active;
+
+          // transcreve na hora do processamento, para queimar a legenda no vídeo
+          let cues = item.captions;
+          const wantCaptions = (active.captions ?? defaultCaptions()).visible;
+          if (autoCap && wantCaptions && !cues?.length) {
+            const run = capChain.current.then(async () => {
+              if (ctrl.cancelled || ac.signal.aborted) return undefined;
+              setItems((p) =>
+                p.map((x) => (x.id === id ? { ...x, capStatus: "transcrevendo…", capError: false } : x)),
+              );
+              return generateCaptions(item.file, {
+                clip: item.clip,
+                language: capLang || undefined,
+                onProgress: ({ done, total: t }) =>
+                  setItems((p) =>
+                    p.map((x) => (x.id === id ? { ...x, capStatus: `transcrevendo ${done}/${t}` } : x)),
+                  ),
+              });
+            });
+            capChain.current = run.catch(() => undefined);
+            try {
+              const got = await run;
+              if (got?.length) {
+                cues = got;
+                setItems((p) =>
+                  p.map((x) =>
+                    x.id === id
+                      ? { ...x, captions: got, capError: false, capStatus: `${got.length} blocos` }
+                      : x,
+                  ),
+                );
+              }
+            } catch (err) {
+              // sem legenda o vídeo ainda é exportado normalmente
+              const msg = String((err as Error)?.message ?? err);
+              setItems((p) => p.map((x) => (x.id === id ? { ...x, capStatus: msg, capError: true } : x)));
+            }
+          }
+
           for (const plat of outs) {
             // cada plataforma recebe a resolução/fps/bitrate recomendados
             const tpl = applyRatio(baseTpl, plat.w, plat.h);
