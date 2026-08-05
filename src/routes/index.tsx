@@ -51,11 +51,24 @@ function Home() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
   const [editing, setEditing] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
   const [items, setItems] = useState<Item[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
+
+  const commit = useCallback((t: Template, note?: string) => {
+    setTemplates((list) => {
+      const res = commitTemplate(list, t, note);
+      setActive(res.template);
+      return res.list;
+    });
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 1800);
+  }, []);
+
 
   useEffect(() => {
     const list = loadTemplates();
