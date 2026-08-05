@@ -51,6 +51,9 @@ import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } fr
 import { registerFonts } from "@/lib/fonts";
 import { CaptionStudio } from "@/components/CaptionStudio";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
+import { canBrowserDecode, guessMime, isVideoFile, VIDEO_ACCEPT, VIDEO_EXT_RE } from "@/lib/media";
+import { toast } from "sonner";
+import { Toaster } from "@/components/ui/sonner";
 
 
 
@@ -209,8 +212,17 @@ function Home() {
 
 
   const addVideos = useCallback(async (list: File[]) => {
-    const vids = list.filter((f) => f.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(f.name));
+    const vids = list.filter(isVideoFile);
+    const ignored = list.length - vids.length;
+    if (ignored > 0) toast.warning(`${ignored} arquivo(s) ignorado(s): não são vídeos.`);
+    const undecodable = vids.filter((f) => !canBrowserDecode(f));
+    if (undecodable.length) {
+      toast.warning(
+        `${undecodable.length} arquivo(s) em formato que o navegador pode não decodificar (ex: .avi, .mkv, .wmv). Se o preview ficar preto, converta para MP4/MOV/WebM.`,
+      );
+    }
     const created: Item[] = vids.map((file) => ({
+
       id: crypto.randomUUID(),
       file,
       poster: null,
@@ -272,10 +284,13 @@ function Home() {
         return;
       }
       const blob = await dl.blob();
+      const urlExt = new URL(res.videoUrl).pathname.match(VIDEO_EXT_RE)?.[1]?.toLowerCase() ?? "mp4";
       const base =
-        (res.title ?? "video").replace(/\.(mp4|mov|webm|m4v)$/i, "").replace(/[^\w\-. ]+/g, "").trim().slice(0, 60) ||
+        (res.title ?? "video").replace(VIDEO_EXT_RE, "").replace(/[^\w\-. ]+/g, "").trim().slice(0, 60) ||
         "video";
-      const file = new File([blob], `${base}.mp4`, { type: blob.type || "video/mp4" });
+      const name = `${base}.${urlExt}`;
+      const file = new File([blob], name, { type: blob.type || guessMime(name) });
+
       await addVideos([file]);
       setLinkMsg(`importado: ${file.name} (${(file.size / 1e6).toFixed(1)} MB)`);
       setLinkUrl("");
@@ -634,6 +649,8 @@ function Home() {
 
   return (
     <main className="min-h-screen">
+      <Toaster />
+
       <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3">
           <div className="flex items-center gap-3">
@@ -797,7 +814,7 @@ function Home() {
               Selecionar pasta
             </Button>
           </div>
-          <input ref={inputRef} type="file" accept="video/*" multiple hidden onChange={(e) => void addFiles(e.target.files)} />
+          <input ref={inputRef} type="file" accept={VIDEO_ACCEPT} multiple hidden onChange={(e) => void addFiles(e.target.files)} />
           <input
             ref={folderRef}
             type="file"
@@ -830,7 +847,7 @@ function Home() {
                 <ol className="mt-2 space-y-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
                   <li>1. baixe o vídeo pelo próprio app (Instagram/TikTok: salvar em vídeos) ou por um downloader</li>
                   <li>2. arraste o arquivo aqui em cima, ou use "Selecionar arquivos"</li>
-                  <li>3. links diretos terminados em .mp4 / .mov / .webm importam normalmente</li>
+                  <li>3. links diretos de arquivo (.mp4, .mov, .webm, .mkv, .m4v...) importam normalmente</li>
                 </ol>
               </div>
             )}
