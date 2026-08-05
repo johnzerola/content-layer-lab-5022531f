@@ -384,8 +384,10 @@ function Home() {
     [active],
   );
 
-  // reflete a anti-duplicidade no preview em tempo real
-  const previewVariation = selected ? variationOf(selected) : null;
+  // reflete a anti-duplicidade no preview em tempo real (mesma seed usada na exportação)
+  const variantIdx = Math.min(previewVariant, Math.max(0, variants - 1));
+  const previewVariation = selected ? variationOf(selected, variantIdx) : null;
+
   const capStyle = active.captions ?? defaultCaptions();
 
   // sem transcrição ainda? mostra legenda de exemplo pra ver o estilo na prévia
