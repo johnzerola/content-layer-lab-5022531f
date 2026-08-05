@@ -46,6 +46,7 @@ import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
 import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } from "@/lib/captions";
 import { registerFonts } from "@/lib/fonts";
 import { CaptionStudio } from "@/components/CaptionStudio";
+import { CaptionTimeline } from "@/components/CaptionTimeline";
 
 
 
