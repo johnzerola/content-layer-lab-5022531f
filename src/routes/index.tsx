@@ -1,12 +1,39 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Upload, X, Play, Download, Pencil, Repeat, Library, Save } from "lucide-react";
+import {
+  Upload,
+  X,
+  Play,
+  Download,
+  Pencil,
+  Repeat,
+  Library,
+  Save,
+  Pause,
+  StopCircle,
+  RotateCcw,
+  FolderDown,
+  FileArchive,
+  Sparkles,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
 import { TemplateEditor } from "@/components/TemplateEditor";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
-import { commitTemplate, createTemplate, loadTemplates, type Template } from "@/lib/template";
+import {
+  applyRatio,
+  commitTemplate,
+  createTemplate,
+  loadTemplates,
+  RATIO_PRESETS,
+  type Template,
+} from "@/lib/template";
 import { downloadBlob, grabPoster, renderVideo } from "@/lib/render";
+import { webCodecsSupported } from "@/lib/encode";
+import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
+import { autoFrame } from "@/lib/autoframe";
+import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
