@@ -171,6 +171,9 @@ export function inpaintTelea(
       (inb(x, y + 1) ? T[(y + 1) * W + x]! : T[y * W + x]!) -
       (inb(x, y - 1) ? T[(y - 1) * W + x]! : T[y * W + x]!);
 
+    const gn = Math.hypot(gx, gy) || 1;
+    const gnx = gx / gn;
+    const gny = gy / gn;
     let wr = 0;
     let sr = 0;
     let sg = 0;
@@ -186,8 +189,9 @@ export function inpaintTelea(
         const d2 = dx * dx + dy * dy;
         if (d2 > eps * eps || d2 === 0) continue;
         const dist = Math.sqrt(d2);
-        // peso direcional: privilegia pixels na direção da isófota (preserva bordas)
-        const dir = Math.abs((-dy * gx + dx * gy) / dist) + 1e-3;
+        // peso direcional (Telea): privilegia pixels alinhados ao gradiente de T,
+        // que é a direção normal à frente — é o que preserva bordas sem borrar
+        const dir = Math.abs((-dx * gnx + -dy * gny) / dist) + 1e-3;
         const geo = 1 / (d2 + 1);
         const lev = 1 / (1 + Math.abs(T[ni]! - T[y * W + x]!));
         const w = dir * geo * lev;
