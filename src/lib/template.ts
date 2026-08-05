@@ -229,8 +229,8 @@ export function makeCleanupRegion(p: Partial<CleanupRegion> = {}): CleanupRegion
     y: 0.78,
     w: 0.8,
     h: 0.12,
-    mode: "smear",
-    strength: 55,
+    mode: "inpaint",
+    strength: 60,
     color: "#000000",
     from: "top",
     enabled: true,
@@ -243,27 +243,27 @@ export const CLEANUP_PRESETS: { id: string; label: string; region: Partial<Clean
   {
     id: "cap-bottom",
     label: "Legenda embaixo",
-    region: { label: "Legenda embaixo", x: 0.05, y: 0.74, w: 0.9, h: 0.14, mode: "smear", from: "top" },
+    region: { label: "Legenda embaixo", x: 0.05, y: 0.74, w: 0.9, h: 0.14, mode: "inpaint", from: "top" },
   },
   {
     id: "cap-center",
     label: "Legenda no meio",
-    region: { label: "Legenda no meio", x: 0.05, y: 0.44, w: 0.9, h: 0.14, mode: "blur", strength: 60 },
+    region: { label: "Legenda no meio", x: 0.05, y: 0.44, w: 0.9, h: 0.14, mode: "inpaint", strength: 60 },
   },
   {
     id: "tt-wm",
     label: "Marca d'água TikTok",
-    region: { label: "Marca d'água TikTok", x: 0.62, y: 0.08, w: 0.34, h: 0.09, mode: "smear", from: "left" },
+    region: { label: "Marca d'água TikTok", x: 0.62, y: 0.08, w: 0.34, h: 0.09, mode: "inpaint", from: "left" },
   },
   {
     id: "tt-user",
     label: "@usuário TikTok",
-    region: { label: "@usuário TikTok", x: 0.04, y: 0.86, w: 0.6, h: 0.07, mode: "smear", from: "top" },
+    region: { label: "@usuário TikTok", x: 0.04, y: 0.86, w: 0.6, h: 0.07, mode: "inpaint", from: "top" },
   },
   {
     id: "top-text",
     label: "Texto no topo",
-    region: { label: "Texto no topo", x: 0.05, y: 0.06, w: 0.9, h: 0.14, mode: "smear", from: "bottom" },
+    region: { label: "Texto no topo", x: 0.05, y: 0.06, w: 0.9, h: 0.14, mode: "inpaint", from: "bottom" },
   },
   {
     id: "corner-logo",
