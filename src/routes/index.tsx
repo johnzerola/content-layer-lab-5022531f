@@ -496,28 +496,40 @@ function Home() {
         setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)));
         try {
           const n = Math.max(1, variants);
+          const targets = PLATFORM_PRESETS.filter((p) => platforms.includes(p.id));
+          const outs = targets.length ? targets : [PLATFORM_PRESETS[0]!];
+          const total = n * outs.length;
           const outputs: { blob: Blob; ext: string; label: string }[] = [];
-          for (let k = 0; k < n; k++) {
-            const { blob, ext } = await renderVideo(
-              item.file,
-              modeRef.current === "clip" ? stripBranding(active) : active,
-              {
+          let step = 0;
+          const baseTpl = modeRef.current === "clip" ? stripBranding(active) : active;
+          for (const plat of outs) {
+            // cada plataforma recebe a resolução/fps/bitrate recomendados
+            const tpl = applyRatio(baseTpl, plat.w, plat.h);
+            for (let k = 0; k < n; k++) {
+              const at = step;
+              const { blob, ext } = await renderVideo(item.file, tpl, {
                 variation: variationOf(item, k),
                 offsetX: item.offsetX,
                 offsetY: item.offsetY,
                 headline: item.headline || undefined,
-                bitrate: bitrate * 1_000_000,
+                fps: plat.fps,
+                bitrate: (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
                 clip: item.clip,
                 captions: item.captions,
                 signal: ac.signal,
                 onProgress: (p) =>
                   setItems((prev) =>
-                    prev.map((x) => (x.id === id ? { ...x, progress: (k + p) / n } : x)),
+                    prev.map((x) => (x.id === id ? { ...x, progress: (at + p) / total } : x)),
                   ),
-              },
-            );
-            outputs.push({ blob, ext, label: n > 1 ? `v${k + 1}` : "" });
+              });
+              const label = [outs.length > 1 ? plat.short : "", n > 1 ? `v${k + 1}` : ""]
+                .filter(Boolean)
+                .join("-");
+              outputs.push({ blob, ext, label });
+              step++;
+            }
           }
+
           doneCount.current++;
           const first = outputs[0]!;
           setItems((p) =>
