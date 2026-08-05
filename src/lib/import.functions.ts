@@ -106,15 +106,16 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
 
     const candidates = [
       pickMeta(html, ["og:video:secure_url", "og:video:url", "og:video", "twitter:player:stream"]),
-      html.match(/<video[^>]+src=["']([^"']+\.(?:mp4|webm|mov)[^"']*)["']/i)?.[1],
-      html.match(/<source[^>]+src=["']([^"']+\.(?:mp4|webm|mov)[^"']*)["']/i)?.[1],
+      html.match(/<video[^>]+src=["']([^"']+\.(?:mp4|m4v|webm|mov|mkv|ogv|3gp|avi|mpeg|mpg|ts)[^"']*)["']/i)?.[1],
+      html.match(/<source[^>]+src=["']([^"']+\.(?:mp4|m4v|webm|mov|mkv|ogv|3gp|avi|mpeg|mpg|ts)[^"']*)["']/i)?.[1],
       html.match(/"(?:contentUrl|video_url|playAddr|downloadAddr)"\s*:\s*"([^"]+)"/i)?.[1],
-      html.match(/https?:\\?\/\\?\/[^"'\s]+\.mp4[^"'\s]*/i)?.[0],
+      html.match(/https?:\\?\/\\?\/[^"'\s]+\.(?:mp4|m4v|webm|mov|mkv)[^"'\s]*/i)?.[0],
     ].filter(Boolean) as string[];
 
     const isPlayerPage = (u: URL) =>
       /\/embed\/|\/player|youtube\.com|youtu\.be|player\.vimeo\.com/.test(u.host + u.pathname) &&
-      !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(u.pathname + u.search);
+      !/\.(mp4|m4v|mov|webm|mkv|ogv|3gp|avi|mpeg|mpg|ts)(\?|$)/i.test(u.pathname + u.search);
+
 
     for (const raw of candidates) {
       const cleaned = raw.replace(/\\u0026/g, "&").replace(/\\\//g, "/").replace(/&amp;/g, "&");
