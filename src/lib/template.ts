@@ -158,10 +158,48 @@ export function createTemplate(name = "Novo template"): Template {
       align: "center",
       color: "#c9cdd2",
     }),
+    extras: [],
     mirror: false,
     speed: 1,
+    canvasW: CANVAS_W,
+    canvasH: CANVAS_H,
+    antiDup: defaultAntiDup(),
   };
 }
+
+export const RATIO_PRESETS = [
+  { id: "9:16", label: "9:16 · Reels/TikTok/Shorts", w: 1080, h: 1920 },
+  { id: "4:5", label: "4:5 · Feed vertical", w: 1080, h: 1350 },
+  { id: "1:1", label: "1:1 · Quadrado", w: 1080, h: 1080 },
+] as const;
+
+/** Troca a proporção reescalando todas as camadas proporcionalmente. */
+export function applyRatio(t: Template, w: number, h: number): Template {
+  const fx = w / (t.canvasW ?? CANVAS_W);
+  const fy = h / (t.canvasH ?? CANVAS_H);
+  const box = <T extends BoxLayer>(l: T): T => ({
+    ...l,
+    x: Math.round(l.x * fx),
+    y: Math.round(l.y * fy),
+    w: Math.round(l.w * fx),
+    h: Math.round(l.h * fy),
+    ...("size" in l ? { size: Math.round((l as unknown as TextLayer).size * fx) } : {}),
+  });
+  return {
+    ...t,
+    canvasW: w,
+    canvasH: h,
+    video: box(t.video),
+    watermark: box(t.watermark),
+    avatar: box(t.avatar),
+    name_: box(t.name_),
+    handle: box(t.handle),
+    headline: box(t.headline),
+    cta: box(t.cta),
+    extras: (t.extras ?? []).map(box),
+  };
+}
+
 
 export const LAYER_LABELS: Record<LayerId, string> = {
   video: "Vídeo",
