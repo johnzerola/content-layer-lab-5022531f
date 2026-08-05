@@ -56,7 +56,7 @@ export const Route = createFileRoute("/")({
   component: Home,
 });
 
-type Status = "pendente" | "processando" | "pronto" | "erro";
+type Status = "pendente" | "na fila" | "processando" | "pronto" | "erro";
 
 interface Item {
   id: string;
@@ -68,10 +68,18 @@ interface Item {
   headline: string;
   offsetX: number;
   offsetY: number;
+  autoFrameSource?: string | undefined;
   status: Status;
   progress: number;
-  blob?: Blob;
-  ext?: string;
+  blob?: Blob | undefined;
+  ext?: string | undefined;
+  error?: string | undefined;
+}
+
+interface QueueCtrl {
+  paused: boolean;
+  cancelled: boolean;
+  aborts: Map<string, AbortController>;
 }
 
 function Home() {
@@ -83,8 +91,21 @@ function Home() {
   const [items, setItems] = useState<Item[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [zipping, setZipping] = useState(false);
+  const [concurrency, setConcurrency] = useState(2);
+  const [bitrate, setBitrate] = useState(10);
+  const [smartFrame, setSmartFrame] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
+  const ctrlRef = useRef<QueueCtrl>({ paused: false, cancelled: false, aborts: new Map() });
+  const itemsRef = useRef<Item[]>([]);
+  const startedAt = useRef(0);
+  const doneCount = useRef(0);
+  const smartRef = useRef(smartFrame);
+
+  itemsRef.current = items;
+  smartRef.current = smartFrame;
 
   const commit = useCallback((t: Template, note?: string) => {
     setTemplates((list) => {
@@ -127,11 +148,20 @@ function Home() {
         setItems((prev) =>
           prev.map((p) => (p.id === it.id ? { ...p, poster: meta.url, w: meta.w, h: meta.h, duration: meta.duration } : p)),
         );
+        if (smartRef.current) {
+          const af = await autoFrame(it.file);
+          setItems((prev) =>
+            prev.map((p) =>
+              p.id === it.id ? { ...p, offsetX: af.offsetX, offsetY: af.offsetY, autoFrameSource: af.source } : p,
+            ),
+          );
+        }
       } catch {
         setItems((prev) => prev.map((p) => (p.id === it.id ? { ...p, status: "erro" } : p)));
       }
     }
   }, []);
+
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
