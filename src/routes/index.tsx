@@ -158,6 +158,8 @@ function Home() {
   const [clipMax, setClipMax] = useState(6);
   const [clipMinScore, setClipMinScore] = useState(60);
   const [variants, setVariants] = useState(1);
+  const [previewVariant, setPreviewVariant] = useState(0);
+
   const [capLang, setCapLang] = useState("pt");
   const [capBusyId, setCapBusyId] = useState<string | null>(null);
 
