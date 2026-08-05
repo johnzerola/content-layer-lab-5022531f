@@ -176,6 +176,10 @@ function Home() {
 
   const [capLang, setCapLang] = useState("pt");
   const [capBusyId, setCapBusyId] = useState<string | null>(null);
+  // transcreve automaticamente no lote quando a legenda está ativa
+  const [autoCap, setAutoCap] = useState(true);
+  // as transcrições rodam em fila (uma por vez) mesmo com render paralelo
+  const capChain = useRef<Promise<unknown>>(Promise.resolve());
 
 
 
@@ -517,6 +521,45 @@ function Home() {
           const outputs: { blob: Blob; ext: string; label: string }[] = [];
           let step = 0;
           const baseTpl = modeRef.current === "clip" ? stripBranding(active) : active;
+
+          // transcreve na hora do processamento, para queimar a legenda no vídeo
+          let cues = item.captions;
+          const wantCaptions = (active.captions ?? defaultCaptions()).visible;
+          if (autoCap && wantCaptions && !cues?.length) {
+            const run = capChain.current.then(async () => {
+              if (ctrl.cancelled || ac.signal.aborted) return undefined;
+              setItems((p) =>
+                p.map((x) => (x.id === id ? { ...x, capStatus: "transcrevendo…", capError: false } : x)),
+              );
+              return generateCaptions(item.file, {
+                clip: item.clip,
+                language: capLang || undefined,
+                onProgress: ({ done, total: t }) =>
+                  setItems((p) =>
+                    p.map((x) => (x.id === id ? { ...x, capStatus: `transcrevendo ${done}/${t}` } : x)),
+                  ),
+              });
+            });
+            capChain.current = run.catch(() => undefined);
+            try {
+              const got = await run;
+              if (got?.length) {
+                cues = got;
+                setItems((p) =>
+                  p.map((x) =>
+                    x.id === id
+                      ? { ...x, captions: got, capError: false, capStatus: `${got.length} blocos` }
+                      : x,
+                  ),
+                );
+              }
+            } catch (err) {
+              // sem legenda o vídeo ainda é exportado normalmente
+              const msg = String((err as Error)?.message ?? err);
+              setItems((p) => p.map((x) => (x.id === id ? { ...x, capStatus: msg, capError: true } : x)));
+            }
+          }
+
           for (const plat of outs) {
             // cada plataforma recebe a resolução/fps/bitrate recomendados
             const tpl = applyRatio(baseTpl, plat.w, plat.h);
@@ -530,7 +573,7 @@ function Home() {
                 fps: plat.fps,
                 bitrate: (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
                 clip: item.clip,
-                captions: item.captions,
+                captions: cues,
                 signal: ac.signal,
                 onProgress: (p) =>
                   setItems((prev) =>
@@ -1281,6 +1324,16 @@ function Home() {
                         exibir no vídeo
                       </label>
                     </div>
+                    <label className="mt-2 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={autoCap}
+                        onChange={(e) => setAutoCap(e.target.checked)}
+                        className="size-4 accent-[var(--primary)]"
+                      />
+                      transcrever automaticamente ao clicar em Processar
+                    </label>
+
                     <div className="mt-3">
                       <CaptionStudio
                         style={active.captions ?? defaultCaptions()}
