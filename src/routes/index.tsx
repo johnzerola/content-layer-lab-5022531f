@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
 import { TemplateEditor } from "@/components/TemplateEditor";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
+import { ClipStudio } from "@/components/ClipStudio";
+
 import {
   applyRatio,
   commitTemplate,
@@ -279,8 +281,23 @@ function Home() {
           progress: 0,
           ...(item.autoFrameSource ? { autoFrameSource: item.autoFrameSource } : {}),
         }));
-        setItems((prev) => [...prev.filter((p) => p.id !== item.id), ...created]);
+        setItems((prev) =>
+          modeRef.current === "clip"
+            ? // no estúdio o vídeo longo continua na lista para novas gerações
+              [...prev.filter((p) => !(p.clip && p.file === item.file)), ...created]
+            : [...prev.filter((p) => p.id !== item.id), ...created],
+        );
         setSelectedId(created[0]?.id ?? null);
+        // miniatura no início de cada corte
+        for (const c of created) {
+          try {
+            const meta = await grabPoster(item.file, (c.clip?.start ?? 0) + 0.5);
+            setItems((prev) => prev.map((p) => (p.id === c.id ? { ...p, poster: meta.url } : p)));
+          } catch {
+            /* mantém a miniatura do vídeo original */
+          }
+        }
+
       } catch (err) {
         setLinkMsg(`falha na clipagem: ${String((err as Error)?.message ?? err)}`);
       } finally {
@@ -622,7 +639,39 @@ function Home() {
           </div>
         </section>
 
-        {items.length > 0 && (
+        {mode === "clip" && items.length > 0 && (
+          <ClipStudio
+            sources={items.filter((i) => !i.clip)}
+            clips={items.filter((i) => i.clip)}
+            settings={{ minLen: clipMinLen, maxLen: clipMaxLen, max: clipMax, minScore: clipMinScore }}
+            onSettings={(p) => {
+              if (p.minLen !== undefined) setClipMinLen(p.minLen);
+              if (p.maxLen !== undefined) setClipMaxLen(p.maxLen);
+              if (p.max !== undefined) setClipMax(p.max);
+              if (p.minScore !== undefined) setClipMinScore(p.minScore);
+            }}
+            clipBusy={clipBusy}
+            onGenerate={(it) => void autoClip(items.find((x) => x.id === it.id)!)}
+            running={running}
+            paused={paused}
+            zipping={zipping}
+            eta={eta}
+            readyCount={readyCount}
+            fsAccess={fsAccessSupported()}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onProcess={(ids) => void processAll(ids)}
+            onTogglePause={togglePause}
+            onCancel={cancelAll}
+            onRemove={(id) => setItems((p) => p.filter((x) => x.id !== id))}
+            onDownload={(it) => it.blob && downloadBlob(it.blob, `corte-${it.id.slice(0, 6)}.${it.ext}`)}
+            onZip={() => void downloadZipAll()}
+            onSaveFolder={() => void saveFolder()}
+          />
+        )}
+
+        {mode === "lote" && items.length > 0 && (
+
           <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
             <section className="panel space-y-4 p-5">
               <div>
