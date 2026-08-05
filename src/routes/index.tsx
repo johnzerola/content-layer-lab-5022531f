@@ -134,8 +134,11 @@ function Home() {
   const [linkMsg, setLinkMsg] = useState<string | null>(null);
   const [linkBlocked, setLinkBlocked] = useState(false);
   const [clipBusy, setClipBusy] = useState(false);
-  const [clipLen, setClipLen] = useState(30);
+  const [clipMinLen, setClipMinLen] = useState(20);
+  const [clipMaxLen, setClipMaxLen] = useState(45);
   const [clipMax, setClipMax] = useState(6);
+  const [clipMinScore, setClipMinScore] = useState(60);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
   const ctrlRef = useRef<QueueCtrl>({ paused: false, cancelled: false, aborts: new Map() });
