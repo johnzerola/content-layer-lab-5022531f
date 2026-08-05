@@ -20,6 +20,7 @@ import {
   Captions,
   AlertTriangle,
   Copy,
+  Columns2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
