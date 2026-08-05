@@ -211,8 +211,8 @@ export interface CleanupRegion {
   y: number;
   w: number;
   h: number;
-  /** blur = borrão, pixelate = mosaico, solid = tarja, smear = clonar pixels vizinhos (inpaint) */
-  mode: "blur" | "pixelate" | "solid" | "smear";
+  /** inpaint = reconstrução IA (Telea/FMM, sem borrão), smear = clonar vizinho, blur/pixelate/solid = tarjas */
+  mode: "inpaint" | "blur" | "pixelate" | "solid" | "smear";
   /** 1..100 */
   strength: number;
   color?: string;
