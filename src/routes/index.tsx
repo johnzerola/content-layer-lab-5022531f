@@ -32,6 +32,8 @@ import { downloadBlob, grabPoster, renderVideo } from "@/lib/render";
 import { webCodecsSupported } from "@/lib/encode";
 import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
 import { autoFrame } from "@/lib/autoframe";
+import { findClips, formatTime } from "@/lib/clips";
+import { resolveVideoLink } from "@/lib/import.functions";
 import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
 
 
@@ -212,7 +214,7 @@ function Home() {
       setClipBusy(true);
       try {
         const clips = await findClips(item.file, { target: clipLen, max: clipMax });
-        const created: Item[] = clips.map((c, i) => ({
+        const created: Item[] = clips.map((c) => ({
           id: crypto.randomUUID(),
           file: item.file,
           poster: item.poster,
@@ -227,8 +229,7 @@ function Home() {
           status: "pendente" as Status,
           progress: 0,
           ...(item.autoFrameSource ? { autoFrameSource: item.autoFrameSource } : {}),
-          name: i,
-        })) as Item[];
+        }));
         setItems((prev) => [...prev.filter((p) => p.id !== item.id), ...created]);
         setSelectedId(created[0]?.id ?? null);
       } catch (err) {
@@ -497,6 +498,24 @@ function Home() {
             webkitdirectory=""
             onChange={(e) => void addFiles(e.target.files)}
           />
+
+          <div className="mx-auto mt-6 max-w-xl border-t border-border pt-5">
+            <p className="mono-label">ou cole o link do vídeo</p>
+            <div className="mt-2 flex gap-2">
+              <input
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void importFromLink()}
+                placeholder="https://... link da página ou do arquivo .mp4"
+                className="flex-1 rounded-lg border border-border bg-surface-2 px-3 py-2 font-mono text-xs outline-none focus:border-primary"
+              />
+              <Button onClick={() => void importFromLink()} disabled={linkBusy || !linkUrl.trim()}>
+                <LinkIcon className="mr-1 size-4" />
+                {linkBusy ? "baixando..." : "Importar"}
+              </Button>
+            </div>
+            {linkMsg && <p className="mt-2 font-mono text-[11px] text-muted-foreground">{linkMsg}</p>}
+          </div>
         </section>
 
         {items.length > 0 && (
