@@ -1109,32 +1109,78 @@ function Home() {
                   </div>
 
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="mono-label">Preview final</p>
-                      {variants > 1 && (
-                        <select
-                          value={variantIdx}
-                          onChange={(e) => setPreviewVariant(Number(e.target.value))}
-                          className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[10px]"
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setCompare((c) => !c)}
+                          className={`rounded-md border px-2 py-1 font-mono text-[10px] ${
+                            compare
+                              ? "border-primary/60 bg-primary/15 text-primary"
+                              : "border-border text-muted-foreground hover:text-foreground"
+                          }`}
                         >
-                          {Array.from({ length: variants }, (_, k) => (
-                            <option key={k} value={k}>
-                              prévia da variação v{k + 1}
-                            </option>
-                          ))}
-                        </select>
-                      )}
+                          <Columns2 className="mr-1 inline size-3" /> comparar
+                        </button>
+                        {variants > 1 && (
+                          <select
+                            value={variantIdx}
+                            onChange={(e) => setPreviewVariant(Number(e.target.value))}
+                            className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[10px]"
+                          >
+                            {Array.from({ length: variants }, (_, k) => (
+                              <option key={k} value={k}>
+                                prévia da variação v{k + 1}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                     </div>
-                    <TemplateCanvas
-                      template={previewTemplate}
-                      interactive={false}
-                      poster={selected.poster}
-                      previewFile={selected.file}
-                      drawOpts={previewDrawOpts}
-                      speed={previewVariation?.speed ?? 1}
-                      loopStart={previewLoop.start}
-                      loopEnd={previewLoop.end}
-                    />
+                    {compare ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <p className="font-mono text-[10px] text-muted-foreground">original</p>
+                          <TemplateCanvas
+                            template={{ ...previewTemplate, cleanup: [] }}
+                            interactive={false}
+                            poster={selected.poster}
+                            previewFile={selected.file}
+                            drawOpts={previewDrawOpts}
+                            speed={previewVariation?.speed ?? 1}
+                            loopStart={previewLoop.start}
+                            loopEnd={previewLoop.end}
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <p className="font-mono text-[10px] text-primary">
+                            limpo{variants > 1 ? ` · v${variantIdx + 1}` : ""}
+                          </p>
+                          <TemplateCanvas
+                            template={previewTemplate}
+                            interactive={false}
+                            poster={selected.poster}
+                            previewFile={selected.file}
+                            drawOpts={previewDrawOpts}
+                            speed={previewVariation?.speed ?? 1}
+                            loopStart={previewLoop.start}
+                            loopEnd={previewLoop.end}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <TemplateCanvas
+                        template={previewTemplate}
+                        interactive={false}
+                        poster={selected.poster}
+                        previewFile={selected.file}
+                        drawOpts={previewDrawOpts}
+                        speed={previewVariation?.speed ?? 1}
+                        loopStart={previewLoop.start}
+                        loopEnd={previewLoop.end}
+                      />
+                    )}
                     {/* estilo rápido de legenda direto na prévia */}
                     <div className="flex flex-wrap items-center gap-1">
                       <button
