@@ -69,6 +69,8 @@ interface Item {
   offsetX: number;
   offsetY: number;
   autoFrameSource?: string | undefined;
+  clip?: { start: number; end: number } | undefined;
+  score?: number | undefined;
   status: Status;
   progress: number;
   blob?: Blob | undefined;
@@ -96,6 +98,12 @@ function Home() {
   const [concurrency, setConcurrency] = useState(2);
   const [bitrate, setBitrate] = useState(10);
   const [smartFrame, setSmartFrame] = useState(true);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkMsg, setLinkMsg] = useState<string | null>(null);
+  const [clipBusy, setClipBusy] = useState(false);
+  const [clipLen, setClipLen] = useState(30);
+  const [clipMax, setClipMax] = useState(6);
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
   const ctrlRef = useRef<QueueCtrl>({ paused: false, cancelled: false, aborts: new Map() });
@@ -124,9 +132,8 @@ function Home() {
     if (list[0]) setActive(list[0]);
   }, []);
 
-  const addFiles = useCallback(async (files: FileList | null) => {
-    if (!files) return;
-    const vids = Array.from(files).filter((f) => f.type.startsWith("video/"));
+  const addVideos = useCallback(async (list: File[]) => {
+    const vids = list.filter((f) => f.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(f.name));
     const created: Item[] = vids.map((file) => ({
       id: crypto.randomUUID(),
       file,
@@ -162,6 +169,76 @@ function Home() {
     }
   }, []);
 
+  const addFiles = useCallback(
+    (files: FileList | null) => (files ? addVideos(Array.from(files)) : Promise.resolve()),
+    [addVideos],
+  );
+
+  /** Importa um vídeo apenas colando o link (baixa pelo servidor, sem upload). */
+  const importFromLink = useCallback(async () => {
+    const url = linkUrl.trim();
+    if (!url || linkBusy) return;
+    setLinkBusy(true);
+    setLinkMsg("procurando o vídeo...");
+    try {
+      const res = await resolveVideoLink({ data: { url } });
+      if (!res.ok || !res.videoUrl) {
+        setLinkMsg(res.message ?? "não encontrei o vídeo nesse link");
+        return;
+      }
+      setLinkMsg(`baixando de ${res.source ?? "origem"}...`);
+      const dl = await fetch(`/api/public/media-proxy?u=${encodeURIComponent(res.videoUrl)}`);
+      if (!dl.ok) {
+        setLinkMsg("a origem bloqueou o download desse arquivo");
+        return;
+      }
+      const blob = await dl.blob();
+      const base = (res.title ?? "video").replace(/[^\w\-. ]+/g, "").slice(0, 60) || "video";
+      const file = new File([blob], `${base}.mp4`, { type: blob.type || "video/mp4" });
+      await addVideos([file]);
+      setLinkMsg(`importado: ${file.name} (${(file.size / 1e6).toFixed(1)} MB)`);
+      setLinkUrl("");
+    } catch (err) {
+      setLinkMsg(String((err as Error)?.message ?? err));
+    } finally {
+      setLinkBusy(false);
+    }
+  }, [linkUrl, linkBusy, addVideos]);
+
+  /** Clipagem automática: quebra um vídeo longo nos melhores trechos. */
+  const autoClip = useCallback(
+    async (item: Item) => {
+      if (clipBusy) return;
+      setClipBusy(true);
+      try {
+        const clips = await findClips(item.file, { target: clipLen, max: clipMax });
+        const created: Item[] = clips.map((c, i) => ({
+          id: crypto.randomUUID(),
+          file: item.file,
+          poster: item.poster,
+          w: item.w,
+          h: item.h,
+          duration: c.end - c.start,
+          headline: item.headline,
+          offsetX: item.offsetX,
+          offsetY: item.offsetY,
+          clip: { start: c.start, end: c.end },
+          score: c.score,
+          status: "pendente" as Status,
+          progress: 0,
+          ...(item.autoFrameSource ? { autoFrameSource: item.autoFrameSource } : {}),
+          name: i,
+        })) as Item[];
+        setItems((prev) => [...prev.filter((p) => p.id !== item.id), ...created]);
+        setSelectedId(created[0]?.id ?? null);
+      } catch (err) {
+        setLinkMsg(`falha na clipagem: ${String((err as Error)?.message ?? err)}`);
+      } finally {
+        setClipBusy(false);
+      }
+    },
+    [clipBusy, clipLen, clipMax],
+  );
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
@@ -211,6 +288,7 @@ function Home() {
             offsetY: item.offsetY,
             headline: item.headline || undefined,
             bitrate: bitrate * 1_000_000,
+            clip: item.clip,
             signal: ac.signal,
             onProgress: (p) => setItems((prev) => prev.map((x) => (x.id === id ? { ...x, progress: p } : x))),
           });
