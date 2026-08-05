@@ -573,7 +573,7 @@ function Home() {
                 fps: plat.fps,
                 bitrate: (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
                 clip: item.clip,
-                captions: item.captions,
+                captions: cues,
                 signal: ac.signal,
                 onProgress: (p) =>
                   setItems((prev) =>
