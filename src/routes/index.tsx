@@ -693,7 +693,8 @@ function Home() {
   };
 
 
-  const baseTpl: Template = mode === "clip" ? stripBranding(active) : active;
+  const baseTpl: Template =
+    mode === "clip" ? stripBranding(active) : mode === "limpar" ? cleanOnly(active) : active;
   const previewTemplate: Template = selected
     ? {
         ...baseTpl,
