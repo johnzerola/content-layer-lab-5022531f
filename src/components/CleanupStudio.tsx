@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { Eraser, Plus, Trash2 } from "lucide-react";
+import { Eraser, Plus, ScanSearch, Trash2 } from "lucide-react";
 import { CLEANUP_PRESETS, makeCleanupRegion, type CleanupRegion } from "@/lib/template";
 
 type Props = {
@@ -9,7 +9,17 @@ type Props = {
   poster?: string | undefined;
   /** proporção da área do vídeo (largura / altura) */
   aspect?: number;
+  /** dispara a detecção automática de legenda/marca d'água */
+  onDetect?: () => void;
+  detecting?: boolean;
+  detectMsg?: string | undefined;
+  /** áreas encontradas pela detecção, ainda não aplicadas */
+  suggestions?: CleanupRegion[];
+  onUseSuggestion?: (r: CleanupRegion) => void;
+  onUseAllSuggestions?: () => void;
+  onClearSuggestions?: () => void;
 };
+
 
 type Drag =
   | { kind: "new"; x0: number; y0: number; id: string }
