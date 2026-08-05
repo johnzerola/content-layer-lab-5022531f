@@ -576,14 +576,49 @@ export function ClipStudio(props: Props) {
                 </button>
               </div>
               <div className="flex gap-2 overflow-x-auto pb-1">
-                {ordered
-                  .filter((c) => validPicked.includes(c.id))
+                {validPicked
+                  .map((id) => clips.find((c) => c.id === id))
+                  .filter((c): c is ClipItem => Boolean(c))
                   .map((c, i) => (
                     <SelectedClip
                       key={c.id}
                       item={c}
                       index={i}
                       active={selectedId === c.id}
+                      draggable={!running}
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = "move";
+                        e.dataTransfer.setData("text/plain", c.id);
+                        setDragId(c.id);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (!dragId || dragId === c.id) return;
+                        e.dataTransfer.dropEffect = "move";
+                        setDragOverId(c.id);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        const fromId = e.dataTransfer.getData("text/plain");
+                        if (!fromId || fromId === c.id) return;
+                        setPicked((prev) => {
+                          const list = [...prev];
+                          const fromIndex = list.indexOf(fromId);
+                          const toIndex = list.indexOf(c.id);
+                          if (fromIndex === -1 || toIndex === -1) return prev;
+                          list.splice(fromIndex, 1);
+                          list.splice(toIndex, 0, fromId);
+                          return list;
+                        });
+                        setDragId(null);
+                        setDragOverId(null);
+                      }}
+                      onDragEnd={() => {
+                        setDragId(null);
+                        setDragOverId(null);
+                      }}
+                      dragging={dragId === c.id}
+                      dragOver={dragOverId === c.id}
                       onSelect={() => onSelect(c.id)}
                       onUnpick={() => setPicked((prev) => prev.filter((x) => x !== c.id))}
                       onRemove={() => onRemove(c.id)}
