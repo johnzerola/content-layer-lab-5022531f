@@ -326,6 +326,44 @@ function Home() {
     [clipBusy, clipMinLen, clipMaxLen, clipMax, clipMinScore],
   );
 
+  /** Transcreve o áudio e gera legendas com tempo por palavra. */
+  const makeCaptions = useCallback(
+    async (item: Item) => {
+      if (capBusyId) return;
+      setCapBusyId(item.id);
+      setItems((p) => p.map((x) => (x.id === item.id ? { ...x, capStatus: "ouvindo o áudio..." } : x)));
+      try {
+        const cues = await generateCaptions(item.file, {
+          clip: item.clip,
+          language: capLang || undefined,
+          onProgress: ({ done, total }) =>
+            setItems((p) =>
+              p.map((x) => (x.id === item.id ? { ...x, capStatus: `transcrevendo ${done}/${total}` } : x)),
+            ),
+        });
+        setItems((p) =>
+          p.map((x) =>
+            x.id === item.id
+              ? {
+                  ...x,
+                  captions: cues,
+                  capStatus: cues.length ? `${cues.length} blocos de legenda` : "nenhuma fala detectada",
+                }
+              : x,
+          ),
+        );
+        if (cues.length) setActive((t) => ({ ...t, captions: { ...(t.captions ?? defaultCaptions()), visible: true } }));
+      } catch (err) {
+        setItems((p) =>
+          p.map((x) => (x.id === item.id ? { ...x, capStatus: `falhou: ${String((err as Error)?.message ?? err)}` } : x)),
+        );
+      } finally {
+        setCapBusyId(null);
+      }
+    },
+    [capBusyId, capLang],
+  );
+
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
   const antiDup = active.antiDup ?? defaultAntiDup();
@@ -333,10 +371,10 @@ function Home() {
     setActive((t) => ({ ...t, antiDup: { ...(t.antiDup ?? defaultAntiDup()), ...patch } }));
 
   const variationOf = useCallback(
-    (item: Item) =>
+    (item: Item, variant = 0) =>
       makeVariation(
         { ...(active.antiDup ?? defaultAntiDup()), mirror: active.mirror, speed: active.speed },
-        `${item.file.name}:${item.file.size}:${item.id}`,
+        `${item.file.name}:${item.file.size}:${item.id}${variant ? `#${variant}` : ""}`,
       ),
     [active],
   );
@@ -352,6 +390,10 @@ function Home() {
             saturation: previewVariation.saturation,
             zoom: previewVariation.zoom,
             noise: previewVariation.noise,
+            rotate: previewVariation.rotate,
+            border: previewVariation.border,
+            borderColor: previewVariation.borderColor,
+            ...(selected?.captions?.length ? { captions: selected.captions } : {}),
           }
         : undefined,
     [
@@ -360,8 +402,13 @@ function Home() {
       previewVariation?.saturation,
       previewVariation?.zoom,
       previewVariation?.noise,
+      previewVariation?.rotate,
+      previewVariation?.border,
+      previewVariation?.borderColor,
+      selected?.captions,
     ],
   );
+
 
 
   const processAll = async (onlyIds?: string[]) => {
