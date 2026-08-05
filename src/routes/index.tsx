@@ -1118,15 +1118,30 @@ function Home() {
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     {(
                       [
-                        ["brightness", "brilho", 0.15],
-                        ["saturation", "saturação", 0.2],
-                        ["zoom", "zoom", 0.12],
-                        ["trim", "corte início/fim (s)", 1],
-                        ["noise", "ruído", 0.12],
+                        ["brightness", "brilho", 0.15, "pct"],
+                        ["saturation", "saturação", 0.2, "pct"],
+                        ["zoom", "zoom", 0.12, "pct"],
+                        ["trim", "corte início/fim", 1, "s"],
+                        ["noise", "ruído", 0.12, "pct"],
+                        ["rotate", "rotação", 1.5, "deg"],
+                        ["border", "moldura", 40, "px"],
+                        ["pitch", "tom do áudio", 60, "cents"],
+                        ["eq", "equalização", 4, "db"],
                       ] as const
-                    ).map(([key, label, max]) => (
+                    ).map(([key, label, max, unit]) => (
                       <label key={key} className="font-mono text-[11px] text-muted-foreground">
-                        {label} · {key === "trim" ? `${antiDup[key].toFixed(2)}s` : `${(antiDup[key] * 100).toFixed(0)}%`}
+                        {label} ·{" "}
+                        {unit === "pct"
+                          ? `${(antiDup[key] * 100).toFixed(0)}%`
+                          : unit === "s"
+                            ? `${antiDup[key].toFixed(2)}s`
+                            : unit === "deg"
+                              ? `${antiDup[key].toFixed(2)}°`
+                              : unit === "px"
+                                ? `${Math.round(antiDup[key])}px`
+                                : unit === "db"
+                                  ? `${antiDup[key].toFixed(1)}dB`
+                                  : `${Math.round(antiDup[key])} cents`}
                         <input
                           type="range"
                           min={0}
@@ -1140,11 +1155,21 @@ function Home() {
                       </label>
                     ))}
                   </div>
+                  <label className="mt-2 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={antiDup.cleanMetadata}
+                      onChange={(e) => setAntiDup({ cleanMetadata: e.target.checked })}
+                      className="accent-[var(--primary)]"
+                    />
+                    limpar metadados do MP4 (datas e identificadores)
+                  </label>
                   {selected && (
                     <p className="mt-1 font-mono text-[11px] text-muted-foreground">
                       este vídeo: {describeVariation(variationOf(selected))}
                     </p>
                   )}
+
                 </div>
 
               </div>
