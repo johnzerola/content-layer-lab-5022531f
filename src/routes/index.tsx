@@ -1267,7 +1267,7 @@ function Home() {
                   {eta && <span className="text-primary">● restam ~{eta}</span>}
                 </div>
 
-                {selected && (
+                {selected && mode !== "limpar" && (
                   <div className="rounded-xl border border-border bg-surface-2 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="mono-label">Legendas automáticas</p>
