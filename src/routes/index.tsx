@@ -35,7 +35,9 @@ import {
   createTemplate,
   defaultCaptions,
   loadTemplates,
+  PLATFORM_PRESETS,
   RATIO_PRESETS,
+
   type Template,
 } from "@/lib/template";
 import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
@@ -151,6 +153,11 @@ function Home() {
   const [zipping, setZipping] = useState(false);
   const [concurrency, setConcurrency] = useState(2);
   const [bitrate, setBitrate] = useState(10);
+  const [autoBitrate, setAutoBitrate] = useState(true);
+  const [platforms, setPlatforms] = useState<string[]>(["reels"]);
+  const togglePlatform = (id: string) =>
+    setPlatforms((p) => (p.includes(id) ? (p.length > 1 ? p.filter((x) => x !== id) : p) : [...p, id]));
+
   const [smartFrame, setSmartFrame] = useState(true);
   const [linkUrl, setLinkUrl] = useState("");
   const [linkBusy, setLinkBusy] = useState(false);
@@ -489,28 +496,40 @@ function Home() {
         setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)));
         try {
           const n = Math.max(1, variants);
+          const targets = PLATFORM_PRESETS.filter((p) => platforms.includes(p.id));
+          const outs = targets.length ? targets : [PLATFORM_PRESETS[0]!];
+          const total = n * outs.length;
           const outputs: { blob: Blob; ext: string; label: string }[] = [];
-          for (let k = 0; k < n; k++) {
-            const { blob, ext } = await renderVideo(
-              item.file,
-              modeRef.current === "clip" ? stripBranding(active) : active,
-              {
+          let step = 0;
+          const baseTpl = modeRef.current === "clip" ? stripBranding(active) : active;
+          for (const plat of outs) {
+            // cada plataforma recebe a resolução/fps/bitrate recomendados
+            const tpl = applyRatio(baseTpl, plat.w, plat.h);
+            for (let k = 0; k < n; k++) {
+              const at = step;
+              const { blob, ext } = await renderVideo(item.file, tpl, {
                 variation: variationOf(item, k),
                 offsetX: item.offsetX,
                 offsetY: item.offsetY,
                 headline: item.headline || undefined,
-                bitrate: bitrate * 1_000_000,
+                fps: plat.fps,
+                bitrate: (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
                 clip: item.clip,
                 captions: item.captions,
                 signal: ac.signal,
                 onProgress: (p) =>
                   setItems((prev) =>
-                    prev.map((x) => (x.id === id ? { ...x, progress: (k + p) / n } : x)),
+                    prev.map((x) => (x.id === id ? { ...x, progress: (at + p) / total } : x)),
                   ),
-              },
-            );
-            outputs.push({ blob, ext, label: n > 1 ? `v${k + 1}` : "" });
+              });
+              const label = [outs.length > 1 ? plat.short : "", n > 1 ? `v${k + 1}` : ""]
+                .filter(Boolean)
+                .join("-");
+              outputs.push({ blob, ext, label });
+              step++;
+            }
           }
+
           doneCount.current++;
           const first = outputs[0]!;
           setItems((p) =>
@@ -1027,6 +1046,50 @@ function Home() {
                   )}
                 </div>
 
+                {/* presets de entrega por plataforma (MP4 H.264) */}
+                <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="mono-label">Exportar MP4 H.264 para</p>
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {platforms.length} formato{platforms.length > 1 ? "s" : ""} × {Math.max(1, variants)} variação
+                      {variants > 1 ? "ões" : ""} = {platforms.length * Math.max(1, variants)} arquivos por vídeo
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {PLATFORM_PRESETS.map((p) => {
+                      const on = platforms.includes(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          disabled={running}
+                          onClick={() => togglePlatform(p.id)}
+                          className={`rounded-lg border px-3 py-2 text-left transition-colors disabled:opacity-50 ${
+                            on ? "border-primary bg-primary/15" : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <span className={`block text-xs font-semibold ${on ? "text-primary" : "text-foreground"}`}>
+                            {p.label}
+                          </span>
+                          <span className="block font-mono text-[10px] text-muted-foreground">{p.hint}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <label className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={autoBitrate}
+                      disabled={running}
+                      onChange={(e) => setAutoBitrate(e.target.checked)}
+                      className="accent-[var(--primary)]"
+                    />
+                    usar bitrate recomendado de cada plataforma
+                  </label>
+                </div>
+
+
+
                 <div className="flex flex-wrap items-center gap-4 font-mono text-[11px] text-muted-foreground">
                   <label className="flex items-center gap-2">
                     paralelo
@@ -1041,18 +1104,19 @@ function Home() {
                     />
                     {concurrency}x
                   </label>
-                  <label className="flex items-center gap-2">
+                  <label className={`flex items-center gap-2 ${autoBitrate ? "opacity-50" : ""}`}>
                     bitrate
                     <input
                       type="range"
                       min={4}
                       max={20}
                       value={bitrate}
-                      disabled={running}
+                      disabled={running || autoBitrate}
                       onChange={(e) => setBitrate(Number(e.target.value))}
                       className="w-24 accent-[var(--primary)]"
                     />
-                    {bitrate} Mbps
+                    {autoBitrate ? "auto (preset)" : `${bitrate} Mbps`}
+
                   </label>
                   <label className="flex items-center gap-2">
                     variações

@@ -395,6 +395,69 @@ export const RATIO_PRESETS = [
   { id: "1:1", label: "1:1 · Quadrado", w: 1080, h: 1080 },
 ] as const;
 
+/** Presets de entrega por plataforma (MP4 H.264). */
+export interface PlatformPreset {
+  id: string;
+  label: string;
+  short: string;
+  w: number;
+  h: number;
+  fps: number;
+  /** bitrate de vídeo em Mbps */
+  bitrate: number;
+  /** duração máxima recomendada, em segundos */
+  maxDur: number;
+  hint: string;
+}
+
+export const PLATFORM_PRESETS: PlatformPreset[] = [
+  {
+    id: "reels",
+    label: "Instagram Reels",
+    short: "reels",
+    w: 1080,
+    h: 1920,
+    fps: 30,
+    bitrate: 12,
+    maxDur: 90,
+    hint: "1080×1920 · 30fps · H.264 · até 90s",
+  },
+  {
+    id: "tiktok",
+    label: "TikTok",
+    short: "tiktok",
+    w: 1080,
+    h: 1920,
+    fps: 30,
+    bitrate: 10,
+    maxDur: 180,
+    hint: "1080×1920 · 30fps · H.264 · até 3min",
+  },
+  {
+    id: "shorts",
+    label: "YouTube Shorts",
+    short: "shorts",
+    w: 1080,
+    h: 1920,
+    fps: 60,
+    bitrate: 16,
+    maxDur: 180,
+    hint: "1080×1920 · 60fps · H.264 · até 3min",
+  },
+  {
+    id: "feed",
+    label: "Feed 4:5",
+    short: "feed",
+    w: 1080,
+    h: 1350,
+    fps: 30,
+    bitrate: 10,
+    maxDur: 90,
+    hint: "1080×1350 · 30fps · H.264",
+  },
+];
+
+
 /** Troca a proporção reescalando todas as camadas proporcionalmente. */
 export function applyRatio(t: Template, w: number, h: number): Template {
   const fx = w / (t.canvasW ?? CANVAS_W);
