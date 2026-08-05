@@ -935,6 +935,19 @@ function Home() {
                     {bitrate} Mbps
                   </label>
                   <label className="flex items-center gap-2">
+                    variações
+                    <input
+                      type="range"
+                      min={1}
+                      max={5}
+                      value={variants}
+                      disabled={running}
+                      onChange={(e) => setVariants(Number(e.target.value))}
+                      className="w-24 accent-[var(--primary)]"
+                    />
+                    {variants}x por vídeo
+                  </label>
+                  <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       checked={smartFrame}
@@ -946,6 +959,58 @@ function Home() {
                   <span>{webCodecsSupported() ? "MP4 H.264 · WebCodecs" : "WebM (fallback)"}</span>
                   {eta && <span className="text-primary">● restam ~{eta}</span>}
                 </div>
+
+                {selected && (
+                  <div className="rounded-xl border border-border bg-surface-2 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="mono-label">Legendas automáticas</p>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={capLang}
+                          onChange={(e) => setCapLang(e.target.value)}
+                          className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[11px]"
+                        >
+                          <option value="pt">pt</option>
+                          <option value="en">en</option>
+                          <option value="es">es</option>
+                          <option value="">auto</option>
+                        </select>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!!capBusyId}
+                          onClick={() => void makeCaptions(selected)}
+                        >
+                          <Captions className="mr-1 size-4" />
+                          {capBusyId === selected.id ? "Transcrevendo…" : "Gerar legendas"}
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                      {selected.capStatus ?? "transcreve a fala e desenha no estilo karaokê definido no editor."}
+                    </p>
+                    {!!selected.captions?.length && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="font-mono text-[11px] text-primary">
+                          ● {selected.captions.length} blocos prontos
+                        </span>
+                        <button
+                          className="font-mono text-[11px] text-muted-foreground underline"
+                          onClick={() =>
+                            setItems((p) =>
+                              p.map((x) =>
+                                x.id === selected.id ? { ...x, captions: undefined, capStatus: undefined } : x,
+                              ),
+                            )
+                          }
+                        >
+                          remover
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
 
                 {selected && (
                   <div className="rounded-xl border border-border bg-surface-2 p-3">
