@@ -27,6 +27,7 @@ type Drag =
   | { kind: "resize"; id: string };
 
 const MODES: { id: CleanupRegion["mode"]; label: string }[] = [
+  { id: "inpaint", label: "Reconstruir (sem borrão)" },
   { id: "smear", label: "Clonar vizinho" },
   { id: "blur", label: "Borrão" },
   { id: "pixelate", label: "Mosaico" },
