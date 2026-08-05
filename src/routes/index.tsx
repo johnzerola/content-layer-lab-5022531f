@@ -1064,6 +1064,20 @@ function Home() {
                       </div>
                     )}
 
+                    {!!selected.captions?.length && (
+                      <div className="mt-3 border-t border-border pt-3">
+                        <p className="mono-label mb-2">Timeline · ajuste palavra por palavra</p>
+                        <CaptionTimeline
+                          file={selected.file}
+                          cues={selected.captions}
+                          onChange={(cues) =>
+                            setItems((p) => p.map((x) => (x.id === selected.id ? { ...x, captions: cues } : x)))
+                          }
+                        />
+                      </div>
+                    )}
+
+
                     <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
                       <p className="mono-label">Estilo das legendas (CapCut)</p>
                       <label className="flex items-center gap-2 font-mono text-[11px]">
