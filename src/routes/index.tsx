@@ -522,13 +522,19 @@ function Home() {
     return s > 90 ? `${Math.round(s / 60)} min` : `${s}s`;
   })();
 
-  const outFiles = () =>
-    items
-      .filter((i) => i.blob)
-      .map((i, idx) => ({
-        name: `${(mode === "clip" ? "corte" : active.name).replace(/\s+/g, "-").toLowerCase()}-${String(idx + 1).padStart(3, "0")}.${i.ext}`,
-        blob: i.blob!,
-      }));
+  const outFiles = () => {
+    const base = (mode === "clip" ? "corte" : active.name).replace(/\s+/g, "-").toLowerCase();
+    const files: { name: string; blob: Blob }[] = [];
+    items.forEach((i, idx) => {
+      const outs = i.outputs ?? (i.blob ? [{ blob: i.blob, ext: i.ext ?? "mp4", label: "" }] : []);
+      outs.forEach((o) => {
+        const suffix = o.label ? `-${o.label}` : "";
+        files.push({ name: `${base}-${String(idx + 1).padStart(3, "0")}${suffix}.${o.ext}`, blob: o.blob });
+      });
+    });
+    return files;
+  };
+
 
   const downloadZipAll = async () => {
     setZipping(true);
