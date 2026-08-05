@@ -8,6 +8,8 @@ export interface ResolvedVideo {
   thumbnail?: string;
   source?: string;
   message?: string;
+  /** plataforma que bloqueia download por link (YouTube, IG, TikTok...) */
+  blocked?: boolean;
 }
 
 const UA =
@@ -110,10 +112,14 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       html.match(/https?:\\?\/\\?\/[^"'\s]+\.mp4[^"'\s]*/i)?.[0],
     ].filter(Boolean) as string[];
 
+    const isPlayerPage = (u: URL) =>
+      /\/embed\/|\/player|youtube\.com|youtu\.be|player\.vimeo\.com/.test(u.host + u.pathname) &&
+      !/\.(mp4|mov|m4v|webm)(\?|$)/i.test(u.pathname + u.search);
+
     for (const raw of candidates) {
       const cleaned = raw.replace(/\\u0026/g, "&").replace(/\\\//g, "/").replace(/&amp;/g, "&");
       const abs = safeRemoteUrl(cleaned.startsWith("http") ? cleaned : new URL(cleaned, target).toString());
-      if (abs) {
+      if (abs && !isPlayerPage(abs)) {
         return {
           ok: true,
           videoUrl: abs.toString(),
@@ -129,8 +135,9 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       ok: false,
       ...(title ? { title } : {}),
       source: host,
+      blocked: protectedHost,
       message: protectedHost
-        ? `${host} bloqueia download direto. Cole o link do arquivo .mp4 ou envie o arquivo.`
-        : "Não encontrei um arquivo de vídeo nessa página.",
+        ? `${host} não permite baixar o vídeo por link. Baixe o arquivo primeiro e arraste aqui, ou cole um link direto .mp4.`
+        : "Não encontrei um arquivo de vídeo nessa página. Cole um link direto .mp4 ou envie o arquivo.",
     };
   });
