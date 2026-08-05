@@ -9,6 +9,62 @@ import {
   type TextLayer,
 } from "./template";
 import type { CaptionCue } from "./captions";
+import { exemplarDetail, inpaintTelea, resetInpaintCache } from "./inpaint";
+
+/** Reconstrói a área (sem borrão) usando FMM de Telea + refino exemplar. */
+function inpaintArea(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  detail: number,
+) {
+  const canvas = ctx.canvas;
+  // margem de contexto: pixels válidos de onde a estrutura é propagada
+  const pad = Math.max(8, Math.round(Math.min(w, h) * 0.6));
+  const sx = Math.max(0, x - pad);
+  const sy = Math.max(0, y - pad);
+  const sw = Math.min(canvas.width - sx, w + pad * 2);
+  const sh = Math.min(canvas.height - sy, h + pad * 2);
+  if (sw < 4 || sh < 4) return;
+
+  // buracos grandes: resolve numa escala menor e devolve só o miolo reconstruído
+  const area = w * h;
+  const scale = area > 90000 ? 0.5 : area > 260000 ? 0.35 : 1;
+  const W = Math.max(4, Math.round(sw * scale));
+  const H = Math.max(4, Math.round(sh * scale));
+
+  const work = document.createElement("canvas");
+  work.width = W;
+  work.height = H;
+  const wc = work.getContext("2d", { willReadFrequently: true });
+  if (!wc) return;
+  wc.drawImage(canvas, sx, sy, sw, sh, 0, 0, W, H);
+
+  const img = wc.getImageData(0, 0, W, H);
+  const mask = new Uint8Array(W * H);
+  const mx0 = Math.round((x - sx) * scale);
+  const my0 = Math.round((y - sy) * scale);
+  const mx1 = Math.min(W, Math.round((x - sx + w) * scale));
+  const my1 = Math.min(H, Math.round((y - sy + h) * scale));
+  for (let yy = Math.max(0, my0); yy < my1; yy++)
+    for (let xx = Math.max(0, mx0); xx < mx1; xx++) mask[yy * W + xx] = 1;
+
+  resetInpaintCache();
+  inpaintTelea(img.data, mask, W, H, {
+    radius: Math.max(3, Math.round(Math.min(W, H) * 0.06)),
+  });
+  exemplarDetail(img.data, mask, W, H, detail);
+  wc.putImageData(img, 0, 0);
+
+  // devolve apenas a área reconstruída (bordas originais ficam intactas)
+  const smooth = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = scale < 1;
+  ctx.drawImage(work, mx0, my0, Math.max(1, mx1 - mx0), Math.max(1, my1 - my0), x, y, w, h);
+  ctx.imageSmoothingEnabled = smooth;
+}
+
 
 const imgCache = new Map<string, HTMLImageElement>();
 
