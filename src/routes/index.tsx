@@ -17,6 +17,9 @@ import {
   FolderDown,
   FileArchive,
   Sparkles,
+  Captions,
+  AlertTriangle,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
@@ -28,17 +31,21 @@ import {
   applyRatio,
   commitTemplate,
   createTemplate,
+  defaultCaptions,
   loadTemplates,
   RATIO_PRESETS,
   type Template,
 } from "@/lib/template";
-import { downloadBlob, grabPoster, renderVideo } from "@/lib/render";
+import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
 import { webCodecsSupported } from "@/lib/encode";
 import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
 import { autoFrame } from "@/lib/autoframe";
 import { findClips, formatTime } from "@/lib/clips";
 import { resolveVideoLink } from "@/lib/import.functions";
 import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
+import { cuesToSrt, cuesToText, generateCaptions, type CaptionCue } from "@/lib/captions";
+import { registerFonts } from "@/lib/fonts";
+
 
 
 export const Route = createFileRoute("/")({
@@ -81,8 +88,13 @@ interface Item {
   progress: number;
   blob?: Blob | undefined;
   ext?: string | undefined;
+  /** todas as variações geradas deste vídeo */
+  outputs?: { blob: Blob; ext: string; label: string }[] | undefined;
+  captions?: CaptionCue[] | undefined;
+  capStatus?: string | undefined;
   error?: string | undefined;
 }
+
 
 interface QueueCtrl {
   paused: boolean;
@@ -140,6 +152,11 @@ function Home() {
   const [clipMaxLen, setClipMaxLen] = useState(45);
   const [clipMax, setClipMax] = useState(6);
   const [clipMinScore, setClipMinScore] = useState(60);
+  const [variants, setVariants] = useState(1);
+  const [capLang, setCapLang] = useState("pt");
+  const [capBusyId, setCapBusyId] = useState<string | null>(null);
+
+
 
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
@@ -169,7 +186,9 @@ function Home() {
     const list = loadTemplates();
     setTemplates(list);
     if (list[0]) setActive(list[0]);
+    void registerFonts(list.flatMap((t) => t.fonts ?? []));
   }, []);
+
 
   const addVideos = useCallback(async (list: File[]) => {
     const vids = list.filter((f) => f.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(f.name));
@@ -307,6 +326,44 @@ function Home() {
     [clipBusy, clipMinLen, clipMaxLen, clipMax, clipMinScore],
   );
 
+  /** Transcreve o áudio e gera legendas com tempo por palavra. */
+  const makeCaptions = useCallback(
+    async (item: Item) => {
+      if (capBusyId) return;
+      setCapBusyId(item.id);
+      setItems((p) => p.map((x) => (x.id === item.id ? { ...x, capStatus: "ouvindo o áudio..." } : x)));
+      try {
+        const cues = await generateCaptions(item.file, {
+          clip: item.clip,
+          language: capLang || undefined,
+          onProgress: ({ done, total }) =>
+            setItems((p) =>
+              p.map((x) => (x.id === item.id ? { ...x, capStatus: `transcrevendo ${done}/${total}` } : x)),
+            ),
+        });
+        setItems((p) =>
+          p.map((x) =>
+            x.id === item.id
+              ? {
+                  ...x,
+                  captions: cues,
+                  capStatus: cues.length ? `${cues.length} blocos de legenda` : "nenhuma fala detectada",
+                }
+              : x,
+          ),
+        );
+        if (cues.length) setActive((t) => ({ ...t, captions: { ...(t.captions ?? defaultCaptions()), visible: true } }));
+      } catch (err) {
+        setItems((p) =>
+          p.map((x) => (x.id === item.id ? { ...x, capStatus: `falhou: ${String((err as Error)?.message ?? err)}` } : x)),
+        );
+      } finally {
+        setCapBusyId(null);
+      }
+    },
+    [capBusyId, capLang],
+  );
+
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
   const antiDup = active.antiDup ?? defaultAntiDup();
@@ -314,10 +371,10 @@ function Home() {
     setActive((t) => ({ ...t, antiDup: { ...(t.antiDup ?? defaultAntiDup()), ...patch } }));
 
   const variationOf = useCallback(
-    (item: Item) =>
+    (item: Item, variant = 0) =>
       makeVariation(
         { ...(active.antiDup ?? defaultAntiDup()), mirror: active.mirror, speed: active.speed },
-        `${item.file.name}:${item.file.size}:${item.id}`,
+        `${item.file.name}:${item.file.size}:${item.id}${variant ? `#${variant}` : ""}`,
       ),
     [active],
   );
@@ -333,6 +390,10 @@ function Home() {
             saturation: previewVariation.saturation,
             zoom: previewVariation.zoom,
             noise: previewVariation.noise,
+            rotate: previewVariation.rotate,
+            border: previewVariation.border,
+            borderColor: previewVariation.borderColor,
+            ...(selected?.captions?.length ? { captions: selected.captions } : {}),
           }
         : undefined,
     [
@@ -341,8 +402,13 @@ function Home() {
       previewVariation?.saturation,
       previewVariation?.zoom,
       previewVariation?.noise,
+      previewVariation?.rotate,
+      previewVariation?.border,
+      previewVariation?.borderColor,
+      selected?.captions,
     ],
   );
+
 
 
   const processAll = async (onlyIds?: string[]) => {
@@ -372,18 +438,39 @@ function Home() {
         ctrl.aborts.set(id, ac);
         setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)));
         try {
-          const { blob, ext } = await renderVideo(item.file, modeRef.current === "clip" ? stripBranding(active) : active, {
-            variation: variationOf(item),
-            offsetX: item.offsetX,
-            offsetY: item.offsetY,
-            headline: item.headline || undefined,
-            bitrate: bitrate * 1_000_000,
-            clip: item.clip,
-            signal: ac.signal,
-            onProgress: (p) => setItems((prev) => prev.map((x) => (x.id === id ? { ...x, progress: p } : x))),
-          });
+          const n = Math.max(1, variants);
+          const outputs: { blob: Blob; ext: string; label: string }[] = [];
+          for (let k = 0; k < n; k++) {
+            const { blob, ext } = await renderVideo(
+              item.file,
+              modeRef.current === "clip" ? stripBranding(active) : active,
+              {
+                variation: variationOf(item, k),
+                offsetX: item.offsetX,
+                offsetY: item.offsetY,
+                headline: item.headline || undefined,
+                bitrate: bitrate * 1_000_000,
+                clip: item.clip,
+                captions: item.captions,
+                signal: ac.signal,
+                onProgress: (p) =>
+                  setItems((prev) =>
+                    prev.map((x) => (x.id === id ? { ...x, progress: (k + p) / n } : x)),
+                  ),
+              },
+            );
+            outputs.push({ blob, ext, label: n > 1 ? `v${k + 1}` : "" });
+          }
           doneCount.current++;
-          setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "pronto", blob, ext, progress: 1 } : x)));
+          const first = outputs[0]!;
+          setItems((p) =>
+            p.map((x) =>
+              x.id === id
+                ? { ...x, status: "pronto", blob: first.blob, ext: first.ext, outputs, progress: 1 }
+                : x,
+            ),
+          );
+
         } catch (err) {
           const aborted = (err as Error)?.name === "AbortError";
           setItems((p) =>
@@ -435,13 +522,19 @@ function Home() {
     return s > 90 ? `${Math.round(s / 60)} min` : `${s}s`;
   })();
 
-  const outFiles = () =>
-    items
-      .filter((i) => i.blob)
-      .map((i, idx) => ({
-        name: `${(mode === "clip" ? "corte" : active.name).replace(/\s+/g, "-").toLowerCase()}-${String(idx + 1).padStart(3, "0")}.${i.ext}`,
-        blob: i.blob!,
-      }));
+  const outFiles = () => {
+    const base = (mode === "clip" ? "corte" : active.name).replace(/\s+/g, "-").toLowerCase();
+    const files: { name: string; blob: Blob }[] = [];
+    items.forEach((i, idx) => {
+      const outs = i.outputs ?? (i.blob ? [{ blob: i.blob, ext: i.ext ?? "mp4", label: "" }] : []);
+      outs.forEach((o) => {
+        const suffix = o.label ? `-${o.label}` : "";
+        files.push({ name: `${base}-${String(idx + 1).padStart(3, "0")}${suffix}.${o.ext}`, blob: o.blob });
+      });
+    });
+    return files;
+  };
+
 
   const downloadZipAll = async () => {
     setZipping(true);
@@ -510,6 +603,19 @@ function Home() {
       </header>
 
       <div className="mx-auto max-w-6xl space-y-5 px-5 py-6">
+        {outputIsWebm() && (
+          <div className="flex items-start gap-3 rounded-xl border border-warn/50 bg-warn/10 p-4">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" />
+            <div className="font-mono text-[11px] leading-relaxed text-muted-foreground">
+              <p className="text-warn">este navegador não gera MP4</p>
+              <p>
+                a saída sairá em WebM, que o Instagram e o TikTok recusam. Abra o VaiViral no Chrome ou Edge
+                atualizados (desktop) para exportar MP4 H.264 — ou converta os arquivos antes de publicar.
+              </p>
+            </div>
+          </div>
+        )}
+
         {mode === "lote" ? (
         <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
           <div>
@@ -829,6 +935,19 @@ function Home() {
                     {bitrate} Mbps
                   </label>
                   <label className="flex items-center gap-2">
+                    variações
+                    <input
+                      type="range"
+                      min={1}
+                      max={5}
+                      value={variants}
+                      disabled={running}
+                      onChange={(e) => setVariants(Number(e.target.value))}
+                      className="w-24 accent-[var(--primary)]"
+                    />
+                    {variants}x por vídeo
+                  </label>
+                  <label className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       checked={smartFrame}
@@ -840,6 +959,75 @@ function Home() {
                   <span>{webCodecsSupported() ? "MP4 H.264 · WebCodecs" : "WebM (fallback)"}</span>
                   {eta && <span className="text-primary">● restam ~{eta}</span>}
                 </div>
+
+                {selected && (
+                  <div className="rounded-xl border border-border bg-surface-2 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="mono-label">Legendas automáticas</p>
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={capLang}
+                          onChange={(e) => setCapLang(e.target.value)}
+                          className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[11px]"
+                        >
+                          <option value="pt">pt</option>
+                          <option value="en">en</option>
+                          <option value="es">es</option>
+                          <option value="">auto</option>
+                        </select>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={!!capBusyId}
+                          onClick={() => void makeCaptions(selected)}
+                        >
+                          <Captions className="mr-1 size-4" />
+                          {capBusyId === selected.id ? "Transcrevendo…" : "Gerar legendas"}
+                        </Button>
+                      </div>
+                    </div>
+                    <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                      {selected.capStatus ?? "transcreve a fala e desenha no estilo karaokê definido no editor."}
+                    </p>
+                    {!!selected.captions?.length && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="font-mono text-[11px] text-primary">
+                          ● {selected.captions.length} blocos prontos
+                        </span>
+                        <button
+                          className="font-mono text-[11px] text-muted-foreground underline"
+                          onClick={() =>
+                            setItems((p) =>
+                              p.map((x) =>
+                                x.id === selected.id ? { ...x, captions: undefined, capStatus: undefined } : x,
+                              ),
+                            )
+                          }
+                        >
+                          remover
+                        </button>
+                        <button
+                          className="font-mono text-[11px] text-muted-foreground underline"
+                          onClick={() =>
+                            downloadBlob(
+                              new Blob([cuesToSrt(selected.captions!)], { type: "text/plain" }),
+                              `${selected.file.name.replace(/\.[^.]+$/, "")}.srt`,
+                            )
+                          }
+                        >
+                          baixar .srt
+                        </button>
+                        <button
+                          className="font-mono text-[11px] text-muted-foreground underline"
+                          onClick={() => void navigator.clipboard.writeText(cuesToText(selected.captions!))}
+                        >
+                          <Copy className="inline size-3" /> copiar texto
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
 
                 {selected && (
                   <div className="rounded-xl border border-border bg-surface-2 p-3">
@@ -947,15 +1135,30 @@ function Home() {
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     {(
                       [
-                        ["brightness", "brilho", 0.15],
-                        ["saturation", "saturação", 0.2],
-                        ["zoom", "zoom", 0.12],
-                        ["trim", "corte início/fim (s)", 1],
-                        ["noise", "ruído", 0.12],
+                        ["brightness", "brilho", 0.15, "pct"],
+                        ["saturation", "saturação", 0.2, "pct"],
+                        ["zoom", "zoom", 0.12, "pct"],
+                        ["trim", "corte início/fim", 1, "s"],
+                        ["noise", "ruído", 0.12, "pct"],
+                        ["rotate", "rotação", 1.5, "deg"],
+                        ["border", "moldura", 40, "px"],
+                        ["pitch", "tom do áudio", 60, "cents"],
+                        ["eq", "equalização", 4, "db"],
                       ] as const
-                    ).map(([key, label, max]) => (
+                    ).map(([key, label, max, unit]) => (
                       <label key={key} className="font-mono text-[11px] text-muted-foreground">
-                        {label} · {key === "trim" ? `${antiDup[key].toFixed(2)}s` : `${(antiDup[key] * 100).toFixed(0)}%`}
+                        {label} ·{" "}
+                        {unit === "pct"
+                          ? `${(antiDup[key] * 100).toFixed(0)}%`
+                          : unit === "s"
+                            ? `${antiDup[key].toFixed(2)}s`
+                            : unit === "deg"
+                              ? `${antiDup[key].toFixed(2)}°`
+                              : unit === "px"
+                                ? `${Math.round(antiDup[key])}px`
+                                : unit === "db"
+                                  ? `${antiDup[key].toFixed(1)}dB`
+                                  : `${Math.round(antiDup[key])} cents`}
                         <input
                           type="range"
                           min={0}
@@ -969,11 +1172,21 @@ function Home() {
                       </label>
                     ))}
                   </div>
+                  <label className="mt-2 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={antiDup.cleanMetadata}
+                      onChange={(e) => setAntiDup({ cleanMetadata: e.target.checked })}
+                      className="accent-[var(--primary)]"
+                    />
+                    limpar metadados do MP4 (datas e identificadores)
+                  </label>
                   {selected && (
                     <p className="mt-1 font-mono text-[11px] text-muted-foreground">
                       este vídeo: {describeVariation(variationOf(selected))}
                     </p>
                   )}
+
                 </div>
 
               </div>
@@ -1039,15 +1252,31 @@ function Home() {
                       <span
                         role="button"
                         tabIndex={0}
+                        title={
+                          (it.outputs?.length ?? 1) > 1 ? `baixar ${it.outputs!.length} variações` : "baixar"
+                        }
                         onClick={(e) => {
                           e.stopPropagation();
-                          downloadBlob(it.blob!, `${it.file.name.replace(/\.\w+$/, "")}-vv.${it.ext}`);
+                          const base = it.file.name.replace(/\.\w+$/, "");
+                          const outs = it.outputs ?? [{ blob: it.blob!, ext: it.ext ?? "mp4", label: "" }];
+                          outs.forEach((o, k) =>
+                            setTimeout(
+                              () => downloadBlob(o.blob, `${base}-vv${o.label ? `-${o.label}` : ""}.${o.ext}`),
+                              k * 250,
+                            ),
+                          );
                         }}
-                        className="rounded-md border border-border p-1.5 hover:border-primary"
+                        className="relative rounded-md border border-border p-1.5 hover:border-primary"
                       >
                         <Download className="size-3.5" />
+                        {(it.outputs?.length ?? 1) > 1 && (
+                          <span className="absolute -right-1 -top-1 rounded-full bg-primary px-1 font-mono text-[9px] text-primary-foreground">
+                            {it.outputs!.length}
+                          </span>
+                        )}
                       </span>
                     )}
+
                     <span
                       role="button"
                       tabIndex={0}

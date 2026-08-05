@@ -2,6 +2,8 @@ import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 import { drawFrame } from "./draw";
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import type { Variation } from "./variation";
+import type { CaptionCue } from "./captions";
+import { cleanMp4Metadata } from "./mp4meta";
 
 export interface EncodeOptions {
   file: File;
@@ -16,6 +18,8 @@ export interface EncodeOptions {
   turbo?: number | undefined;
   /** recorte do vídeo fonte (clipagem automática) */
   clip?: { start: number; end: number } | undefined;
+  /** legendas em tempo do vídeo fonte */
+  captions?: CaptionCue[] | undefined;
   onProgress?: ((p: number) => void) | undefined;
   signal?: AbortSignal | undefined;
 }
@@ -76,7 +80,14 @@ async function pickAudioCodec(channels: number, sampleRate: number): Promise<"aa
   return null;
 }
 
-async function decodeAudio(file: File, trimStart: number, dur: number, speed: number) {
+async function decodeAudio(
+  file: File,
+  trimStart: number,
+  dur: number,
+  speed: number,
+  pitchCents = 0,
+  eqDb = 0,
+) {
   try {
     const buf = await file.arrayBuffer();
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -92,7 +103,26 @@ async function decodeAudio(file: File, trimStart: number, dur: number, speed: nu
     const src = off.createBufferSource();
     src.buffer = decoded;
     src.playbackRate.value = speed;
-    src.connect(off.destination);
+    // anti-duplicidade: leve alteração de tom (cents) sem mudar a duração de saída
+    if (pitchCents) {
+      try {
+        src.detune.value = pitchCents;
+      } catch {
+        /* navegador sem detune */
+      }
+    }
+
+    let node: AudioNode = src;
+    if (eqDb) {
+      // realce/corte sutil de agudos: muda o fingerprint do áudio sem soar diferente
+      const shelf = off.createBiquadFilter();
+      shelf.type = "highshelf";
+      shelf.frequency.value = 5200;
+      shelf.gain.value = eqDb;
+      node.connect(shelf);
+      node = shelf;
+    }
+    node.connect(off.destination);
     src.start(0, trimStart, dur);
     const rendered = await off.startRendering();
     return { rendered, channels, sampleRate };
@@ -135,7 +165,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     const outDur = effDur / v.speed;
     const totalFrames = Math.max(1, Math.round(outDur * fps));
 
-    const audio = await decodeAudio(opts.file, trimStart, effDur, v.speed);
+    const audio = await decodeAudio(opts.file, trimStart, effDur, v.speed, v.pitch, v.eq);
     const audioCodec = audio ? await pickAudioCodec(audio.channels, audio.sampleRate) : null;
 
     const muxer = new Muxer({
@@ -170,13 +200,24 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       saturation: v.saturation,
       zoom: v.zoom,
       noise: v.noise,
+      rotate: v.rotate,
+      border: v.border,
+      borderColor: v.borderColor,
+      ...(opts.captions?.length ? { captions: opts.captions } : {}),
     };
 
     let frameIndex = 0;
     const frameDur = Math.round(1_000_000 / fps);
 
     const emit = async () => {
-      drawFrame(ctx, tpl, { el: video, width: video.videoWidth, height: video.videoHeight }, drawOpts);
+      // tempo do vídeo fonte correspondente a este frame (legendas sincronizadas)
+      const srcTime = trimStart + (frameIndex / fps) * v.speed;
+      drawFrame(
+        ctx,
+        tpl,
+        { el: video, width: video.videoWidth, height: video.videoHeight },
+        { ...drawOpts, time: srcTime },
+      );
       const frame = new VideoFrame(canvas, {
         timestamp: frameIndex * frameDur,
         duration: frameDur,
@@ -277,7 +318,9 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
 
     muxer.finalize();
     opts.onProgress?.(1);
-    return new Blob([muxer.target.buffer as ArrayBuffer], { type: "video/mp4" });
+    const raw = muxer.target.buffer as ArrayBuffer;
+    const clean = t.antiDup?.cleanMetadata === false ? raw : cleanMp4Metadata(raw);
+    return new Blob([clean], { type: "video/mp4" });
   } finally {
     URL.revokeObjectURL(url);
     video.src = "";
