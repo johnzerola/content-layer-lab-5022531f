@@ -680,7 +680,10 @@ function Home() {
   const downloadZipAll = async () => {
     setZipping(true);
     try {
-      await downloadAsZip(outFiles(), `${(mode === "clip" ? "cortes" : active.name).replace(/\s+/g, "-").toLowerCase()}.zip`);
+      await downloadAsZip(
+        outFiles(),
+        `${(mode === "clip" ? "cortes" : mode === "limpar" ? "limpos" : active.name).replace(/\s+/g, "-").toLowerCase()}.zip`,
+      );
     } finally {
       setZipping(false);
     }
