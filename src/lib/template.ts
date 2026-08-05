@@ -202,6 +202,77 @@ export interface CustomFont {
   dataUrl: string;
 }
 
+/** Máscara para remover legenda queimada, marca d'água ou texto do vídeo original.
+ *  Coordenadas normalizadas (0..1) relativas à área do vídeo. */
+export interface CleanupRegion {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** blur = borrão, pixelate = mosaico, solid = tarja, smear = clonar pixels vizinhos (inpaint) */
+  mode: "blur" | "pixelate" | "solid" | "smear";
+  /** 1..100 */
+  strength: number;
+  color?: string;
+  /** direção de onde copiar os pixels no modo smear */
+  from?: "bottom" | "top" | "left" | "right";
+  enabled: boolean;
+}
+
+export function makeCleanupRegion(p: Partial<CleanupRegion> = {}): CleanupRegion {
+  return {
+    id: crypto.randomUUID(),
+    label: "Área",
+    x: 0.1,
+    y: 0.78,
+    w: 0.8,
+    h: 0.12,
+    mode: "smear",
+    strength: 55,
+    color: "#000000",
+    from: "top",
+    enabled: true,
+    ...p,
+  };
+}
+
+/** Presets de posições comuns de legenda/marca d'água nas redes. */
+export const CLEANUP_PRESETS: { id: string; label: string; region: Partial<CleanupRegion> }[] = [
+  {
+    id: "cap-bottom",
+    label: "Legenda embaixo",
+    region: { label: "Legenda embaixo", x: 0.05, y: 0.74, w: 0.9, h: 0.14, mode: "smear", from: "top" },
+  },
+  {
+    id: "cap-center",
+    label: "Legenda no meio",
+    region: { label: "Legenda no meio", x: 0.05, y: 0.44, w: 0.9, h: 0.14, mode: "blur", strength: 60 },
+  },
+  {
+    id: "tt-wm",
+    label: "Marca d'água TikTok",
+    region: { label: "Marca d'água TikTok", x: 0.62, y: 0.08, w: 0.34, h: 0.09, mode: "smear", from: "left" },
+  },
+  {
+    id: "tt-user",
+    label: "@usuário TikTok",
+    region: { label: "@usuário TikTok", x: 0.04, y: 0.86, w: 0.6, h: 0.07, mode: "smear", from: "top" },
+  },
+  {
+    id: "top-text",
+    label: "Texto no topo",
+    region: { label: "Texto no topo", x: 0.05, y: 0.06, w: 0.9, h: 0.14, mode: "smear", from: "bottom" },
+  },
+  {
+    id: "corner-logo",
+    label: "Logo canto superior",
+    region: { label: "Logo canto", x: 0.03, y: 0.03, w: 0.24, h: 0.1, mode: "pixelate", strength: 60 },
+  },
+];
+
+
 export interface Template {
   id: string;
   name: string;
