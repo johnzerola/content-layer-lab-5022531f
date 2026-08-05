@@ -6,7 +6,7 @@ type Props = {
   regions: CleanupRegion[];
   onChange: (regions: CleanupRegion[]) => void;
   /** quadro do vídeo original para desenhar as máscaras por cima */
-  poster?: string;
+  poster?: string | undefined;
   /** proporção da área do vídeo (largura / altura) */
   aspect?: number;
 };
