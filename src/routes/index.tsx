@@ -88,7 +88,34 @@ interface QueueCtrl {
   aborts: Map<string, AbortController>;
 }
 
+/** Modo "só cortes": remove toda a marca e usa o vídeo cheio no quadro. */
+function stripBranding(t: Template): Template {
+  const off = <T extends { visible: boolean }>(l: T): T => ({ ...l, visible: false });
+  return {
+    ...t,
+    background: "#000000",
+    video: {
+      ...t.video,
+      x: 0,
+      y: 0,
+      w: t.canvasW ?? 1080,
+      h: t.canvasH ?? 1920,
+      rotation: 0,
+      radius: 0,
+      visible: true,
+    },
+    watermark: off(t.watermark),
+    avatar: off(t.avatar),
+    name_: off(t.name_),
+    handle: off(t.handle),
+    headline: off(t.headline),
+    cta: off(t.cta),
+    extras: [],
+  };
+}
+
 function Home() {
+  const [mode, setMode] = useState<"lote" | "clip">("lote");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
   const [editing, setEditing] = useState(false);
@@ -116,6 +143,8 @@ function Home() {
   const startedAt = useRef(0);
   const doneCount = useRef(0);
   const smartRef = useRef(smartFrame);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   itemsRef.current = items;
   smartRef.current = smartFrame;
@@ -291,7 +320,7 @@ function Home() {
         ctrl.aborts.set(id, ac);
         setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)));
         try {
-          const { blob, ext } = await renderVideo(item.file, active, {
+          const { blob, ext } = await renderVideo(item.file, modeRef.current === "clip" ? stripBranding(active) : active, {
             variation: variationOf(item),
             offsetX: item.offsetX,
             offsetY: item.offsetY,
@@ -380,13 +409,14 @@ function Home() {
   };
 
 
+  const baseTpl: Template = mode === "clip" ? stripBranding(active) : active;
   const previewTemplate: Template = selected
     ? {
-        ...active,
-        headline: { ...active.headline, text: selected.headline || active.headline.text },
-        video: { ...active.video, offsetX: selected.offsetX, offsetY: selected.offsetY },
+        ...baseTpl,
+        headline: { ...baseTpl.headline, text: selected.headline || baseTpl.headline.text },
+        video: { ...baseTpl.video, offsetX: selected.offsetX, offsetY: selected.offsetY },
       }
-    : active;
+    : baseTpl;
 
   return (
     <main className="min-h-screen">
