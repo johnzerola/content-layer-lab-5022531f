@@ -1,14 +1,17 @@
 import { defaultAntiDup, type AntiDupConfig } from "./variation";
 
 export type LayerId =
-
   | "video"
   | "watermark"
   | "avatar"
   | "name"
   | "handle"
   | "headline"
-  | "cta";
+  | "cta"
+  | "captions";
+
+/** Identificador de camada selecionável: fixa ou extra ("extra:<id>"). */
+export type SelId = LayerId | string;
 
 export const CANVAS_W = 1080;
 export const CANVAS_H = 1920;
@@ -20,6 +23,10 @@ export interface BoxLayer {
   h: number;
   visible: boolean;
   rotation: number;
+  /** ordem de empilhamento (maior = na frente) */
+  z?: number;
+  /** opacidade 0..1 (padrão 1) */
+  opacity?: number;
 }
 
 export interface TextLayer extends BoxLayer {
@@ -49,6 +56,29 @@ export interface VideoLayer extends BoxLayer {
 
 export type ExtraLayer = (TextLayer | ImageLayer) & { id: string; label: string };
 
+/** Estilo das legendas automáticas. */
+export interface CaptionStyle extends BoxLayer {
+  size: number;
+  font: string;
+  weight: "400" | "600" | "700" | "800";
+  color: string;
+  activeColor: string;
+  strokeColor: string;
+  stroke: number;
+  bg: "none" | "box" | "shadow";
+  boxColor: string;
+  uppercase: boolean;
+  /** karaoke = destaca a palavra atual · word = uma palavra por vez · line = linha inteira */
+  mode: "karaoke" | "word" | "line";
+  maxWords: number;
+  align: "left" | "center" | "right";
+}
+
+export interface CustomFont {
+  name: string;
+  dataUrl: string;
+}
+
 export interface Template {
   id: string;
   name: string;
@@ -64,12 +94,13 @@ export interface Template {
   handle: TextLayer;
   headline: TextLayer;
   cta: TextLayer;
+  captions?: CaptionStyle;
   extras?: ExtraLayer[];
+  fonts?: CustomFont[];
   mirror: boolean;
   speed: number;
   antiDup?: AntiDupConfig;
 }
-
 
 const text = (o: Partial<TextLayer>): TextLayer => ({
   x: 90,
@@ -86,6 +117,32 @@ const text = (o: Partial<TextLayer>): TextLayer => ({
   font: "Inter, sans-serif",
   ...o,
 });
+
+export function defaultCaptions(): CaptionStyle {
+  return {
+    x: 90,
+    y: 1420,
+    w: 900,
+    h: 220,
+    visible: false,
+    rotation: 0,
+    z: 70,
+    opacity: 1,
+    size: 64,
+    font: "Inter, sans-serif",
+    weight: "800",
+    color: "#ffffff",
+    activeColor: "#c6f24e",
+    strokeColor: "#000000",
+    stroke: 10,
+    bg: "shadow",
+    boxColor: "#000000",
+    uppercase: true,
+    mode: "karaoke",
+    maxWords: 4,
+    align: "center",
+  };
+}
 
 export function createTemplate(name = "Novo template"): Template {
   return {
@@ -104,6 +161,7 @@ export function createTemplate(name = "Novo template"): Template {
       radius: 24,
       offsetX: 0,
       offsetY: 0,
+      z: 0,
     },
     watermark: {
       x: 720,
@@ -115,6 +173,7 @@ export function createTemplate(name = "Novo template"): Template {
       src: null,
       opacity: 0.35,
       round: false,
+      z: 10,
     },
     avatar: {
       x: 90,
@@ -126,8 +185,9 @@ export function createTemplate(name = "Novo template"): Template {
       src: null,
       opacity: 1,
       round: true,
+      z: 20,
     },
-    name_: text({ x: 260, y: 258, text: "Seu nome", size: 56, badge: true }),
+    name_: text({ x: 260, y: 258, text: "Seu nome", size: 56, badge: true, z: 30 }),
     handle: text({
       x: 260,
       y: 325,
@@ -136,6 +196,7 @@ export function createTemplate(name = "Novo template"): Template {
       weight: "400",
       color: "#9aa0a6",
       h: 60,
+      z: 40,
     }),
     headline: text({
       x: 90,
@@ -146,6 +207,7 @@ export function createTemplate(name = "Novo template"): Template {
       size: 60,
       weight: "800",
       align: "center",
+      z: 50,
     }),
     cta: text({
       x: 90,
@@ -157,14 +219,52 @@ export function createTemplate(name = "Novo template"): Template {
       weight: "600",
       align: "center",
       color: "#c9cdd2",
+      z: 60,
     }),
+    captions: defaultCaptions(),
     extras: [],
+    fonts: [],
     mirror: false,
     speed: 1,
     canvasW: CANVAS_W,
     canvasH: CANVAS_H,
     antiDup: defaultAntiDup(),
   };
+}
+
+/** Cria uma camada livre de texto ou imagem. */
+export function makeExtra(kind: "text" | "image", index: number): ExtraLayer {
+  const base = {
+    id: crypto.randomUUID(),
+    x: 140,
+    y: 900,
+    visible: true,
+    rotation: 0,
+    z: 100 + index,
+    opacity: 1,
+  };
+  if (kind === "text") {
+    return {
+      ...base,
+      label: `Texto ${index + 1}`,
+      w: 800,
+      h: 120,
+      text: "Novo texto",
+      color: "#ffffff",
+      size: 56,
+      weight: "700",
+      align: "center",
+      font: "Inter, sans-serif",
+    } as ExtraLayer;
+  }
+  return {
+    ...base,
+    label: `Imagem ${index + 1}`,
+    w: 300,
+    h: 300,
+    src: null,
+    round: false,
+  } as ExtraLayer;
 }
 
 export const RATIO_PRESETS = [
@@ -196,10 +296,10 @@ export function applyRatio(t: Template, w: number, h: number): Template {
     handle: box(t.handle),
     headline: box(t.headline),
     cta: box(t.cta),
+    ...(t.captions ? { captions: box(t.captions) } : {}),
     extras: (t.extras ?? []).map(box),
   };
 }
-
 
 export const LAYER_LABELS: Record<LayerId, string> = {
   video: "Vídeo",
@@ -209,6 +309,7 @@ export const LAYER_LABELS: Record<LayerId, string> = {
   handle: "@ Nome de usuário",
   headline: "Headline",
   cta: "CTA (chamada)",
+  captions: "Legendas automáticas",
 };
 
 const KEY = "vv.templates";
@@ -232,8 +333,19 @@ function read<T>(key: string, fallback: T): T {
   }
 }
 
+/** Garante campos novos em templates salvos antes desta versão. */
+export function migrate(t: Template): Template {
+  return {
+    ...t,
+    captions: t.captions ?? defaultCaptions(),
+    extras: t.extras ?? [],
+    fonts: t.fonts ?? [],
+    antiDup: { ...defaultAntiDup(), ...(t.antiDup ?? {}) },
+  };
+}
+
 export function loadTemplates(): Template[] {
-  return read<Template[]>(KEY, []);
+  return read<Template[]>(KEY, []).map(migrate);
 }
 
 export function saveTemplates(list: Template[]) {
@@ -307,6 +419,5 @@ export async function importTemplateFile(file: File): Promise<Template> {
   const parsed = JSON.parse(await file.text()) as Partial<Template>;
   if (!parsed || !parsed.video || !parsed.headline) throw new Error("Arquivo de template inválido");
   const base = createTemplate(parsed.name ?? "Template importado");
-  return { ...base, ...parsed, id: base.id, version: 1, updatedAt: Date.now() };
+  return migrate({ ...base, ...parsed, id: base.id, version: 1, updatedAt: Date.now() } as Template);
 }
-

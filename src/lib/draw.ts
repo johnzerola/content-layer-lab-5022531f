@@ -1,4 +1,12 @@
-import { CANVAS_H, CANVAS_W, type ImageLayer, type Template, type TextLayer } from "./template";
+import {
+  CANVAS_H,
+  CANVAS_W,
+  type CaptionStyle,
+  type ImageLayer,
+  type Template,
+  type TextLayer,
+} from "./template";
+import type { CaptionCue } from "./captions";
 
 const imgCache = new Map<string, HTMLImageElement>();
 
@@ -52,73 +60,197 @@ function wrap(ctx: CanvasRenderingContext2D, txt: string, maxW: number) {
   return lines;
 }
 
+/** Aplica rotação em torno do centro da caixa da camada. */
+function withTransform(
+  ctx: CanvasRenderingContext2D,
+  l: { x: number; y: number; w: number; h: number; rotation?: number; opacity?: number },
+  fn: () => void,
+) {
+  ctx.save();
+  if (l.opacity != null && l.opacity !== 1) ctx.globalAlpha = l.opacity;
+  if (l.rotation) {
+    const cx = l.x + l.w / 2;
+    const cy = l.y + l.h / 2;
+    ctx.translate(cx, cy);
+    ctx.rotate((l.rotation * Math.PI) / 180);
+    ctx.translate(-cx, -cy);
+  }
+  fn();
+  ctx.restore();
+}
+
 function drawText(ctx: CanvasRenderingContext2D, l: TextLayer) {
   if (!l.visible || !l.text) return;
-  ctx.save();
-  ctx.font = `${l.weight} ${l.size}px ${l.font}`;
-  ctx.textBaseline = "top";
-  const lines = wrap(ctx, l.text, l.w);
-  const lh = l.size * 1.18;
-  lines.forEach((line, i) => {
-    const y = l.y + i * lh;
-    let x = l.x;
-    const width = ctx.measureText(line).width;
-    if (l.align === "center") x = l.x + (l.w - width) / 2;
-    if (l.align === "right") x = l.x + l.w - width;
+  withTransform(ctx, l, () => {
+    ctx.font = `${l.weight} ${l.size}px ${l.font}`;
+    ctx.textBaseline = "top";
+    const lines = wrap(ctx, l.text, l.w);
+    const lh = l.size * 1.18;
+    lines.forEach((line, i) => {
+      const y = l.y + i * lh;
+      let x = l.x;
+      const width = ctx.measureText(line).width;
+      if (l.align === "center") x = l.x + (l.w - width) / 2;
+      if (l.align === "right") x = l.x + l.w - width;
 
-    if (l.accentColor && l.accentTo != null && l.accentFrom != null && lines.length === 1) {
-      const a = l.text.slice(0, l.accentFrom);
-      const b = l.text.slice(l.accentFrom, l.accentTo);
-      const c = l.text.slice(l.accentTo);
-      let cx = x;
-      ctx.fillStyle = l.color;
-      ctx.fillText(a, cx, y);
-      cx += ctx.measureText(a).width;
-      ctx.fillStyle = l.accentColor;
-      ctx.fillText(b, cx, y);
-      cx += ctx.measureText(b).width;
-      ctx.fillStyle = l.color;
-      ctx.fillText(c, cx, y);
-    } else {
-      ctx.fillStyle = l.color;
-      ctx.fillText(line, x, y);
-    }
+      if (l.accentColor && l.accentTo != null && l.accentFrom != null && lines.length === 1) {
+        const a = l.text.slice(0, l.accentFrom);
+        const b = l.text.slice(l.accentFrom, l.accentTo);
+        const c = l.text.slice(l.accentTo);
+        let cx = x;
+        ctx.fillStyle = l.color;
+        ctx.fillText(a, cx, y);
+        cx += ctx.measureText(a).width;
+        ctx.fillStyle = l.accentColor;
+        ctx.fillText(b, cx, y);
+        cx += ctx.measureText(b).width;
+        ctx.fillStyle = l.color;
+        ctx.fillText(c, cx, y);
+      } else {
+        ctx.fillStyle = l.color;
+        ctx.fillText(line, x, y);
+      }
 
-    if (l.badge && i === lines.length - 1) {
-      const bx = x + width + l.size * 0.25;
-      const by = y + l.size * 0.32;
-      const r = l.size * 0.28;
-      ctx.fillStyle = "#1d9bf0";
-      ctx.beginPath();
-      ctx.arc(bx + r, by + r, r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = Math.max(2, r * 0.22);
-      ctx.beginPath();
-      ctx.moveTo(bx + r * 0.55, by + r);
-      ctx.lineTo(bx + r * 0.9, by + r * 1.38);
-      ctx.lineTo(bx + r * 1.45, by + r * 0.62);
-      ctx.stroke();
-    }
+      if (l.badge && i === lines.length - 1) {
+        const bx = x + width + l.size * 0.25;
+        const by = y + l.size * 0.32;
+        const r = l.size * 0.28;
+        ctx.fillStyle = "#1d9bf0";
+        ctx.beginPath();
+        ctx.arc(bx + r, by + r, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = Math.max(2, r * 0.22);
+        ctx.beginPath();
+        ctx.moveTo(bx + r * 0.55, by + r);
+        ctx.lineTo(bx + r * 0.9, by + r * 1.38);
+        ctx.lineTo(bx + r * 1.45, by + r * 0.62);
+        ctx.stroke();
+      }
+    });
   });
-  ctx.restore();
 }
 
 function drawImageLayer(ctx: CanvasRenderingContext2D, l: ImageLayer) {
   if (!l.visible || !l.src) return;
   const img = getImage(l.src);
   if (!img) return;
+  withTransform(ctx, { ...l, opacity: 1 }, () => {
+    ctx.globalAlpha = l.opacity;
+    if (l.round) {
+      ctx.beginPath();
+      ctx.arc(l.x + l.w / 2, l.y + l.h / 2, Math.min(l.w, l.h) / 2, 0, Math.PI * 2);
+      ctx.clip();
+    }
+    const scale = Math.max(l.w / img.width, l.h / img.height);
+    const dw = img.width * scale;
+    const dh = img.height * scale;
+    ctx.drawImage(img, l.x + (l.w - dw) / 2, l.y + (l.h - dh) / 2, dw, dh);
+  });
+}
+
+/* ---------------------------------------------------------------- legendas */
+
+function chunkWords<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+export function drawCaptions(
+  ctx: CanvasRenderingContext2D,
+  s: CaptionStyle,
+  cues: CaptionCue[],
+  time: number,
+) {
+  if (!s.visible || !cues.length) return;
+  const cue = cues.find((c) => time >= c.start && time <= c.end);
+  if (!cue) return;
+
+  const groups = chunkWords(cue.words, Math.max(1, s.maxWords));
+  const group =
+    groups.find((g) => time >= (g[0]?.start ?? 0) && time <= (g[g.length - 1]?.end ?? 0)) ??
+    groups[groups.length - 1];
+  if (!group || !group.length) return;
+
+  const activeIdx = group.findIndex((w) => time >= w.start && time <= w.end);
+  const shown =
+    s.mode === "word" ? [group[Math.max(0, activeIdx)]!] : group;
+
   ctx.save();
-  ctx.globalAlpha = l.opacity;
-  if (l.round) {
-    ctx.beginPath();
-    ctx.arc(l.x + l.w / 2, l.y + l.h / 2, Math.min(l.w, l.h) / 2, 0, Math.PI * 2);
-    ctx.clip();
+  ctx.globalAlpha = s.opacity ?? 1;
+  ctx.font = `${s.weight} ${s.size}px ${s.font}`;
+  ctx.textBaseline = "top";
+
+  const norm = (txt: string) => (s.uppercase ? txt.toUpperCase() : txt);
+  const space = ctx.measureText(" ").width;
+
+  // quebra em linhas respeitando a largura da caixa
+  const lines: (typeof shown)[] = [];
+  let line: typeof shown = [];
+  let lineW = 0;
+  for (const w of shown) {
+    const ww = ctx.measureText(norm(w.text)).width;
+    if (line.length && lineW + space + ww > s.w) {
+      lines.push(line);
+      line = [];
+      lineW = 0;
+    }
+    line.push(w);
+    lineW += (line.length > 1 ? space : 0) + ww;
   }
-  const scale = Math.max(l.w / img.width, l.h / img.height);
-  const dw = img.width * scale;
-  const dh = img.height * scale;
-  ctx.drawImage(img, l.x + (l.w - dw) / 2, l.y + (l.h - dh) / 2, dw, dh);
+  if (line.length) lines.push(line);
+
+  const lh = s.size * 1.2;
+  const totalH = lines.length * lh;
+  const startY = s.y + Math.max(0, (s.h - totalH) / 2);
+
+  if (s.bg === "box") {
+    const pad = s.size * 0.28;
+    let maxW = 0;
+    for (const ln of lines) {
+      const wSum = ln.reduce((acc, w, i) => acc + (i ? space : 0) + ctx.measureText(norm(w.text)).width, 0);
+      maxW = Math.max(maxW, wSum);
+    }
+    const bx =
+      s.align === "left" ? s.x : s.align === "right" ? s.x + s.w - maxW : s.x + (s.w - maxW) / 2;
+    ctx.fillStyle = s.boxColor;
+    ctx.globalAlpha = (s.opacity ?? 1) * 0.65;
+    roundRect(ctx, bx - pad, startY - pad * 0.7, maxW + pad * 2, totalH + pad * 1.4, s.size * 0.18);
+    ctx.fill();
+    ctx.globalAlpha = s.opacity ?? 1;
+  }
+
+  lines.forEach((ln, li) => {
+    const widths = ln.map((w) => ctx.measureText(norm(w.text)).width);
+    const total = widths.reduce((a, b) => a + b, 0) + space * (ln.length - 1);
+    let x =
+      s.align === "left" ? s.x : s.align === "right" ? s.x + s.w - total : s.x + (s.w - total) / 2;
+    const y = startY + li * lh;
+
+    ln.forEach((w, i) => {
+      const txt = norm(w.text);
+      const active = time >= w.start && time <= w.end;
+      if (s.bg === "shadow") {
+        ctx.shadowColor = "rgba(0,0,0,0.65)";
+        ctx.shadowBlur = s.size * 0.25;
+        ctx.shadowOffsetY = s.size * 0.06;
+      }
+      if (s.stroke > 0) {
+        ctx.lineJoin = "round";
+        ctx.lineWidth = s.stroke;
+        ctx.strokeStyle = s.strokeColor;
+        ctx.strokeText(txt, x, y);
+      }
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.fillStyle = s.mode === "line" ? s.color : active ? s.activeColor : s.color;
+      ctx.fillText(txt, x, y);
+      x += (widths[i] ?? 0) + space;
+    });
+  });
+
   ctx.restore();
 }
 
@@ -154,6 +286,79 @@ export interface DrawOpts {
   saturation?: number;
   zoom?: number;
   noise?: number;
+  /** rotação anti-duplicidade aplicada ao vídeo (graus) */
+  rotate?: number;
+  /** moldura anti-duplicidade em px */
+  border?: number;
+  borderColor?: string;
+  /** tempo atual do vídeo fonte (segundos) — usado pelas legendas */
+  time?: number;
+  captions?: CaptionCue[];
+}
+
+function drawVideoLayer(
+  ctx: CanvasRenderingContext2D,
+  t: Template,
+  source?: FrameSource | null,
+  opts?: DrawOpts,
+) {
+  const v = t.video;
+  if (!v.visible) return;
+  const border = opts?.border ?? 0;
+  if (border > 0) {
+    ctx.save();
+    ctx.fillStyle = opts?.borderColor ?? "#000";
+    roundRect(ctx, v.x - border, v.y - border, v.w + border * 2, v.h + border * 2, v.radius + border);
+    ctx.fill();
+    ctx.restore();
+  }
+  ctx.save();
+  const rot = (v.rotation ?? 0) + (opts?.rotate ?? 0);
+  if (rot) {
+    const cx = v.x + v.w / 2;
+    const cy = v.y + v.h / 2;
+    ctx.translate(cx, cy);
+    ctx.rotate((rot * Math.PI) / 180);
+    ctx.translate(-cx, -cy);
+  }
+  roundRect(ctx, v.x, v.y, v.w, v.h, v.radius);
+  ctx.clip();
+  if (source && source.width) {
+    // a rotação exige um leve zoom extra pra não aparecer canto vazio
+    const rotPad = rot ? 1 + Math.abs(rot) / 40 : 1;
+    const zoom = (opts?.zoom ?? 1) * rotPad;
+    const scale = Math.max(v.w / source.width, v.h / source.height) * zoom;
+    const dw = source.width * scale;
+    const dh = source.height * scale;
+    const ox = (opts?.offsetX ?? v.offsetX) * (dw - v.w) * 0.5;
+    const oy = (opts?.offsetY ?? v.offsetY) * (dh - v.h) * 0.5;
+    const dx = v.x + (v.w - dw) / 2 + ox;
+    const dy = v.y + (v.h - dh) / 2 + oy;
+    if (opts?.mirror ?? t.mirror) {
+      ctx.translate(v.x * 2 + v.w, 0);
+      ctx.scale(-1, 1);
+    }
+    const b = opts?.brightness ?? 1;
+    const s = opts?.saturation ?? 1;
+    if (b !== 1 || s !== 1) ctx.filter = `brightness(${b}) saturate(${s})`;
+    ctx.drawImage(source.el, dx, dy, dw, dh);
+    ctx.filter = "none";
+    if (opts?.noise) {
+      ctx.globalAlpha = Math.min(0.12, opts.noise);
+      ctx.globalCompositeOperation = "overlay";
+      const pat = ctx.createPattern(getNoiseTile(), "repeat");
+      if (pat) {
+        ctx.fillStyle = pat;
+        ctx.fillRect(v.x, v.y, v.w, v.h);
+      }
+      ctx.globalCompositeOperation = "source-over";
+      ctx.globalAlpha = 1;
+    }
+  } else {
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.fillRect(v.x, v.y, v.w, v.h);
+  }
+  ctx.restore();
 }
 
 export function drawFrame(
@@ -168,57 +373,27 @@ export function drawFrame(
   ctx.fillStyle = t.background;
   ctx.fillRect(0, 0, W, H);
 
-  const v = t.video;
-  if (v.visible) {
-    ctx.save();
-    roundRect(ctx, v.x, v.y, v.w, v.h, v.radius);
-    ctx.clip();
-    if (source && source.width) {
-      const zoom = opts?.zoom ?? 1;
-      const scale = Math.max(v.w / source.width, v.h / source.height) * zoom;
-      const dw = source.width * scale;
-      const dh = source.height * scale;
-      const ox = (opts?.offsetX ?? v.offsetX) * (dw - v.w) * 0.5;
-      const oy = (opts?.offsetY ?? v.offsetY) * (dh - v.h) * 0.5;
-      const dx = v.x + (v.w - dw) / 2 + ox;
-      const dy = v.y + (v.h - dh) / 2 + oy;
-      if (opts?.mirror ?? t.mirror) {
-        ctx.translate(v.x * 2 + v.w, 0);
-        ctx.scale(-1, 1);
-      }
-      const b = opts?.brightness ?? 1;
-      const s = opts?.saturation ?? 1;
-      if (b !== 1 || s !== 1) ctx.filter = `brightness(${b}) saturate(${s})`;
-      ctx.drawImage(source.el, dx, dy, dw, dh);
-      ctx.filter = "none";
-      if (opts?.noise) {
-        ctx.globalAlpha = Math.min(0.12, opts.noise);
-        ctx.globalCompositeOperation = "overlay";
-        const pat = ctx.createPattern(getNoiseTile(), "repeat");
-        if (pat) {
-          ctx.fillStyle = pat;
-          ctx.fillRect(v.x, v.y, v.w, v.h);
-        }
-        ctx.globalCompositeOperation = "source-over";
-        ctx.globalAlpha = 1;
-      }
-    } else {
-      ctx.fillStyle = "rgba(255,255,255,0.06)";
-      ctx.fillRect(v.x, v.y, v.w, v.h);
-    }
-    ctx.restore();
+  // ordem de empilhamento configurável (z-index por camada)
+  const jobs: { z: number; i: number; run: () => void }[] = [];
+  const push = (z: number | undefined, fallback: number, run: () => void) =>
+    jobs.push({ z: z ?? fallback, i: jobs.length, run });
+
+  push(t.video.z, 0, () => drawVideoLayer(ctx, t, source, opts));
+  push(t.watermark.z, 10, () => drawImageLayer(ctx, t.watermark));
+  push(t.avatar.z, 20, () => drawImageLayer(ctx, t.avatar));
+  push(t.name_.z, 30, () => drawText(ctx, t.name_));
+  push(t.handle.z, 40, () => drawText(ctx, t.handle));
+  push(t.headline.z, 50, () => drawText(ctx, t.headline));
+  push(t.cta.z, 60, () => drawText(ctx, t.cta));
+  (t.extras ?? []).forEach((extra, i) =>
+    push(extra.z, 100 + i, () => ("src" in extra ? drawImageLayer(ctx, extra) : drawText(ctx, extra))),
+  );
+  if (t.captions && opts?.captions?.length) {
+    const cues = opts.captions;
+    const time = opts.time ?? 0;
+    push(t.captions.z, 70, () => drawCaptions(ctx, t.captions!, cues, time));
   }
 
-  drawImageLayer(ctx, t.watermark);
-  drawImageLayer(ctx, t.avatar);
-  drawText(ctx, t.name_);
-  drawText(ctx, t.handle);
-  drawText(ctx, t.headline);
-  drawText(ctx, t.cta);
-  for (const extra of t.extras ?? []) {
-    if ("src" in extra) drawImageLayer(ctx, extra);
-    else drawText(ctx, extra);
-  }
+  jobs.sort((a, b) => a.z - b.z || a.i - b.i).forEach((j) => j.run());
   ctx.restore();
 }
-

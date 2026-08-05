@@ -2,6 +2,7 @@ import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import { drawFrame } from "./draw";
 import { encodeMp4, webCodecsSupported } from "./encode";
 import type { Variation } from "./variation";
+import type { CaptionCue } from "./captions";
 
 export interface RenderOptions {
   variation: Variation;
@@ -12,6 +13,7 @@ export interface RenderOptions {
   bitrate?: number | undefined;
   turbo?: number | undefined;
   clip?: { start: number; end: number } | undefined;
+  captions?: CaptionCue[] | undefined;
   onProgress?: ((p: number) => void) | undefined;
   signal?: AbortSignal | undefined;
 }
@@ -27,6 +29,12 @@ function pickMime() {
     if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(c)) return c;
   }
   return "video/webm";
+}
+
+/** true quando o navegador só consegue gerar WebM (rejeitado por Instagram/TikTok). */
+export function outputIsWebm() {
+  if (webCodecsSupported()) return false;
+  return !pickMime().startsWith("video/mp4");
 }
 
 /** Fallback em tempo real (navegadores sem WebCodecs). */
@@ -90,6 +98,11 @@ async function recordVideo(
       saturation: v.saturation,
       zoom: v.zoom,
       noise: v.noise,
+      rotate: v.rotate,
+      border: v.border,
+      borderColor: v.borderColor,
+      time: video.currentTime,
+      ...(opts.captions?.length ? { captions: opts.captions } : {}),
     });
     if (video.duration) opts.onProgress?.(Math.min(1, video.currentTime / endAt));
     if (video.currentTime >= endAt) video.pause();
@@ -136,6 +149,7 @@ export async function renderVideo(
         bitrate: opts.bitrate ?? 10_000_000,
         turbo: opts.turbo ?? 4,
         clip: opts.clip,
+        captions: opts.captions,
         onProgress: opts.onProgress,
         signal: opts.signal,
       });
