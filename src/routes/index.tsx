@@ -340,7 +340,9 @@ function Home() {
     async (item: Item) => {
       if (capBusyId) return;
       setCapBusyId(item.id);
-      setItems((p) => p.map((x) => (x.id === item.id ? { ...x, capStatus: "ouvindo o áudio..." } : x)));
+      setItems((p) =>
+        p.map((x) => (x.id === item.id ? { ...x, capStatus: "ouvindo o áudio...", capError: false } : x)),
+      );
       try {
         const cues = await generateCaptions(item.file, {
           clip: item.clip,
@@ -356,17 +358,18 @@ function Home() {
               ? {
                   ...x,
                   captions: cues,
-                  capStatus: cues.length ? `${cues.length} blocos de legenda` : "nenhuma fala detectada",
+                  capError: false,
+                  capStatus: `${cues.length} blocos · ${cues.reduce((n, c) => n + c.words.length, 0)} palavras`,
                 }
               : x,
           ),
         );
         if (cues.length) setActive((t) => ({ ...t, captions: { ...(t.captions ?? defaultCaptions()), visible: true } }));
       } catch (err) {
-        setItems((p) =>
-          p.map((x) => (x.id === item.id ? { ...x, capStatus: `falhou: ${String((err as Error)?.message ?? err)}` } : x)),
-        );
+        const msg = String((err as Error)?.message ?? err);
+        setItems((p) => p.map((x) => (x.id === item.id ? { ...x, capStatus: msg, capError: true } : x)));
       } finally {
+
         setCapBusyId(null);
       }
     },
