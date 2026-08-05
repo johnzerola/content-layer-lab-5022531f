@@ -115,6 +115,9 @@ export function TemplateCanvas({
   previewFile,
   drawOpts,
   snap = true,
+  speed = 1,
+  trimStart = 0,
+  trimEnd = 0,
 }: {
   template: Template;
   selected?: SelId | null;
@@ -125,7 +128,13 @@ export function TemplateCanvas({
   previewFile?: File | null;
   drawOpts?: DrawOpts | undefined;
   snap?: boolean;
+  /** velocidade anti-duplicidade aplicada na prévia */
+  speed?: number;
+  /** corte inicial/final (s) aplicado na prévia */
+  trimStart?: number;
+  trimEnd?: number;
 }) {
+
   const W = template.canvasW ?? CANVAS_W;
   const H = template.canvasH ?? CANVAS_H;
   const canvasRef = useRef<HTMLCanvasElement>(null);
