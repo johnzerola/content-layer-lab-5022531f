@@ -94,6 +94,8 @@ interface Item {
   outputs?: { blob: Blob; ext: string; label: string }[] | undefined;
   captions?: CaptionCue[] | undefined;
   capStatus?: string | undefined;
+  capError?: boolean | undefined;
+
   error?: string | undefined;
 }
 
