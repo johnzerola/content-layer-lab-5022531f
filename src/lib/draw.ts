@@ -442,7 +442,121 @@ function drawVideoLayer(
     ctx.fillRect(v.x, v.y, v.w, v.h);
   }
   ctx.restore();
+  applyCleanup(ctx, v, t.cleanup);
 }
+
+let scratch: HTMLCanvasElement | null = null;
+function getScratch(w: number, h: number) {
+  if (!scratch) scratch = document.createElement("canvas");
+  if (scratch.width !== w || scratch.height !== h) {
+    scratch.width = w;
+    scratch.height = h;
+  }
+  return scratch;
+}
+
+/** Remove legenda queimada / marca d'água / texto do vídeo original dentro das máscaras. */
+export function applyCleanup(
+  ctx: CanvasRenderingContext2D,
+  v: { x: number; y: number; w: number; h: number; radius: number },
+  regions?: CleanupRegion[],
+) {
+  const list = (regions ?? []).filter((r) => r.enabled && r.w > 0 && r.h > 0);
+  if (!list.length) return;
+  const canvas = ctx.canvas;
+
+  for (const r of list) {
+    const x = Math.round(v.x + r.x * v.w);
+    const y = Math.round(v.y + r.y * v.h);
+    const w = Math.round(r.w * v.w);
+    const h = Math.round(r.h * v.h);
+    if (w < 2 || h < 2) continue;
+    const k = Math.max(1, Math.min(100, r.strength || 50)) / 100;
+
+    ctx.save();
+    roundRect(ctx, v.x, v.y, v.w, v.h, v.radius);
+    ctx.clip();
+    ctx.beginPath();
+    ctx.rect(x, y, w, h);
+    ctx.clip();
+
+    if (r.mode === "solid") {
+      ctx.fillStyle = r.color ?? "#000000";
+      ctx.fillRect(x, y, w, h);
+    } else if (r.mode === "pixelate") {
+      const px = Math.max(2, Math.round(Math.min(w, h) * 0.5 * k));
+      const sw = Math.max(1, Math.round(w / px));
+      const sh = Math.max(1, Math.round(h / px));
+      const s = getScratch(sw, sh);
+      const sc = s.getContext("2d");
+      if (sc) {
+        sc.clearRect(0, 0, sw, sh);
+        sc.drawImage(canvas, x, y, w, h, 0, 0, sw, sh);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(s, 0, 0, sw, sh, x, y, w, h);
+        ctx.imageSmoothingEnabled = true;
+      }
+    } else if (r.mode === "blur") {
+      const pad = Math.round(Math.min(w, h) * 0.4) + 8;
+      const sx = Math.max(0, x - pad);
+      const sy = Math.max(0, y - pad);
+      const sw = Math.min(canvas.width - sx, w + pad * 2);
+      const sh = Math.min(canvas.height - sy, h + pad * 2);
+      const s = getScratch(sw, sh);
+      const sc = s.getContext("2d");
+      if (sc) {
+        sc.clearRect(0, 0, sw, sh);
+        sc.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+        ctx.filter = `blur(${Math.max(3, Math.round(Math.min(w, h) * 0.35 * k))}px)`;
+        ctx.drawImage(s, sx, sy);
+        ctx.filter = "none";
+      }
+    } else {
+      // smear: clona a faixa vizinha por cima da área (inpaint simples)
+      const from = r.from ?? "top";
+      const bandBase = Math.max(4, Math.round((from === "left" || from === "right" ? w : h) * 0.25));
+      const band = Math.max(3, Math.round(bandBase * (0.4 + k)));
+      let sx = x;
+      let sy = y;
+      let sw = w;
+      let sh = h;
+      if (from === "top") {
+        sy = Math.max(0, y - band);
+        sh = Math.min(band, y);
+      } else if (from === "bottom") {
+        sy = Math.min(canvas.height - 1, y + h);
+        sh = Math.min(band, canvas.height - sy);
+      } else if (from === "left") {
+        sx = Math.max(0, x - band);
+        sw = Math.min(band, x);
+      } else {
+        sx = Math.min(canvas.width - 1, x + w);
+        sw = Math.min(band, canvas.width - sx);
+      }
+      if (sw > 0 && sh > 0) {
+        const s = getScratch(sw, sh);
+        const sc = s.getContext("2d");
+        if (sc) {
+          sc.clearRect(0, 0, sw, sh);
+          sc.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+          ctx.filter = `blur(${Math.max(2, Math.round(Math.min(w, h) * 0.12))}px)`;
+          ctx.drawImage(s, 0, 0, sw, sh, x, y, w, h);
+          // segunda passada espelhada suaviza a emenda
+          ctx.globalAlpha = 0.5;
+          ctx.save();
+          ctx.translate(x, y + h);
+          ctx.scale(1, -1);
+          ctx.drawImage(s, 0, 0, sw, sh, 0, 0, w, h);
+          ctx.restore();
+          ctx.globalAlpha = 1;
+          ctx.filter = "none";
+        }
+      }
+    }
+    ctx.restore();
+  }
+}
+
 
 export function drawFrame(
   ctx: CanvasRenderingContext2D,
