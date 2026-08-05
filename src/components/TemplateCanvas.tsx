@@ -162,16 +162,30 @@ export function TemplateCanvas({
     const v = document.createElement("video");
     v.src = url;
     v.muted = true;
-    v.loop = true;
     v.playsInline = true;
+    // respeita o corte inicial/final da anti-duplicidade no loop da prévia
+    const onLoop = () => {
+      const end = v.duration ? v.duration - trimEnd : Infinity;
+      if (v.currentTime < trimStart || v.currentTime >= end) v.currentTime = trimStart;
+    };
+    v.addEventListener("loadedmetadata", onLoop);
+    v.addEventListener("timeupdate", onLoop);
     void v.play().catch(() => undefined);
     videoEl.current = v;
     return () => {
+      v.removeEventListener("loadedmetadata", onLoop);
+      v.removeEventListener("timeupdate", onLoop);
       v.pause();
       videoEl.current = null;
       URL.revokeObjectURL(url);
     };
-  }, [previewFile]);
+  }, [previewFile, trimStart, trimEnd]);
+
+  // velocidade anti-duplicidade em tempo real
+  useEffect(() => {
+    if (videoEl.current) videoEl.current.playbackRate = Math.max(0.25, Math.min(4, speed || 1));
+  }, [speed, previewFile]);
+
 
   useEffect(() => {
     for (const src of [template.avatar.src, template.watermark.src]) {
