@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Upload,
+  Link as LinkIcon,
+  Scissors,
   X,
   Play,
   Download,
@@ -655,6 +657,56 @@ function Home() {
                   <span>{webCodecsSupported() ? "MP4 H.264 · WebCodecs" : "WebM (fallback)"}</span>
                   {eta && <span className="text-primary">● restam ~{eta}</span>}
                 </div>
+
+                {selected && (
+                  <div className="rounded-xl border border-border bg-surface-2 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="mono-label">Cortes automáticos</p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={clipBusy}
+                        onClick={() => void autoClip(selected)}
+                      >
+                        <Scissors className="mr-1 size-4" />
+                        {clipBusy ? "analisando..." : "Gerar cortes"}
+                      </Button>
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <label className="font-mono text-[11px] text-muted-foreground">
+                        duração de cada corte · {clipLen}s
+                        <input
+                          type="range"
+                          min={10}
+                          max={90}
+                          step={5}
+                          value={clipLen}
+                          onChange={(e) => setClipLen(Number(e.target.value))}
+                          className="w-full accent-[var(--primary)]"
+                        />
+                      </label>
+                      <label className="font-mono text-[11px] text-muted-foreground">
+                        máximo de cortes · {clipMax}
+                        <input
+                          type="range"
+                          min={1}
+                          max={20}
+                          step={1}
+                          value={clipMax}
+                          onChange={(e) => setClipMax(Number(e.target.value))}
+                          className="w-full accent-[var(--primary)]"
+                        />
+                      </label>
+                    </div>
+                    <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                      {selected.clip
+                        ? `trecho ${formatTime(selected.clip.start)}–${formatTime(selected.clip.end)}${
+                            selected.score ? ` · score ${selected.score}` : ""
+                          }`
+                        : "analisa áudio e movimento e separa os melhores trechos do vídeo longo"}
+                    </p>
+                  </div>
+                )}
 
                 <div className="rounded-xl border border-border bg-surface-2 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
