@@ -231,13 +231,14 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
           </Field>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {(
             [
               ["Cor do texto", "color"],
               ["Cor do destaque", "activeColor"],
               ["Contorno", "strokeColor"],
               ["Caixa/realce", "highlightColor"],
+              ["Fundo (caixa)", "boxColor"],
             ] as const
           ).map(([label, key]) => (
             <Field key={key} label={label}>
@@ -250,6 +251,7 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
             </Field>
           ))}
         </div>
+
 
         <div className="grid gap-3 sm:grid-cols-2">
           <Range label="Tamanho" value={style.size} min={28} max={150} onChange={(v) => onChange({ size: v })} />
@@ -277,6 +279,14 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
             onChange={(v) => onChange({ lineHeight: v })}
           />
           <Range
+            label="Posição horizontal"
+            value={style.x}
+            min={0}
+            max={1080}
+            step={10}
+            onChange={(v) => onChange({ x: v })}
+          />
+          <Range
             label="Posição vertical"
             value={style.y}
             min={0}
@@ -300,7 +310,36 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
             suffix="%"
             onChange={(v) => onChange({ opacity: v / 100 })}
           />
+          {style.bg === "box" && (
+            <>
+              <Range
+                label="Respiro da caixa"
+                value={Math.round((style.boxPad ?? 0.28) * 100)}
+                min={0}
+                max={100}
+                suffix="%"
+                onChange={(v) => onChange({ boxPad: v / 100 })}
+              />
+              <Range
+                label="Cantos da caixa"
+                value={Math.round((style.boxRadius ?? 0.18) * 100)}
+                min={0}
+                max={80}
+                suffix="%"
+                onChange={(v) => onChange({ boxRadius: v / 100 })}
+              />
+              <Range
+                label="Opacidade da caixa"
+                value={Math.round((style.boxOpacity ?? 0.65) * 100)}
+                min={0}
+                max={100}
+                suffix="%"
+                onChange={(v) => onChange({ boxOpacity: v / 100 })}
+              />
+            </>
+          )}
         </div>
+
 
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex gap-1">

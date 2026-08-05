@@ -82,7 +82,14 @@ export interface CaptionStyle extends BoxLayer {
   maxLines?: number;
   /** espaçamento entre linhas (multiplicador) */
   lineHeight?: number;
+  /** respiro interno da caixa de fundo (multiplicador do tamanho da fonte) */
+  boxPad?: number;
+  /** arredondamento da caixa de fundo (multiplicador do tamanho da fonte) */
+  boxRadius?: number;
+  /** opacidade da caixa de fundo (0–1) */
+  boxOpacity?: number;
 }
+
 
 /** Presets prontos, estilo CapCut. */
 export const CAPTION_PRESETS: { id: string; label: string; style: Partial<CaptionStyle> }[] = [

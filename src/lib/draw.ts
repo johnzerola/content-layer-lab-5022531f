@@ -247,7 +247,7 @@ export function drawCaptions(
   const hlColor = s.highlightColor ?? s.activeColor;
 
   if (s.bg === "box") {
-    const pad = s.size * 0.28;
+    const pad = s.size * (s.boxPad ?? 0.28);
     let maxW = 0;
     for (const ln of lines) {
       const wSum = ln.reduce((acc, w, i) => acc + (i ? space : 0) + ctx.measureText(norm(w.text)).width, 0);
@@ -257,11 +257,19 @@ export function drawCaptions(
       s.align === "left" ? s.x : s.align === "right" ? s.x + s.w - maxW : s.x + (s.w - maxW) / 2;
     ctx.fillStyle = s.boxColor;
     const prev = ctx.globalAlpha;
-    ctx.globalAlpha = prev * 0.65;
-    roundRect(ctx, bx - pad, startY - pad * 0.7, maxW + pad * 2, totalH + pad * 1.4, s.size * 0.18);
+    ctx.globalAlpha = prev * (s.boxOpacity ?? 0.65);
+    roundRect(
+      ctx,
+      bx - pad,
+      startY - pad * 0.7,
+      maxW + pad * 2,
+      totalH + pad * 1.4,
+      s.size * (s.boxRadius ?? 0.18),
+    );
     ctx.fill();
     ctx.globalAlpha = prev;
   }
+
 
   lines.forEach((ln, li) => {
     const widths = ln.map((w) => ctx.measureText(norm(w.text)).width);
