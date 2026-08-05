@@ -168,42 +168,83 @@ export function drawCaptions(
   if (!cue) return;
 
   const groups = chunkWords(cue.words, Math.max(1, s.maxWords));
-  const group =
-    groups.find((g) => time >= (g[0]?.start ?? 0) && time <= (g[g.length - 1]?.end ?? 0)) ??
-    groups[groups.length - 1];
+  const gi = groups.findIndex(
+    (g) => time >= (g[0]?.start ?? 0) && time <= (g[g.length - 1]?.end ?? 0),
+  );
+  const group = groups[gi >= 0 ? gi : groups.length - 1];
   if (!group || !group.length) return;
 
+  const groupStart = group[0]?.start ?? 0;
   const activeIdx = group.findIndex((w) => time >= w.start && time <= w.end);
-  const shown =
-    s.mode === "word" ? [group[Math.max(0, activeIdx)]!] : group;
+  const shown = s.mode === "word" ? [group[Math.max(0, activeIdx)]!] : group;
+
+  // animação de entrada do bloco
+  const anim = s.anim ?? "none";
+  const since = Math.max(0, time - (s.mode === "word" ? (shown[0]?.start ?? groupStart) : groupStart));
+  const p = Math.min(1, since / 0.22);
+  let scaleIn = 1;
+  let slideY = 0;
+  let alphaIn = 1;
+  if (anim === "pop") scaleIn = 0.72 + 0.28 * (1 - (1 - p) ** 3);
+  else if (anim === "bounce") scaleIn = 1 + 0.18 * Math.sin(Math.PI * p) * (1 - p);
+  else if (anim === "slide") slideY = (1 - (1 - p) ** 3) * 0 + (1 - p) * s.size * 0.7;
+  else if (anim === "fade") alphaIn = p;
 
   ctx.save();
-  ctx.globalAlpha = s.opacity ?? 1;
+  ctx.globalAlpha = (s.opacity ?? 1) * alphaIn;
   ctx.font = `${s.weight} ${s.size}px ${s.font}`;
   ctx.textBaseline = "top";
 
   const norm = (txt: string) => (s.uppercase ? txt.toUpperCase() : txt);
   const space = ctx.measureText(" ").width;
 
+  // typewriter: revela apenas as palavras já faladas
+  const visible =
+    anim === "typewriter" ? shown.filter((w) => time >= w.start - 0.02) : shown;
+  const words = visible.length ? visible : [shown[0]!];
+
   // quebra em linhas respeitando a largura da caixa
-  const lines: (typeof shown)[] = [];
-  let line: typeof shown = [];
+  const allLines: (typeof words)[] = [];
+  let line: typeof words = [];
   let lineW = 0;
-  for (const w of shown) {
+  for (const w of words) {
     const ww = ctx.measureText(norm(w.text)).width;
     if (line.length && lineW + space + ww > s.w) {
-      lines.push(line);
+      allLines.push(line);
       line = [];
       lineW = 0;
     }
     line.push(w);
     lineW += (line.length > 1 ? space : 0) + ww;
   }
-  if (line.length) lines.push(line);
+  if (line.length) allLines.push(line);
 
-  const lh = s.size * 1.2;
+  // limita o número de linhas visíveis (mantém as que contêm a palavra atual)
+  const maxLines = Math.max(1, s.maxLines ?? 2);
+  let lines = allLines;
+  if (allLines.length > maxLines) {
+    const cur = Math.max(
+      0,
+      allLines.findIndex((ln) => ln.some((w) => time >= w.start && time <= w.end)),
+    );
+    const start = Math.min(Math.max(0, cur - maxLines + 1), allLines.length - maxLines);
+    lines = allLines.slice(start, start + maxLines);
+  }
+
+  const lh = s.size * (s.lineHeight ?? 1.2);
   const totalH = lines.length * lh;
-  const startY = s.y + Math.max(0, (s.h - totalH) / 2);
+  const startY = s.y + Math.max(0, (s.h - totalH) / 2) + slideY;
+  const cx = s.x + s.w / 2;
+  const cy = s.y + s.h / 2;
+
+  if (scaleIn !== 1) {
+    ctx.translate(cx, cy);
+    ctx.scale(scaleIn, scaleIn);
+    ctx.translate(-cx, -cy);
+  }
+
+  const highlight = s.highlight ?? "color";
+  const hlColor = s.highlightColor ?? s.activeColor;
 
   if (s.bg === "box") {
     const pad = s.size * 0.28;
@@ -215,10 +256,11 @@ export function drawCaptions(
     const bx =
       s.align === "left" ? s.x : s.align === "right" ? s.x + s.w - maxW : s.x + (s.w - maxW) / 2;
     ctx.fillStyle = s.boxColor;
-    ctx.globalAlpha = (s.opacity ?? 1) * 0.65;
+    const prev = ctx.globalAlpha;
+    ctx.globalAlpha = prev * 0.65;
     roundRect(ctx, bx - pad, startY - pad * 0.7, maxW + pad * 2, totalH + pad * 1.4, s.size * 0.18);
     ctx.fill();
-    ctx.globalAlpha = s.opacity ?? 1;
+    ctx.globalAlpha = prev;
   }
 
   lines.forEach((ln, li) => {
@@ -230,7 +272,23 @@ export function drawCaptions(
 
     ln.forEach((w, i) => {
       const txt = norm(w.text);
-      const active = time >= w.start && time <= w.end;
+      const ww = widths[i] ?? 0;
+      const active = s.mode !== "line" && time >= w.start && time <= w.end;
+
+      if (active && highlight === "box") {
+        const pad = s.size * 0.16;
+        ctx.fillStyle = hlColor;
+        roundRect(ctx, x - pad, y - pad * 0.5, ww + pad * 2, s.size * 1.15 + pad, s.size * 0.16);
+        ctx.fill();
+      }
+
+      ctx.save();
+      if (active && highlight === "scale") {
+        ctx.translate(x + ww / 2, y + s.size * 0.55);
+        ctx.scale(1.14, 1.14);
+        ctx.translate(-(x + ww / 2), -(y + s.size * 0.55));
+      }
+
       if (s.bg === "shadow") {
         ctx.shadowColor = "rgba(0,0,0,0.65)";
         ctx.shadowBlur = s.size * 0.25;
@@ -245,14 +303,31 @@ export function drawCaptions(
       ctx.shadowColor = "transparent";
       ctx.shadowBlur = 0;
       ctx.shadowOffsetY = 0;
-      ctx.fillStyle = s.mode === "line" ? s.color : active ? s.activeColor : s.color;
+      ctx.fillStyle =
+        s.mode === "line"
+          ? s.color
+          : active
+            ? highlight === "box"
+              ? s.activeColor
+              : highlight === "color" || highlight === "scale"
+                ? s.activeColor
+                : s.color
+            : s.color;
       ctx.fillText(txt, x, y);
-      x += (widths[i] ?? 0) + space;
+      ctx.restore();
+
+      if (active && highlight === "underline") {
+        ctx.fillStyle = hlColor;
+        ctx.fillRect(x, y + s.size * 1.12, ww, Math.max(3, s.size * 0.08));
+      }
+
+      x += ww + space;
     });
   });
 
   ctx.restore();
 }
+
 
 export interface FrameSource {
   el: CanvasImageSource;
