@@ -105,6 +105,7 @@ function Home() {
   const [linkUrl, setLinkUrl] = useState("");
   const [linkBusy, setLinkBusy] = useState(false);
   const [linkMsg, setLinkMsg] = useState<string | null>(null);
+  const [linkBlocked, setLinkBlocked] = useState(false);
   const [clipBusy, setClipBusy] = useState(false);
   const [clipLen, setClipLen] = useState(30);
   const [clipMax, setClipMax] = useState(6);
@@ -183,16 +184,19 @@ function Home() {
     const url = linkUrl.trim();
     if (!url || linkBusy) return;
     setLinkBusy(true);
+    setLinkBlocked(false);
     setLinkMsg("procurando o vídeo...");
     try {
       const res = await resolveVideoLink({ data: { url } });
       if (!res.ok || !res.videoUrl) {
+        setLinkBlocked(Boolean(res.blocked));
         setLinkMsg(res.message ?? "não encontrei o vídeo nesse link");
         return;
       }
       setLinkMsg(`baixando de ${res.source ?? "origem"}...`);
       const dl = await fetch(`/api/public/media-proxy?u=${encodeURIComponent(res.videoUrl)}`);
       if (!dl.ok) {
+        setLinkBlocked(true);
         setLinkMsg("a origem bloqueou o download desse arquivo");
         return;
       }
@@ -519,6 +523,16 @@ function Home() {
               </Button>
             </div>
             {linkMsg && <p className="mt-2 font-mono text-[11px] text-muted-foreground">{linkMsg}</p>}
+            {linkBlocked && (
+              <div className="mx-auto mt-3 max-w-xl rounded-lg border border-border bg-muted/30 p-3 text-left">
+                <p className="font-mono text-[11px] uppercase tracking-wider text-primary">como importar mesmo assim</p>
+                <ol className="mt-2 space-y-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                  <li>1. baixe o vídeo pelo próprio app (Instagram/TikTok: salvar em vídeos) ou por um downloader</li>
+                  <li>2. arraste o arquivo aqui em cima, ou use "Selecionar arquivos"</li>
+                  <li>3. links diretos terminados em .mp4 / .mov / .webm importam normalmente</li>
+                </ol>
+              </div>
+            )}
           </div>
         </section>
 
