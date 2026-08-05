@@ -242,6 +242,13 @@ function SelectedClip({
   onRemove,
   onSelect,
   active,
+  draggable,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  dragging,
+  dragOver,
 }: {
   item: ClipItem;
   index: number;
@@ -249,6 +256,13 @@ function SelectedClip({
   onRemove: () => void;
   onSelect: () => void;
   active: boolean;
+  draggable: boolean;
+  onDragStart: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
+  dragging: boolean;
+  dragOver: boolean;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
@@ -273,11 +287,21 @@ function SelectedClip({
 
   return (
     <div
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
       onClick={onSelect}
-      className={`relative w-36 shrink-0 overflow-hidden rounded-lg border bg-surface-2 transition ${
+      className={`group relative w-36 shrink-0 cursor-move overflow-hidden rounded-lg border bg-surface-2 transition ${
         active ? "border-primary" : "border-border hover:border-primary/40"
+      } ${dragging ? "opacity-40" : "opacity-100"} ${
+        dragOver ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
       }`}
     >
+      <div className="absolute left-0 top-0 z-10 rounded-br-md bg-background/80 p-1 backdrop-blur">
+        <GripVertical className="size-3.5 text-muted-foreground" />
+      </div>
       <div className="relative aspect-[9/16] bg-black">
         <video
           ref={videoRef}
