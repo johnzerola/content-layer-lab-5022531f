@@ -37,7 +37,7 @@ import {
   loadTemplates,
   PLATFORM_PRESETS,
   RATIO_PRESETS,
-
+  makeCleanupRegion,
   type CleanupRegion,
   type Template,
 } from "@/lib/template";
