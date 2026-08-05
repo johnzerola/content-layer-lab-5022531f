@@ -44,11 +44,15 @@ export interface VideoLayer extends BoxLayer {
   offsetY: number;
 }
 
+export type ExtraLayer = (TextLayer | ImageLayer) & { id: string; label: string };
+
 export interface Template {
   id: string;
   name: string;
   version?: number;
   updatedAt?: number;
+  canvasW?: number;
+  canvasH?: number;
   background: string;
   video: VideoLayer;
   watermark: ImageLayer;
@@ -57,9 +61,12 @@ export interface Template {
   handle: TextLayer;
   headline: TextLayer;
   cta: TextLayer;
+  extras?: ExtraLayer[];
   mirror: boolean;
   speed: number;
+  antiDup?: AntiDupConfig;
 }
+
 
 const text = (o: Partial<TextLayer>): TextLayer => ({
   x: 90,
