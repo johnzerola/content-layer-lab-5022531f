@@ -65,7 +65,7 @@ export function TemplateCanvas({
   interactive?: boolean;
   poster?: string | null;
   previewFile?: File | null;
-  drawOpts?: DrawOpts;
+  drawOpts?: DrawOpts | undefined;
 }) {
   const W = template.canvasW ?? CANVAS_W;
   const H = template.canvasH ?? CANVAS_H;
