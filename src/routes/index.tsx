@@ -134,8 +134,11 @@ function Home() {
   const [linkMsg, setLinkMsg] = useState<string | null>(null);
   const [linkBlocked, setLinkBlocked] = useState(false);
   const [clipBusy, setClipBusy] = useState(false);
-  const [clipLen, setClipLen] = useState(30);
+  const [clipMinLen, setClipMinLen] = useState(20);
+  const [clipMaxLen, setClipMaxLen] = useState(45);
   const [clipMax, setClipMax] = useState(6);
+  const [clipMinScore, setClipMinScore] = useState(60);
+
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
   const ctrlRef = useRef<QueueCtrl>({ paused: false, cancelled: false, aborts: new Map() });
@@ -250,7 +253,16 @@ function Home() {
       if (clipBusy) return;
       setClipBusy(true);
       try {
-        const clips = await findClips(item.file, { target: clipLen, max: clipMax });
+        const clips = await findClips(item.file, {
+          minLen: Math.min(clipMinLen, clipMaxLen),
+          maxLen: Math.max(clipMinLen, clipMaxLen),
+          max: clipMax,
+          minScore: clipMinScore,
+        });
+        if (!clips.length) {
+          setLinkMsg("nenhum trecho atingiu o score mínimo — reduza a intensidade do score");
+          return;
+        }
         const created: Item[] = clips.map((c) => ({
           id: crypto.randomUUID(),
           file: item.file,
@@ -275,7 +287,7 @@ function Home() {
         setClipBusy(false);
       }
     },
-    [clipBusy, clipLen, clipMax],
+    [clipBusy, clipMinLen, clipMaxLen, clipMax, clipMinScore],
   );
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
@@ -766,19 +778,39 @@ function Home() {
                     </div>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
                       <label className="font-mono text-[11px] text-muted-foreground">
-                        duração de cada corte · {clipLen}s
+                        duração mínima · {clipMinLen}s
                         <input
                           type="range"
-                          min={10}
-                          max={90}
+                          min={5}
+                          max={120}
                           step={5}
-                          value={clipLen}
-                          onChange={(e) => setClipLen(Number(e.target.value))}
+                          value={clipMinLen}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            setClipMinLen(v);
+                            if (v > clipMaxLen) setClipMaxLen(v);
+                          }}
                           className="w-full accent-[var(--primary)]"
                         />
                       </label>
                       <label className="font-mono text-[11px] text-muted-foreground">
-                        máximo de cortes · {clipMax}
+                        duração máxima · {clipMaxLen}s
+                        <input
+                          type="range"
+                          min={5}
+                          max={120}
+                          step={5}
+                          value={clipMaxLen}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            setClipMaxLen(v);
+                            if (v < clipMinLen) setClipMinLen(v);
+                          }}
+                          className="w-full accent-[var(--primary)]"
+                        />
+                      </label>
+                      <label className="font-mono text-[11px] text-muted-foreground">
+                        quantidade de cortes · até {clipMax}
                         <input
                           type="range"
                           min={1}
@@ -789,7 +821,27 @@ function Home() {
                           className="w-full accent-[var(--primary)]"
                         />
                       </label>
+                      <label className="font-mono text-[11px] text-muted-foreground">
+                        intensidade do score · {clipMinScore}
+                        <input
+                          type="range"
+                          min={0}
+                          max={95}
+                          step={5}
+                          value={clipMinScore}
+                          onChange={(e) => setClipMinScore(Number(e.target.value))}
+                          className="w-full accent-[var(--primary)]"
+                        />
+                        <span className="block text-[10px] opacity-70">
+                          {clipMinScore >= 80
+                            ? "só os trechos mais fortes"
+                            : clipMinScore >= 60
+                              ? "equilibrado"
+                              : "aceita quase tudo"}
+                        </span>
+                      </label>
                     </div>
+
                     <p className="mt-1 font-mono text-[11px] text-muted-foreground">
                       {selected.clip
                         ? `trecho ${formatTime(selected.clip.start)}–${formatTime(selected.clip.end)}${

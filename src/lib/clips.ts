@@ -12,13 +12,20 @@ export interface Clip {
 }
 
 export interface ClipOptions {
-  /** duração alvo de cada corte, em segundos */
+  /** duração alvo (compat) — usada quando min/max não são informados */
   target?: number;
+  /** duração mínima de cada corte, em segundos */
+  minLen?: number;
+  /** duração máxima de cada corte, em segundos */
+  maxLen?: number;
   /** quantidade máxima de cortes */
   max?: number;
+  /** 0..100 — só devolve cortes com score igual ou acima */
+  minScore?: number;
   onProgress?: (p: number) => void;
   signal?: AbortSignal;
 }
+
 
 async function loudnessCurve(file: File, step = 0.25): Promise<{ curve: number[]; duration: number }> {
   const Ctx = window.OfflineAudioContext ?? window.webkitOfflineAudioContext;
@@ -95,8 +102,11 @@ function at(curve: number[], t: number, duration: number) {
 
 /** Encontra os melhores trechos de um vídeo longo. */
 export async function findClips(file: File, opts: ClipOptions = {}): Promise<Clip[]> {
-  const target = Math.max(5, opts.target ?? 30);
+  const target = Math.max(3, opts.target ?? 30);
+  const minLen = Math.max(3, opts.minLen ?? target);
+  const maxLen = Math.max(minLen, opts.maxLen ?? target);
   const max = Math.max(1, opts.max ?? 8);
+  const minScore = Math.min(100, Math.max(0, opts.minScore ?? 0));
 
   let curve: number[] = [];
   let duration = 0;
@@ -124,50 +134,65 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
   const motion = await motionCurve(file, Math.min(60, Math.max(12, Math.round(duration / 4))), opts.signal);
   opts.onProgress?.(0.85);
 
-  if (duration <= target * 1.2) {
+  if (duration <= minLen * 1.2) {
     return [{ start: 0, end: duration, score: 70 }];
   }
 
+  // durações candidatas entre mínimo e máximo
+  const lens: number[] = [];
+  const steps = maxLen > minLen ? 4 : 1;
+  for (let i = 0; i < steps; i++) {
+    const len = steps === 1 ? minLen : minLen + ((maxLen - minLen) * i) / (steps - 1);
+    if (len <= duration) lens.push(Number(len.toFixed(2)));
+  }
+  if (!lens.length) lens.push(Math.min(minLen, duration));
+
   // janela deslizante de meio segundo
   const step = 0.5;
-  const windows: { start: number; raw: number }[] = [];
-  for (let s = 0; s + target <= duration; s += step) {
-    let sum = 0;
-    let peak = 0;
-    for (let t = s; t < s + target; t += step) {
-      const energy = at(curve, t, duration) * 0.7 + at(motion, t, duration) * 0.3;
-      sum += energy;
-      peak = Math.max(peak, energy);
+  const windows: { start: number; len: number; raw: number }[] = [];
+  for (const len of lens) {
+    for (let s = 0; s + len <= duration; s += step) {
+      let sum = 0;
+      let peak = 0;
+      for (let t = s; t < s + len; t += step) {
+        const energy = at(curve, t, duration) * 0.7 + at(motion, t, duration) * 0.3;
+        sum += energy;
+        peak = Math.max(peak, energy);
+      }
+      const n = len / step;
+      // média alta + um pico forte = trecho com gancho
+      windows.push({ start: s, len, raw: (sum / n) * 0.75 + peak * 0.25 });
     }
-    const n = target / step;
-    // média alta + um pico forte = trecho com gancho
-    windows.push({ start: s, raw: (sum / n) * 0.75 + peak * 0.25 });
   }
-  if (!windows.length) return [{ start: 0, end: Math.min(target, duration), score: 60 }];
+  if (!windows.length) return [{ start: 0, end: Math.min(minLen, duration), score: 60 }];
 
   windows.sort((a, b) => b.raw - a.raw);
-  const chosen: { start: number; raw: number }[] = [];
+  const best = windows[0]!.raw;
+  const worst = windows[windows.length - 1]?.raw ?? 0;
+  const span = Math.max(1e-6, best - worst);
+  const scoreOf = (raw: number) => Math.round(55 + ((raw - worst) / span) * 44);
+
+  const chosen: { start: number; len: number; raw: number }[] = [];
   for (const w of windows) {
     if (chosen.length >= max) break;
-    // sem sobreposição maior que 30%
-    if (chosen.some((c) => Math.abs(c.start - w.start) < target * 0.7)) continue;
+    if (scoreOf(w.raw) < minScore) break;
+    // sem sobreposição relevante com um corte já escolhido
+    if (chosen.some((c) => w.start < c.start + c.len * 0.7 && c.start < w.start + w.len * 0.7)) continue;
     chosen.push(w);
   }
 
-  const best = chosen[0]?.raw ?? 1;
-  const worst = windows[windows.length - 1]?.raw ?? 0;
-  const span = Math.max(1e-6, best - worst);
   const clips = chosen
     .map((c) => ({
       start: Number(c.start.toFixed(2)),
-      end: Number(Math.min(duration, c.start + target).toFixed(2)),
-      score: Math.round(55 + ((c.raw - worst) / span) * 44),
+      end: Number(Math.min(duration, c.start + c.len).toFixed(2)),
+      score: scoreOf(c.raw),
     }))
     .sort((a, b) => a.start - b.start);
 
   opts.onProgress?.(1);
   return clips;
 }
+
 
 export function formatTime(t: number) {
   const m = Math.floor(t / 60);
