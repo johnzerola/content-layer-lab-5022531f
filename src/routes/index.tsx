@@ -423,14 +423,23 @@ function Home() {
             setEditing(false);
           }}
           onSave={(t) => {
-            const list = templates.some((x) => x.id === t.id)
-              ? templates.map((x) => (x.id === t.id ? t : x))
-              : [...templates, t];
-            setTemplates(list);
-            saveTemplates(list);
-            setActive(t);
+            commit(t, "editado no editor");
             setEditing(false);
           }}
+        />
+      )}
+
+      {libraryOpen && (
+        <TemplateLibrary
+          templates={templates}
+          activeId={active.id}
+          onClose={() => setLibraryOpen(false)}
+          onChangeList={setTemplates}
+          onUse={(t) => {
+            setActive(t);
+            setLibraryOpen(false);
+          }}
+          onCommit={commit}
         />
       )}
     </main>
