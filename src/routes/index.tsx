@@ -832,7 +832,7 @@ function Home() {
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && void importFromLink()}
-                placeholder="https://... link da página ou do arquivo .mp4"
+                placeholder="https://... TikTok, X, Reddit, Vimeo, Streamable ou arquivo direto"
                 className="flex-1 rounded-lg border border-border bg-surface-2 px-3 py-2 font-mono text-xs outline-none focus:border-primary"
               />
               <Button onClick={() => void importFromLink()} disabled={linkBusy || !linkUrl.trim()}>
@@ -840,17 +840,23 @@ function Home() {
                 {linkBusy ? "baixando..." : "Importar"}
               </Button>
             </div>
+            <p className="mt-2 font-mono text-[10px] leading-relaxed text-muted-foreground">
+              importação automática: tiktok · x/twitter · reddit · vimeo · streamable · links diretos de arquivo.
+              youtube / instagram / facebook exigem um serviço de resolução próprio (COBALT_API_URL).
+            </p>
             {linkMsg && <p className="mt-2 font-mono text-[11px] text-muted-foreground">{linkMsg}</p>}
             {linkBlocked && (
               <div className="mx-auto mt-3 max-w-xl rounded-lg border border-border bg-muted/30 p-3 text-left">
                 <p className="font-mono text-[11px] uppercase tracking-wider text-primary">como importar mesmo assim</p>
                 <ol className="mt-2 space-y-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
-                  <li>1. baixe o vídeo pelo próprio app (Instagram/TikTok: salvar em vídeos) ou por um downloader</li>
+                  <li>1. baixe o vídeo pelo próprio app (Instagram/YouTube: salvar em vídeos) ou por um downloader</li>
                   <li>2. arraste o arquivo aqui em cima, ou use "Selecionar arquivos"</li>
                   <li>3. links diretos de arquivo (.mp4, .mov, .webm, .mkv, .m4v...) importam normalmente</li>
+                  <li>4. para automatizar youtube/instagram, hospede uma instância cobalt e me peça para ligar a chave</li>
                 </ol>
               </div>
             )}
+
           </div>
         </section>
 
