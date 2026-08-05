@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { CANVAS_H, CANVAS_W, LAYER_LABELS, type LayerId, type Template } from "@/lib/template";
-import { drawFrame, preloadImage } from "@/lib/draw";
+import { drawFrame, preloadImage, type DrawOpts } from "@/lib/draw";
 
 type Rect = { x: number; y: number; w: number; h: number };
 
