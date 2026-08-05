@@ -655,6 +655,33 @@ function Home() {
     if (ids.length) void processAll(ids);
   };
 
+  /** Analisa o vídeo selecionado e sugere as áreas com legenda queimada / marca d'água. */
+  const runDetect = async () => {
+    const it = itemsRef.current.find((x) => x.id === selectedId);
+    if (!it) return;
+    setDetecting(true);
+    setSuggestions([]);
+    setDetectMsg("analisando quadros…");
+    try {
+      const found = await detectOverlays(it.file, {
+        clip: it.clip,
+        onProgress: (d, t) => setDetectMsg(`analisando quadros ${d}/${t}…`),
+      });
+      const regions = found.map((f) => makeCleanupRegion(f));
+      setSuggestions(regions);
+      setDetectMsg(
+        regions.length
+          ? `${regions.length} área(s) encontrada(s) — clique para usar`
+          : "nada fixo encontrado neste vídeo — marque manualmente",
+      );
+    } catch (err) {
+      setSuggestions([]);
+      setDetectMsg(`falha na detecção: ${String((err as Error)?.message ?? err)}`);
+    } finally {
+      setDetecting(false);
+    }
+  };
+
   const readyCount = items.filter((i) => i.status === "pronto").length;
   const errorCount = items.filter((i) => i.status === "erro").length;
   const pendingCount = items.filter((i) => i.status !== "pronto").length;
