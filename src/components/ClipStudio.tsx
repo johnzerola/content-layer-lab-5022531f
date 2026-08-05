@@ -537,7 +537,37 @@ export function ClipStudio(props: Props) {
             </div>
           </div>
 
+          {validPicked.length > 0 && (
+            <div className="rounded-xl border border-border bg-surface-2 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="mono-label">selecionados para exportar · {validPicked.length}</p>
+                <button
+                  className="font-mono text-[11px] text-muted-foreground hover:text-foreground"
+                  onClick={() => setPicked([])}
+                >
+                  limpar
+                </button>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {ordered
+                  .filter((c) => validPicked.includes(c.id))
+                  .map((c, i) => (
+                    <SelectedClip
+                      key={c.id}
+                      item={c}
+                      index={i}
+                      active={selectedId === c.id}
+                      onSelect={() => onSelect(c.id)}
+                      onUnpick={() => setPicked((prev) => prev.filter((x) => x !== c.id))}
+                      onRemove={() => onRemove(c.id)}
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+
             {ordered.map((c, i) => (
               <ClipCard
                 key={c.id}
