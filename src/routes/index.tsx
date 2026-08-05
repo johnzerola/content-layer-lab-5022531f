@@ -470,17 +470,83 @@ function Home() {
                 <p className="text-sm text-muted-foreground">Selecione um vídeo na lista.</p>
               )}
 
-              <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4">
-                <Button onClick={processAll} disabled={running}>
-                  <Play className="size-4" /> {running ? "Processando…" : "Processar em lote"}
-                </Button>
-                <Button variant="outline" onClick={downloadAll} disabled={readyCount === 0}>
-                  <Download className="size-4" /> Baixar todos ({readyCount})
-                </Button>
-                <span className="font-mono text-xs text-muted-foreground">
-                  {active.mirror ? "espelhado · " : ""}velocidade {active.speed.toFixed(2)}x
-                </span>
+              <div className="space-y-3 border-t border-border pt-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button onClick={() => void processAll()} disabled={running}>
+                    <Play className="size-4" /> {running ? "Processando…" : "Processar em lote"}
+                  </Button>
+                  {running && (
+                    <>
+                      <Button variant="outline" onClick={togglePause}>
+                        <Pause className="size-4" /> {paused ? "Retomar" : "Pausar"}
+                      </Button>
+                      <Button variant="outline" onClick={cancelAll}>
+                        <StopCircle className="size-4" /> Cancelar
+                      </Button>
+                    </>
+                  )}
+                  {errorCount > 0 && !running && (
+                    <Button variant="outline" onClick={retryErrors}>
+                      <RotateCcw className="size-4" /> Tentar de novo ({errorCount})
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => void downloadZipAll()} disabled={readyCount === 0 || zipping}>
+                    <FileArchive className="size-4" /> {zipping ? "Compactando…" : `Baixar ZIP (${readyCount})`}
+                  </Button>
+                  {fsAccessSupported() && (
+                    <Button variant="outline" onClick={() => void saveFolder()} disabled={readyCount === 0}>
+                      <FolderDown className="size-4" /> Salvar na pasta
+                    </Button>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 font-mono text-[11px] text-muted-foreground">
+                  <label className="flex items-center gap-2">
+                    paralelo
+                    <input
+                      type="range"
+                      min={1}
+                      max={4}
+                      value={concurrency}
+                      disabled={running}
+                      onChange={(e) => setConcurrency(Number(e.target.value))}
+                      className="w-24 accent-[var(--primary)]"
+                    />
+                    {concurrency}x
+                  </label>
+                  <label className="flex items-center gap-2">
+                    bitrate
+                    <input
+                      type="range"
+                      min={4}
+                      max={20}
+                      value={bitrate}
+                      disabled={running}
+                      onChange={(e) => setBitrate(Number(e.target.value))}
+                      className="w-24 accent-[var(--primary)]"
+                    />
+                    {bitrate} Mbps
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={smartFrame}
+                      onChange={(e) => setSmartFrame(e.target.checked)}
+                      className="accent-[var(--primary)]"
+                    />
+                    <Sparkles className="size-3" /> enquadramento inteligente
+                  </label>
+                  <span>{webCodecsSupported() ? "MP4 H.264 · WebCodecs" : "WebM (fallback)"}</span>
+                  {eta && <span className="text-primary">● restam ~{eta}</span>}
+                </div>
+
+                {selected && (
+                  <p className="font-mono text-[11px] text-muted-foreground">
+                    anti-duplicidade: {describeVariation(variationOf(selected))}
+                  </p>
+                )}
               </div>
+
             </section>
 
             <section className="panel flex max-h-[70vh] flex-col p-5">
