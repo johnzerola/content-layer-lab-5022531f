@@ -410,6 +410,19 @@ function Home() {
     return out;
   }, [selected?.captions, capStyle.visible]);
 
+  // mesma janela calculada pelo encoder (clipe + corte anti-duplicidade)
+  const previewLoop = useMemo(() => {
+    const v = previewVariation;
+    const dur = selected?.duration || 0;
+    if (!v || !dur) return { start: 0, end: undefined as number | undefined };
+    const clipStart = Math.max(0, Math.min(selected?.clip?.start ?? 0, Math.max(0, dur - 0.5)));
+    const clipEnd = Math.min(dur, selected?.clip?.end ?? dur);
+    const clipDur = Math.max(0.5, clipEnd - clipStart);
+    const start = clipStart + Math.min(v.trimStart, Math.max(0, clipDur - 0.5));
+    const effDur = Math.max(0.2, clipDur - (start - clipStart) - v.trimEnd);
+    return { start, end: start + effDur };
+  }, [previewVariation?.trimStart, previewVariation?.trimEnd, selected?.duration, selected?.clip?.start, selected?.clip?.end]);
+
   const previewDrawOpts = useMemo(
     () =>
       previewVariation
