@@ -438,18 +438,39 @@ function Home() {
         ctrl.aborts.set(id, ac);
         setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)));
         try {
-          const { blob, ext } = await renderVideo(item.file, modeRef.current === "clip" ? stripBranding(active) : active, {
-            variation: variationOf(item),
-            offsetX: item.offsetX,
-            offsetY: item.offsetY,
-            headline: item.headline || undefined,
-            bitrate: bitrate * 1_000_000,
-            clip: item.clip,
-            signal: ac.signal,
-            onProgress: (p) => setItems((prev) => prev.map((x) => (x.id === id ? { ...x, progress: p } : x))),
-          });
+          const n = Math.max(1, variants);
+          const outputs: { blob: Blob; ext: string; label: string }[] = [];
+          for (let k = 0; k < n; k++) {
+            const { blob, ext } = await renderVideo(
+              item.file,
+              modeRef.current === "clip" ? stripBranding(active) : active,
+              {
+                variation: variationOf(item, k),
+                offsetX: item.offsetX,
+                offsetY: item.offsetY,
+                headline: item.headline || undefined,
+                bitrate: bitrate * 1_000_000,
+                clip: item.clip,
+                captions: item.captions,
+                signal: ac.signal,
+                onProgress: (p) =>
+                  setItems((prev) =>
+                    prev.map((x) => (x.id === id ? { ...x, progress: (k + p) / n } : x)),
+                  ),
+              },
+            );
+            outputs.push({ blob, ext, label: n > 1 ? `v${k + 1}` : "" });
+          }
           doneCount.current++;
-          setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "pronto", blob, ext, progress: 1 } : x)));
+          const first = outputs[0]!;
+          setItems((p) =>
+            p.map((x) =>
+              x.id === id
+                ? { ...x, status: "pronto", blob: first.blob, ext: first.ext, outputs, progress: 1 }
+                : x,
+            ),
+          );
+
         } catch (err) {
           const aborted = (err as Error)?.name === "AbortError";
           setItems((p) =>
