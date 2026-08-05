@@ -527,7 +527,12 @@ function Home() {
           const total = n * outs.length;
           const outputs: { blob: Blob; ext: string; label: string }[] = [];
           let step = 0;
-          const baseTpl = modeRef.current === "clip" ? stripBranding(active) : active;
+          const baseTpl =
+            modeRef.current === "clip"
+              ? stripBranding(active)
+              : modeRef.current === "limpar"
+                ? cleanOnly(active)
+                : active;
 
           // transcreve na hora do processamento, para queimar a legenda no vídeo
           let cues = item.captions;
