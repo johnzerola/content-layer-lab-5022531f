@@ -165,6 +165,10 @@ function Home() {
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
+  const antiDup = active.antiDup ?? defaultAntiDup();
+  const setAntiDup = (patch: Partial<typeof antiDup>) =>
+    setActive((t) => ({ ...t, antiDup: { ...(t.antiDup ?? defaultAntiDup()), ...patch } }));
+
   const variationOf = useCallback(
     (item: Item) =>
       makeVariation(
