@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { Eraser, Plus, Trash2 } from "lucide-react";
+import { Eraser, Plus, ScanSearch, Trash2 } from "lucide-react";
 import { CLEANUP_PRESETS, makeCleanupRegion, type CleanupRegion } from "@/lib/template";
 
 type Props = {
@@ -9,7 +9,17 @@ type Props = {
   poster?: string | undefined;
   /** proporção da área do vídeo (largura / altura) */
   aspect?: number;
+  /** dispara a detecção automática de legenda/marca d'água */
+  onDetect?: () => void;
+  detecting?: boolean;
+  detectMsg?: string | undefined;
+  /** áreas encontradas pela detecção, ainda não aplicadas */
+  suggestions?: CleanupRegion[];
+  onUseSuggestion?: (r: CleanupRegion) => void;
+  onUseAllSuggestions?: () => void;
+  onClearSuggestions?: () => void;
 };
+
 
 type Drag =
   | { kind: "new"; x0: number; y0: number; id: string }
@@ -30,7 +40,19 @@ const FROM: { id: NonNullable<CleanupRegion["from"]>; label: string }[] = [
   { id: "right", label: "da direita" },
 ];
 
-export function CleanupStudio({ regions, onChange, poster, aspect = 9 / 16 }: Props) {
+export function CleanupStudio({
+  regions,
+  onChange,
+  poster,
+  aspect = 9 / 16,
+  onDetect,
+  detecting,
+  detectMsg,
+  suggestions = [],
+  onUseSuggestion,
+  onUseAllSuggestions,
+  onClearSuggestions,
+}: Props) {
   const boxRef = useRef<HTMLDivElement | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [sel, setSel] = useState<string | null>(regions[0]?.id ?? null);
@@ -101,18 +123,73 @@ export function CleanupStudio({ regions, onChange, poster, aspect = 9 / 16 }: Pr
         <p className="mono-label flex items-center gap-1.5">
           <Eraser className="size-3.5" /> Remover legenda / marca d'água / texto
         </p>
-        <button
-          type="button"
-          onClick={() => {
-            const r = makeCleanupRegion({ label: `Área ${regions.length + 1}` });
-            onChange([...regions, r]);
-            setSel(r.id);
-          }}
-          className="flex items-center gap-1 rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:border-primary/60 hover:text-foreground"
-        >
-          <Plus className="size-3" /> nova área
-        </button>
+        <div className="flex items-center gap-1">
+          {onDetect && (
+            <button
+              type="button"
+              disabled={detecting}
+              onClick={onDetect}
+              className="flex items-center gap-1 rounded-md border border-primary/50 bg-primary/10 px-2 py-1 font-mono text-[10px] text-primary disabled:opacity-60"
+            >
+              <ScanSearch className="size-3" /> {detecting ? "analisando…" : "detectar automático"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              const r = makeCleanupRegion({ label: `Área ${regions.length + 1}` });
+              onChange([...regions, r]);
+              setSel(r.id);
+            }}
+            className="flex items-center gap-1 rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:border-primary/60 hover:text-foreground"
+          >
+            <Plus className="size-3" /> nova área
+          </button>
+        </div>
       </div>
+
+      {(detectMsg || suggestions.length > 0) && (
+        <div className="rounded-lg border border-warn/50 bg-warn/10 p-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="font-mono text-[10px] text-warn">
+              {detectMsg ?? `${suggestions.length} área(s) encontrada(s)`}
+            </p>
+            {suggestions.length > 0 && (
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={onUseAllSuggestions}
+                  className="rounded border border-primary/60 bg-primary/15 px-2 py-0.5 font-mono text-[10px] text-primary"
+                >
+                  usar todas
+                </button>
+                <button
+                  type="button"
+                  onClick={onClearSuggestions}
+                  className="rounded border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground"
+                >
+                  descartar
+                </button>
+              </div>
+            )}
+          </div>
+          {suggestions.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {suggestions.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => onUseSuggestion?.(s)}
+                  className="rounded border border-border bg-background px-2 py-0.5 font-mono text-[10px] text-foreground hover:border-primary/60"
+                >
+                  + {s.label} · {Math.round(s.w * 100)}×{Math.round(s.h * 100)}%
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
 
       <div className="flex flex-wrap gap-1">
         {CLEANUP_PRESETS.map((p) => (
@@ -150,6 +227,21 @@ export function CleanupStudio({ regions, onChange, poster, aspect = 9 / 16 }: Pr
             selecione um vídeo para ver o quadro
           </div>
         )}
+        {suggestions.map((s) => (
+          <div
+            key={s.id}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onUseSuggestion?.(s);
+            }}
+            className="absolute cursor-copy border-2 border-dashed border-warn bg-warn/15"
+            style={{ left: `${s.x * 100}%`, top: `${s.y * 100}%`, width: `${s.w * 100}%`, height: `${s.h * 100}%` }}
+          >
+            <span className="absolute -top-5 left-0 whitespace-nowrap rounded bg-warn px-1 font-mono text-[9px] text-background">
+              {s.label} · clique para usar
+            </span>
+          </div>
+        ))}
         {regions.map((r) => (
           <div
             key={r.id}
