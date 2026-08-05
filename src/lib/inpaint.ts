@@ -210,14 +210,20 @@ export function inpaintTelea(
     }
   };
 
+  const painted = new Uint8Array(N);
   while (heap.size) {
     const top = heap.pop();
     if (!top) break;
     const i = top[1];
     if (flags[i] === KNOWN) continue;
-    flags[i] = KNOWN;
     const x = i % W;
     const y = (i / W) | 0;
+    // pixels da banda inicial ainda carregam o conteúdo a remover: reconstrói antes
+    if (mask[i] && !painted[i]) {
+      paint(x, y);
+      painted[i] = 1;
+    }
+    flags[i] = KNOWN;
     const nb: [number, number][] = [
       [x - 1, y],
       [x + 1, y],
@@ -238,6 +244,7 @@ export function inpaintTelea(
       if (flags[ni] === HOLE) {
         flags[ni] = BAND;
         paint(nx, ny);
+        painted[ni] = 1;
       }
       heap.push(t, ni);
     }
