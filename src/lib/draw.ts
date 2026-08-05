@@ -2,6 +2,8 @@ import {
   CANVAS_H,
   CANVAS_W,
   type CaptionStyle,
+  type CleanupRegion,
+
   type ImageLayer,
   type Template,
   type TextLayer,
