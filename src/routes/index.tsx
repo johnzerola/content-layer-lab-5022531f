@@ -555,11 +555,51 @@ function Home() {
                   {eta && <span className="text-primary">● restam ~{eta}</span>}
                 </div>
 
-                {selected && (
-                  <p className="font-mono text-[11px] text-muted-foreground">
-                    anti-duplicidade: {describeVariation(variationOf(selected))}
-                  </p>
-                )}
+                <div className="rounded-xl border border-border bg-surface-2 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="mono-label">Anti-duplicidade</p>
+                    <label className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={antiDup.auto}
+                        onChange={(e) => setAntiDup({ auto: e.target.checked })}
+                        className="accent-[var(--primary)]"
+                      />
+                      randomizar por vídeo
+                    </label>
+                  </div>
+                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {(
+                      [
+                        ["brightness", "brilho", 0.15],
+                        ["saturation", "saturação", 0.2],
+                        ["zoom", "zoom", 0.12],
+                        ["trim", "corte início/fim (s)", 1],
+                        ["noise", "ruído", 0.12],
+                      ] as const
+                    ).map(([key, label, max]) => (
+                      <label key={key} className="font-mono text-[11px] text-muted-foreground">
+                        {label} · {key === "trim" ? `${antiDup[key].toFixed(2)}s` : `${(antiDup[key] * 100).toFixed(0)}%`}
+                        <input
+                          type="range"
+                          min={0}
+                          max={max}
+                          step={max / 50}
+                          value={antiDup[key]}
+                          disabled={!antiDup.auto}
+                          onChange={(e) => setAntiDup({ [key]: Number(e.target.value) })}
+                          className="w-full accent-[var(--primary)]"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  {selected && (
+                    <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                      este vídeo: {describeVariation(variationOf(selected))}
+                    </p>
+                  )}
+                </div>
+
               </div>
 
             </section>
