@@ -234,6 +234,111 @@ function ClipCard({
   );
 }
 
+function SelectedClip({
+  item,
+  index,
+  onUnpick,
+  onRemove,
+  onSelect,
+  active,
+}: {
+  item: ClipItem;
+  index: number;
+  onUnpick: () => void;
+  onRemove: () => void;
+  onSelect: () => void;
+  active: boolean;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+  const url = useMemo(() => URL.createObjectURL(item.file), [item.file]);
+  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+
+  const start = item.clip?.start ?? 0;
+  const end = item.clip?.end ?? item.duration;
+
+  const toggle = () => {
+    const v = videoRef.current;
+    if (!v) return;
+    if (playing) {
+      v.pause();
+      setPlaying(false);
+      return;
+    }
+    if (v.currentTime < start || v.currentTime >= end) v.currentTime = start;
+    void v.play();
+    setPlaying(true);
+  };
+
+  return (
+    <div
+      onClick={onSelect}
+      className={`relative w-36 shrink-0 overflow-hidden rounded-lg border bg-surface-2 transition ${
+        active ? "border-primary" : "border-border hover:border-primary/40"
+      }`}
+    >
+      <div className="relative aspect-[9/16] bg-black">
+        <video
+          ref={videoRef}
+          src={url}
+          muted
+          playsInline
+          poster={item.poster ?? undefined}
+          className="size-full object-cover"
+          onTimeUpdate={(e) => {
+            const v = e.currentTarget;
+            if (v.currentTime >= end) {
+              v.pause();
+              v.currentTime = start;
+              setPlaying(false);
+            }
+          }}
+        />
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggle();
+          }}
+          className="absolute inset-0 grid place-items-center"
+        >
+          <span className="grid size-9 place-items-center rounded-full bg-background/75 backdrop-blur">
+            {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+          </span>
+        </button>
+        <span className="absolute left-1.5 top-1.5 rounded bg-background/80 px-1.5 py-0.5 font-mono text-[10px] backdrop-blur">
+          #{index + 1}
+        </span>
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-1.5">
+          <p className="font-mono text-[10px] text-white/90">
+            {formatTime(start)} – {formatTime(end)}
+          </p>
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-1 px-1.5 py-1">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onUnpick();
+          }}
+          className="font-mono text-[10px] text-muted-foreground hover:text-foreground"
+        >
+          tirar
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+          className="rounded p-1 text-muted-foreground hover:text-destructive"
+          title="remover clipe"
+        >
+          <X className="size-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ClipStudio(props: Props) {
   const {
     sources,
@@ -432,7 +537,37 @@ export function ClipStudio(props: Props) {
             </div>
           </div>
 
+          {validPicked.length > 0 && (
+            <div className="rounded-xl border border-border bg-surface-2 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="mono-label">selecionados para exportar · {validPicked.length}</p>
+                <button
+                  className="font-mono text-[11px] text-muted-foreground hover:text-foreground"
+                  onClick={() => setPicked([])}
+                >
+                  limpar
+                </button>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {ordered
+                  .filter((c) => validPicked.includes(c.id))
+                  .map((c, i) => (
+                    <SelectedClip
+                      key={c.id}
+                      item={c}
+                      index={i}
+                      active={selectedId === c.id}
+                      onSelect={() => onSelect(c.id)}
+                      onUnpick={() => setPicked((prev) => prev.filter((x) => x !== c.id))}
+                      onRemove={() => onRemove(c.id)}
+                    />
+                  ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
+
             {ordered.map((c, i) => (
               <ClipCard
                 key={c.id}
