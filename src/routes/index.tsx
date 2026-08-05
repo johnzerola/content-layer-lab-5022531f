@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Upload, X, Play, Download, Pencil, Repeat } from "lucide-react";
+import { Upload, X, Play, Download, Pencil, Repeat, Library, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
 import { TemplateEditor } from "@/components/TemplateEditor";
-import { createTemplate, loadTemplates, saveTemplates, type Template } from "@/lib/template";
+import { TemplateLibrary } from "@/components/TemplateLibrary";
+import { commitTemplate, createTemplate, loadTemplates, type Template } from "@/lib/template";
 import { downloadBlob, grabPoster, renderVideo } from "@/lib/render";
 
 export const Route = createFileRoute("/")({
