@@ -32,7 +32,15 @@ export function webCodecsSupported() {
 }
 
 async function pickVideoCodec(width: number, height: number, bitrate: number, framerate: number) {
-  for (const codec of ["avc1.640028", "avc1.4d0032", "avc1.42003c", "avc1.42001f"]) {
+  const candidates: { codec: string; mux: "avc" | "vp9" }[] = [
+    { codec: "avc1.640028", mux: "avc" },
+    { codec: "avc1.4d0032", mux: "avc" },
+    { codec: "avc1.42003c", mux: "avc" },
+    { codec: "avc1.42001f", mux: "avc" },
+    // último recurso: VP9 dentro do MP4 (quando o navegador não tem H.264)
+    { codec: "vp09.00.10.08", mux: "vp9" },
+  ];
+  for (const { codec, mux } of candidates) {
     try {
       const cfg: VideoEncoderConfig = {
         codec,
@@ -40,13 +48,27 @@ async function pickVideoCodec(width: number, height: number, bitrate: number, fr
         height,
         bitrate,
         framerate,
-        avc: { format: "avc" },
         latencyMode: "quality",
+        ...(mux === "avc" ? { avc: { format: "avc" as const } } : {}),
       };
       const sup = await VideoEncoder.isConfigSupported(cfg);
-      if (sup.supported) return cfg;
+      if (sup.supported) return { cfg, mux };
     } catch {
       /* tenta o próximo */
+    }
+  }
+  return null;
+}
+
+async function pickAudioCodec(channels: number, sampleRate: number): Promise<"aac" | "opus" | null> {
+  const Enc = window.AudioEncoder;
+  if (!Enc) return null;
+  for (const [mux, codec] of [["aac", "mp4a.40.2"], ["opus", "opus"]] as const) {
+    try {
+      const sup = await Enc.isConfigSupported({ codec, sampleRate, numberOfChannels: channels, bitrate: 128_000 });
+      if (sup.supported) return mux;
+    } catch {
+      /* próximo */
     }
   }
   return null;
@@ -86,8 +108,9 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
   const H = t.canvasH ?? CANVAS_H;
   const v = opts.variation;
 
-  const videoConfig = await pickVideoCodec(W, H, bitrate, fps);
-  if (!videoConfig) throw new Error("H.264 não suportado neste navegador");
+  const picked = await pickVideoCodec(W, H, bitrate, fps);
+  if (!picked) throw new Error("Codificação de vídeo não suportada neste navegador");
+  const videoConfig = picked.cfg;
 
   const url = URL.createObjectURL(opts.file);
   const video = document.createElement("video") as VideoWithRvfc;
@@ -108,12 +131,13 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     const totalFrames = Math.max(1, Math.round(outDur * fps));
 
     const audio = await decodeAudio(opts.file, trimStart, effDur, v.speed);
+    const audioCodec = audio ? await pickAudioCodec(audio.channels, audio.sampleRate) : null;
 
     const muxer = new Muxer({
       target: new ArrayBufferTarget(),
-      video: { codec: "avc", width: W, height: H, frameRate: fps },
-      ...(audio
-        ? { audio: { codec: "aac" as const, numberOfChannels: audio.channels, sampleRate: audio.sampleRate } }
+      video: { codec: picked.mux, width: W, height: H, frameRate: fps },
+      ...(audio && audioCodec
+        ? { audio: { codec: audioCodec, numberOfChannels: audio.channels, sampleRate: audio.sampleRate } }
         : {}),
       fastStart: "in-memory",
     });
@@ -205,7 +229,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     await encoder.flush();
     encoder.close();
 
-    if (audio) {
+    if (audio && audioCodec) {
       const { rendered, channels, sampleRate } = audio;
       const AudioEnc = window.AudioEncoder;
       if (AudioEnc) {
@@ -214,7 +238,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
           error: (e) => console.error(e),
         });
         const aConfig: AudioEncoderConfig = {
-          codec: "mp4a.40.2",
+          codec: audioCodec === "aac" ? "mp4a.40.2" : "opus",
           sampleRate,
           numberOfChannels: channels,
           bitrate: 128_000,
