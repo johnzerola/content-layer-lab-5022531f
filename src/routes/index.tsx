@@ -186,7 +186,9 @@ function Home() {
     const list = loadTemplates();
     setTemplates(list);
     if (list[0]) setActive(list[0]);
+    void registerFonts(list.flatMap((t) => t.fonts ?? []));
   }, []);
+
 
   const addVideos = useCallback(async (list: File[]) => {
     const vids = list.filter((f) => f.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(f.name));
