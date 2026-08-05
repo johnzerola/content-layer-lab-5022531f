@@ -211,7 +211,13 @@ export function defaultCaptions(): CaptionStyle {
     mode: "karaoke",
     maxWords: 4,
     align: "center",
+    anim: "pop",
+    highlight: "color",
+    highlightColor: "#c6f24e",
+    maxLines: 2,
+    lineHeight: 1.2,
   };
+
 }
 
 export function createTemplate(name = "Novo template"): Template {
