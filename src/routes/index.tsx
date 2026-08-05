@@ -136,6 +136,9 @@ function Home() {
   const [editing, setEditing] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [webmWarn, setWebmWarn] = useState(false);
+  useEffect(() => setWebmWarn(outputIsWebm()), []);
+
   const [items, setItems] = useState<Item[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
