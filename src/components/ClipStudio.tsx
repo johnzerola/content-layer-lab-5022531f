@@ -11,6 +11,7 @@ import {
   Sliders,
   Check,
   Flame,
+  GripVertical,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatTime } from "@/lib/clips";
