@@ -1046,6 +1046,50 @@ function Home() {
                   )}
                 </div>
 
+                {/* presets de entrega por plataforma (MP4 H.264) */}
+                <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="mono-label">Exportar MP4 H.264 para</p>
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      {platforms.length} formato{platforms.length > 1 ? "s" : ""} × {Math.max(1, variants)} variação
+                      {variants > 1 ? "ões" : ""} = {platforms.length * Math.max(1, variants)} arquivos por vídeo
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {PLATFORM_PRESETS.map((p) => {
+                      const on = platforms.includes(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          disabled={running}
+                          onClick={() => togglePlatform(p.id)}
+                          className={`rounded-lg border px-3 py-2 text-left transition-colors disabled:opacity-50 ${
+                            on ? "border-primary bg-primary/15" : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          <span className={`block text-xs font-semibold ${on ? "text-primary" : "text-foreground"}`}>
+                            {p.label}
+                          </span>
+                          <span className="block font-mono text-[10px] text-muted-foreground">{p.hint}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <label className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                    <input
+                      type="checkbox"
+                      checked={autoBitrate}
+                      disabled={running}
+                      onChange={(e) => setAutoBitrate(e.target.checked)}
+                      className="accent-[var(--primary)]"
+                    />
+                    usar bitrate recomendado de cada plataforma
+                  </label>
+                </div>
+
+
+
                 <div className="flex flex-wrap items-center gap-4 font-mono text-[11px] text-muted-foreground">
                   <label className="flex items-center gap-2">
                     paralelo
