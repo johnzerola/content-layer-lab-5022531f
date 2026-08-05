@@ -662,7 +662,9 @@ function Home() {
   })();
 
   const outFiles = () => {
-    const base = (mode === "clip" ? "corte" : active.name).replace(/\s+/g, "-").toLowerCase();
+    const base = (mode === "clip" ? "corte" : mode === "limpar" ? "limpo" : active.name)
+      .replace(/\s+/g, "-")
+      .toLowerCase();
     const files: { name: string; blob: Blob }[] = [];
     items.forEach((i, idx) => {
       const outs = i.outputs ?? (i.blob ? [{ blob: i.blob, ext: i.ext ?? "mp4", label: "" }] : []);
