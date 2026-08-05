@@ -175,7 +175,7 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
             <select
               className={input}
               value={style.anim ?? "pop"}
-              onChange={(e) => onChange({ anim: e.target.value as CaptionStyle["anim"] })}
+              onChange={(e) => onChange({ anim: e.target.value as NonNullable<CaptionStyle["anim"]> })}
             >
               <option value="pop">Pop</option>
               <option value="bounce">Bounce</option>
@@ -189,7 +189,7 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
             <select
               className={input}
               value={style.highlight ?? "color"}
-              onChange={(e) => onChange({ highlight: e.target.value as CaptionStyle["highlight"] })}
+              onChange={(e) => onChange({ highlight: e.target.value as NonNullable<CaptionStyle["highlight"]> })}
             >
               <option value="color">Trocar cor</option>
               <option value="box">Caixa colorida</option>
