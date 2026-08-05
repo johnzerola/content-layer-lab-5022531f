@@ -88,8 +88,13 @@ interface Item {
   progress: number;
   blob?: Blob | undefined;
   ext?: string | undefined;
+  /** todas as variações geradas deste vídeo */
+  outputs?: { blob: Blob; ext: string; label: string }[] | undefined;
+  captions?: CaptionCue[] | undefined;
+  capStatus?: string | undefined;
   error?: string | undefined;
 }
+
 
 interface QueueCtrl {
   paused: boolean;
