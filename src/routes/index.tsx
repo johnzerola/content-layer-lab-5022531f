@@ -140,8 +140,14 @@ function stripBranding(t: Template): Template {
   };
 }
 
+/** Modo "limpar": vídeo cheio, sem marca e sem legenda nova — só as áreas de limpeza. */
+function cleanOnly(t: Template): Template {
+  const b = stripBranding(t);
+  return { ...b, captions: { ...(b.captions ?? defaultCaptions()), visible: false } };
+}
+
 function Home() {
-  const [mode, setMode] = useState<"lote" | "clip">("lote");
+  const [mode, setMode] = useState<"lote" | "clip" | "limpar">("lote");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
   const [editing, setEditing] = useState(false);
