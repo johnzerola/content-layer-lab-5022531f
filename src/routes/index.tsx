@@ -50,6 +50,7 @@ import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
 import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } from "@/lib/captions";
 import { registerFonts } from "@/lib/fonts";
 import { CaptionStudio } from "@/components/CaptionStudio";
+import { CleanupStudio } from "@/components/CleanupStudio";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { canBrowserDecode, guessMime, isVideoFile, VIDEO_ACCEPT, VIDEO_EXT_RE } from "@/lib/media";
 import { toast } from "sonner";
@@ -995,7 +996,16 @@ function Home() {
                         <Repeat className="size-3" /> restaurar auto
                       </button>
                     </div>
+                    <div className="mt-3 border-t border-border pt-3">
+                      <CleanupStudio
+                        regions={active.cleanup ?? []}
+                        onChange={(cleanup) => setActive((t) => ({ ...t, cleanup }))}
+                        poster={selected.poster ?? undefined}
+                        aspect={active.video.w / active.video.h}
+                      />
+                    </div>
                   </div>
+
                   <div className="space-y-2">
                     <div className="flex items-center justify-between gap-2">
                       <p className="mono-label">Preview final</p>
