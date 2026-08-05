@@ -322,6 +322,29 @@ function Home() {
     [active],
   );
 
+  // reflete a anti-duplicidade no preview em tempo real
+  const previewVariation = selected ? variationOf(selected) : null;
+  const previewDrawOpts = useMemo(
+    () =>
+      previewVariation
+        ? {
+            mirror: previewVariation.mirror,
+            brightness: previewVariation.brightness,
+            saturation: previewVariation.saturation,
+            zoom: previewVariation.zoom,
+            noise: previewVariation.noise,
+          }
+        : undefined,
+    [
+      previewVariation?.mirror,
+      previewVariation?.brightness,
+      previewVariation?.saturation,
+      previewVariation?.zoom,
+      previewVariation?.noise,
+    ],
+  );
+
+
   const processAll = async (onlyIds?: string[]) => {
     const ctrl = ctrlRef.current;
     ctrl.paused = false;
