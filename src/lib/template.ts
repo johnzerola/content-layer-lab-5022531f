@@ -432,6 +432,8 @@ export function createTemplate(name = "Novo template"): Template {
     canvasW: CANVAS_W,
     canvasH: CANVAS_H,
     antiDup: defaultAntiDup(),
+    cleanup: [],
+
   };
 }
 
