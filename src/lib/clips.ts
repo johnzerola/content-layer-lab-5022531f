@@ -12,13 +12,20 @@ export interface Clip {
 }
 
 export interface ClipOptions {
-  /** duração alvo de cada corte, em segundos */
+  /** duração alvo (compat) — usada quando min/max não são informados */
   target?: number;
+  /** duração mínima de cada corte, em segundos */
+  minLen?: number;
+  /** duração máxima de cada corte, em segundos */
+  maxLen?: number;
   /** quantidade máxima de cortes */
   max?: number;
+  /** 0..100 — só devolve cortes com score igual ou acima */
+  minScore?: number;
   onProgress?: (p: number) => void;
   signal?: AbortSignal;
 }
+
 
 async function loudnessCurve(file: File, step = 0.25): Promise<{ curve: number[]; duration: number }> {
   const Ctx = window.OfflineAudioContext ?? window.webkitOfflineAudioContext;
