@@ -72,7 +72,77 @@ export interface CaptionStyle extends BoxLayer {
   mode: "karaoke" | "word" | "line";
   maxWords: number;
   align: "left" | "center" | "right";
+  /** animação de entrada de cada bloco/palavra */
+  anim?: "none" | "pop" | "bounce" | "slide" | "fade" | "typewriter";
+  /** como a palavra falada é destacada */
+  highlight?: "color" | "box" | "underline" | "scale";
+  /** cor da caixa/sublinhado do destaque */
+  highlightColor?: string;
+  /** máximo de linhas exibidas ao mesmo tempo */
+  maxLines?: number;
+  /** espaçamento entre linhas (multiplicador) */
+  lineHeight?: number;
 }
+
+/** Presets prontos, estilo CapCut. */
+export const CAPTION_PRESETS: { id: string; label: string; style: Partial<CaptionStyle> }[] = [
+  {
+    id: "capcut",
+    label: "CapCut Clássico",
+    style: {
+      font: "Arial Black, sans-serif", weight: "800", color: "#ffffff", activeColor: "#ffe600",
+      stroke: 12, strokeColor: "#000000", bg: "shadow", uppercase: true, mode: "karaoke",
+      anim: "pop", highlight: "color", maxWords: 4, maxLines: 2, size: 68,
+    },
+  },
+  {
+    id: "neon",
+    label: "Neon Viral",
+    style: {
+      font: "Inter, sans-serif", weight: "800", color: "#ffffff", activeColor: "#c6f24e",
+      stroke: 8, strokeColor: "#0a0a0a", bg: "shadow", uppercase: true, mode: "karaoke",
+      anim: "bounce", highlight: "scale", maxWords: 3, maxLines: 2, size: 72,
+    },
+  },
+  {
+    id: "box",
+    label: "Caixa Destaque",
+    style: {
+      font: "Inter, sans-serif", weight: "700", color: "#ffffff", activeColor: "#111111",
+      stroke: 0, bg: "none", uppercase: false, mode: "karaoke", anim: "fade",
+      highlight: "box", highlightColor: "#c6f24e", maxWords: 5, maxLines: 2, size: 60,
+    },
+  },
+  {
+    id: "oneword",
+    label: "Uma Palavra",
+    style: {
+      font: "Impact, sans-serif", weight: "800", color: "#ffffff", activeColor: "#ff3b3b",
+      stroke: 14, strokeColor: "#000000", bg: "none", uppercase: true, mode: "word",
+      anim: "pop", highlight: "color", maxWords: 1, maxLines: 1, size: 110,
+    },
+  },
+  {
+    id: "clean",
+    label: "Minimal Clean",
+    style: {
+      font: "Inter, sans-serif", weight: "600", color: "#ffffff", activeColor: "#ffffff",
+      stroke: 0, bg: "box", boxColor: "#000000", uppercase: false, mode: "line",
+      anim: "slide", highlight: "color", maxWords: 6, maxLines: 2, size: 52,
+    },
+  },
+  {
+    id: "type",
+    label: "Máquina de Escrever",
+    style: {
+      font: "Courier New, monospace", weight: "700", color: "#ffffff", activeColor: "#c6f24e",
+      stroke: 6, strokeColor: "#000000", bg: "shadow", uppercase: false, mode: "karaoke",
+      anim: "typewriter", highlight: "underline", highlightColor: "#c6f24e",
+      maxWords: 5, maxLines: 2, size: 56,
+    },
+  },
+];
+
 
 export interface CustomFont {
   name: string;
