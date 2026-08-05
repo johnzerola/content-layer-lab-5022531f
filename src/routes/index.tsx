@@ -716,7 +716,12 @@ function Home() {
             <div>
               <h1 className="font-mono text-sm tracking-[0.2em] text-foreground">VAIVIRAL</h1>
               <p className="font-mono text-[10px] text-muted-foreground">
-                {mode === "clip" ? "clipagem sem template" : "editor em lote"} · roda no navegador
+                {mode === "clip"
+                  ? "clipagem sem template"
+                  : mode === "limpar"
+                    ? "remover legenda e marca d'água"
+                    : "editor em lote"}{" "}
+                · roda no navegador
               </p>
             </div>
           </div>
