@@ -603,6 +603,19 @@ function Home() {
       </header>
 
       <div className="mx-auto max-w-6xl space-y-5 px-5 py-6">
+        {outputIsWebm() && (
+          <div className="flex items-start gap-3 rounded-xl border border-warn/50 bg-warn/10 p-4">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" />
+            <div className="font-mono text-[11px] leading-relaxed text-muted-foreground">
+              <p className="text-warn">este navegador não gera MP4</p>
+              <p>
+                a saída sairá em WebM, que o Instagram e o TikTok recusam. Abra o VaiViral no Chrome ou Edge
+                atualizados (desktop) para exportar MP4 H.264 — ou converta os arquivos antes de publicar.
+              </p>
+            </div>
+          </div>
+        )}
+
         {mode === "lote" ? (
         <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
           <div>
