@@ -18,11 +18,10 @@ export interface EncodeOptions {
   signal?: AbortSignal;
 }
 
-declare global {
-  interface HTMLVideoElement {
-    requestVideoFrameCallback?: (cb: (now: number, meta: unknown) => void) => number;
-  }
-}
+type VideoWithRvfc = HTMLVideoElement & {
+  requestVideoFrameCallback?: (cb: () => void) => number;
+};
+
 
 export function webCodecsSupported() {
   return (
