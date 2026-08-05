@@ -45,6 +45,7 @@ import { resolveVideoLink } from "@/lib/import.functions";
 import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
 import { cuesToSrt, cuesToText, generateCaptions, type CaptionCue } from "@/lib/captions";
 import { registerFonts } from "@/lib/fonts";
+import { CaptionStudio } from "@/components/CaptionStudio";
 
 
 
@@ -603,7 +604,7 @@ function Home() {
       </header>
 
       <div className="mx-auto max-w-6xl space-y-5 px-5 py-6">
-        {outputIsWebm() && (
+        {webmWarn && (
           <div className="flex items-start gap-3 rounded-xl border border-warn/50 bg-warn/10 p-4">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" />
             <div className="font-mono text-[11px] leading-relaxed text-muted-foreground">
