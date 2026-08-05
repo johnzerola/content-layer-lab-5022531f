@@ -227,6 +227,21 @@ export function CleanupStudio({
             selecione um vídeo para ver o quadro
           </div>
         )}
+        {suggestions.map((s) => (
+          <div
+            key={s.id}
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              onUseSuggestion?.(s);
+            }}
+            className="absolute cursor-copy border-2 border-dashed border-warn bg-warn/15"
+            style={{ left: `${s.x * 100}%`, top: `${s.y * 100}%`, width: `${s.w * 100}%`, height: `${s.h * 100}%` }}
+          >
+            <span className="absolute -top-5 left-0 whitespace-nowrap rounded bg-warn px-1 font-mono text-[9px] text-background">
+              {s.label} · clique para usar
+            </span>
+          </div>
+        ))}
         {regions.map((r) => (
           <div
             key={r.id}
