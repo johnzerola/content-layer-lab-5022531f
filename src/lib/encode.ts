@@ -14,6 +14,8 @@ export interface EncodeOptions {
   bitrate?: number | undefined;
   /** aceleração de leitura do vídeo fonte (1 = tempo real) */
   turbo?: number | undefined;
+  /** recorte do vídeo fonte (clipagem automática) */
+  clip?: { start: number; end: number } | undefined;
   onProgress?: ((p: number) => void) | undefined;
   signal?: AbortSignal | undefined;
 }
@@ -125,8 +127,11 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       video.onerror = () => rej(new Error("Não foi possível ler o vídeo"));
     });
 
-    const trimStart = Math.min(v.trimStart, Math.max(0, video.duration - 0.5));
-    const effDur = Math.max(0.2, video.duration - trimStart - v.trimEnd);
+    const clipStart = Math.max(0, Math.min(opts.clip?.start ?? 0, Math.max(0, video.duration - 0.5)));
+    const clipEnd = Math.min(video.duration, opts.clip?.end ?? video.duration);
+    const clipDur = Math.max(0.5, clipEnd - clipStart);
+    const trimStart = clipStart + Math.min(v.trimStart, Math.max(0, clipDur - 0.5));
+    const effDur = Math.max(0.2, clipDur - (trimStart - clipStart) - v.trimEnd);
     const outDur = effDur / v.speed;
     const totalFrames = Math.max(1, Math.round(outDur * fps));
 

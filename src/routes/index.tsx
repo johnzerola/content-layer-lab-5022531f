@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Upload,
+  Link as LinkIcon,
+  Scissors,
   X,
   Play,
   Download,
@@ -32,6 +34,8 @@ import { downloadBlob, grabPoster, renderVideo } from "@/lib/render";
 import { webCodecsSupported } from "@/lib/encode";
 import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
 import { autoFrame } from "@/lib/autoframe";
+import { findClips, formatTime } from "@/lib/clips";
+import { resolveVideoLink } from "@/lib/import.functions";
 import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
 
 
@@ -69,6 +73,8 @@ interface Item {
   offsetX: number;
   offsetY: number;
   autoFrameSource?: string | undefined;
+  clip?: { start: number; end: number } | undefined;
+  score?: number | undefined;
   status: Status;
   progress: number;
   blob?: Blob | undefined;
@@ -96,6 +102,12 @@ function Home() {
   const [concurrency, setConcurrency] = useState(2);
   const [bitrate, setBitrate] = useState(10);
   const [smartFrame, setSmartFrame] = useState(true);
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [linkMsg, setLinkMsg] = useState<string | null>(null);
+  const [clipBusy, setClipBusy] = useState(false);
+  const [clipLen, setClipLen] = useState(30);
+  const [clipMax, setClipMax] = useState(6);
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
   const ctrlRef = useRef<QueueCtrl>({ paused: false, cancelled: false, aborts: new Map() });
@@ -124,9 +136,8 @@ function Home() {
     if (list[0]) setActive(list[0]);
   }, []);
 
-  const addFiles = useCallback(async (files: FileList | null) => {
-    if (!files) return;
-    const vids = Array.from(files).filter((f) => f.type.startsWith("video/"));
+  const addVideos = useCallback(async (list: File[]) => {
+    const vids = list.filter((f) => f.type.startsWith("video/") || /\.(mp4|mov|webm|m4v)$/i.test(f.name));
     const created: Item[] = vids.map((file) => ({
       id: crypto.randomUUID(),
       file,
@@ -162,6 +173,77 @@ function Home() {
     }
   }, []);
 
+  const addFiles = useCallback(
+    (files: FileList | null) => (files ? addVideos(Array.from(files)) : Promise.resolve()),
+    [addVideos],
+  );
+
+  /** Importa um vídeo apenas colando o link (baixa pelo servidor, sem upload). */
+  const importFromLink = useCallback(async () => {
+    const url = linkUrl.trim();
+    if (!url || linkBusy) return;
+    setLinkBusy(true);
+    setLinkMsg("procurando o vídeo...");
+    try {
+      const res = await resolveVideoLink({ data: { url } });
+      if (!res.ok || !res.videoUrl) {
+        setLinkMsg(res.message ?? "não encontrei o vídeo nesse link");
+        return;
+      }
+      setLinkMsg(`baixando de ${res.source ?? "origem"}...`);
+      const dl = await fetch(`/api/public/media-proxy?u=${encodeURIComponent(res.videoUrl)}`);
+      if (!dl.ok) {
+        setLinkMsg("a origem bloqueou o download desse arquivo");
+        return;
+      }
+      const blob = await dl.blob();
+      const base =
+        (res.title ?? "video").replace(/\.(mp4|mov|webm|m4v)$/i, "").replace(/[^\w\-. ]+/g, "").trim().slice(0, 60) ||
+        "video";
+      const file = new File([blob], `${base}.mp4`, { type: blob.type || "video/mp4" });
+      await addVideos([file]);
+      setLinkMsg(`importado: ${file.name} (${(file.size / 1e6).toFixed(1)} MB)`);
+      setLinkUrl("");
+    } catch (err) {
+      setLinkMsg(String((err as Error)?.message ?? err));
+    } finally {
+      setLinkBusy(false);
+    }
+  }, [linkUrl, linkBusy, addVideos]);
+
+  /** Clipagem automática: quebra um vídeo longo nos melhores trechos. */
+  const autoClip = useCallback(
+    async (item: Item) => {
+      if (clipBusy) return;
+      setClipBusy(true);
+      try {
+        const clips = await findClips(item.file, { target: clipLen, max: clipMax });
+        const created: Item[] = clips.map((c) => ({
+          id: crypto.randomUUID(),
+          file: item.file,
+          poster: item.poster,
+          w: item.w,
+          h: item.h,
+          duration: c.end - c.start,
+          headline: item.headline,
+          offsetX: item.offsetX,
+          offsetY: item.offsetY,
+          clip: { start: c.start, end: c.end },
+          score: c.score,
+          status: "pendente" as Status,
+          progress: 0,
+          ...(item.autoFrameSource ? { autoFrameSource: item.autoFrameSource } : {}),
+        }));
+        setItems((prev) => [...prev.filter((p) => p.id !== item.id), ...created]);
+        setSelectedId(created[0]?.id ?? null);
+      } catch (err) {
+        setLinkMsg(`falha na clipagem: ${String((err as Error)?.message ?? err)}`);
+      } finally {
+        setClipBusy(false);
+      }
+    },
+    [clipBusy, clipLen, clipMax],
+  );
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
@@ -211,6 +293,7 @@ function Home() {
             offsetY: item.offsetY,
             headline: item.headline || undefined,
             bitrate: bitrate * 1_000_000,
+            clip: item.clip,
             signal: ac.signal,
             onProgress: (p) => setItems((prev) => prev.map((x) => (x.id === id ? { ...x, progress: p } : x))),
           });
@@ -419,6 +502,24 @@ function Home() {
             webkitdirectory=""
             onChange={(e) => void addFiles(e.target.files)}
           />
+
+          <div className="mx-auto mt-6 max-w-xl border-t border-border pt-5">
+            <p className="mono-label">ou cole o link do vídeo</p>
+            <div className="mt-2 flex gap-2">
+              <input
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && void importFromLink()}
+                placeholder="https://... link da página ou do arquivo .mp4"
+                className="flex-1 rounded-lg border border-border bg-surface-2 px-3 py-2 font-mono text-xs outline-none focus:border-primary"
+              />
+              <Button onClick={() => void importFromLink()} disabled={linkBusy || !linkUrl.trim()}>
+                <LinkIcon className="mr-1 size-4" />
+                {linkBusy ? "baixando..." : "Importar"}
+              </Button>
+            </div>
+            {linkMsg && <p className="mt-2 font-mono text-[11px] text-muted-foreground">{linkMsg}</p>}
+          </div>
         </section>
 
         {items.length > 0 && (
@@ -559,6 +660,56 @@ function Home() {
                   {eta && <span className="text-primary">● restam ~{eta}</span>}
                 </div>
 
+                {selected && (
+                  <div className="rounded-xl border border-border bg-surface-2 p-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="mono-label">Cortes automáticos</p>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={clipBusy}
+                        onClick={() => void autoClip(selected)}
+                      >
+                        <Scissors className="mr-1 size-4" />
+                        {clipBusy ? "analisando..." : "Gerar cortes"}
+                      </Button>
+                    </div>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                      <label className="font-mono text-[11px] text-muted-foreground">
+                        duração de cada corte · {clipLen}s
+                        <input
+                          type="range"
+                          min={10}
+                          max={90}
+                          step={5}
+                          value={clipLen}
+                          onChange={(e) => setClipLen(Number(e.target.value))}
+                          className="w-full accent-[var(--primary)]"
+                        />
+                      </label>
+                      <label className="font-mono text-[11px] text-muted-foreground">
+                        máximo de cortes · {clipMax}
+                        <input
+                          type="range"
+                          min={1}
+                          max={20}
+                          step={1}
+                          value={clipMax}
+                          onChange={(e) => setClipMax(Number(e.target.value))}
+                          className="w-full accent-[var(--primary)]"
+                        />
+                      </label>
+                    </div>
+                    <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                      {selected.clip
+                        ? `trecho ${formatTime(selected.clip.start)}–${formatTime(selected.clip.end)}${
+                            selected.score ? ` · score ${selected.score}` : ""
+                          }`
+                        : "analisa áudio e movimento e separa os melhores trechos do vídeo longo"}
+                    </p>
+                  </div>
+                )}
+
                 <div className="rounded-xl border border-border bg-surface-2 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="mono-label">Anti-duplicidade</p>
@@ -644,6 +795,9 @@ function Home() {
                       </p>
                       <p className="font-mono text-[11px] text-muted-foreground">
                         {it.w && it.h ? `${it.w}×${it.h}` : "…"} · {it.duration ? `${it.duration.toFixed(0)}s` : "…"}
+                        {it.clip ? ` · corte ${formatTime(it.clip.start)}` : ""}
+                        {it.score ? ` · ${it.score}` : ""}
+
                       </p>
                       <p
                         className={`font-mono text-[11px] ${
