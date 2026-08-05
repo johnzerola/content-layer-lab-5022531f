@@ -173,14 +173,17 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       }
     }
 
-    const protectedHost = /youtube\.com|youtu\.be|instagram\.com|tiktok\.com|facebook\.com/.test(host);
+    const needsService = ["youtube", "instagram", "facebook", "twitch", "pinterest", "kwai"].includes(platform);
     return {
       ok: false,
       ...(title ? { title } : {}),
       source: host,
-      blocked: protectedHost,
-      message: protectedHost
-        ? `${host} não permite baixar o vídeo por link. Baixe o arquivo primeiro e arraste aqui, ou cole um link direto .mp4.`
-        : "Não encontrei um arquivo de vídeo nessa página. Cole um link direto .mp4 ou envie o arquivo.",
+      blocked: needsService,
+      message: needsService
+        ? cobaltConfigured()
+          ? `Não consegui obter esse vídeo do ${platform} pelo serviço configurado (pode ser privado, restrito por idade ou indisponível). Baixe o arquivo e arraste aqui.`
+          : `${platform} não expõe download direto por link. Configure um serviço de resolução (COBALT_API_URL) para importar automaticamente, ou baixe o arquivo e arraste aqui.`
+        : "Não encontrei um arquivo de vídeo nessa página. Cole um link direto do arquivo ou envie o vídeo.",
     };
+
   });
