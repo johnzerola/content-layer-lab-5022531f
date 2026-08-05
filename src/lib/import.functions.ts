@@ -70,10 +70,50 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
     if (!target) return { ok: false, message: "Link inválido ou não permitido." };
 
     const host = target.hostname.replace(/^www\./, "");
+    const {
+      platformOf,
+      resolveTikTok,
+      resolveTwitter,
+      resolveReddit,
+      resolveStreamable,
+      resolveVimeo,
+      resolveWithCobalt,
+      cobaltConfigured,
+    } = await import("./resolvers.server");
+    const platform = platformOf(host);
 
     // 1) já é um arquivo de vídeo?
-    if (/\.(mp4|mov|m4v|webm)(\?|$)/i.test(target.pathname + target.search)) {
+    if (/\.(mp4|mov|m4v|webm|mkv|ogv|3gp|avi|mpeg|mpg|ts)(\?|$)/i.test(target.pathname + target.search)) {
       return { ok: true, videoUrl: target.toString(), title: target.pathname.split("/").pop() ?? "video", source: host };
+    }
+
+    // 2) resolvers específicos por plataforma
+    const byPlatform: Record<string, (u: string) => Promise<import("./resolvers.server").ResolverHit | null>> = {
+      tiktok: resolveTikTok,
+      twitter: resolveTwitter,
+      reddit: resolveReddit,
+      streamable: resolveStreamable,
+      vimeo: resolveVimeo,
+    };
+    const chain = [byPlatform[platform], resolveWithCobalt].filter(Boolean) as ((
+      u: string,
+    ) => Promise<import("./resolvers.server").ResolverHit | null>)[];
+
+    for (const fn of chain) {
+      try {
+        const hit = await fn(target.toString());
+        if (hit?.videoUrl && safeRemoteUrl(hit.videoUrl)) {
+          return {
+            ok: true,
+            videoUrl: hit.videoUrl,
+            ...(hit.title ? { title: hit.title } : {}),
+            ...(hit.thumbnail ? { thumbnail: hit.thumbnail } : {}),
+            source: hit.source || host,
+          };
+        }
+      } catch {
+        /* tenta o próximo */
+      }
     }
 
     let head: Response | null = null;
@@ -86,6 +126,8 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
     if (headType.startsWith("video/")) {
       return { ok: true, videoUrl: target.toString(), title: target.pathname.split("/").pop() ?? "video", source: host };
     }
+
+
 
     // 2) raspar a página em busca de og:video / <video src>
     let html = "";
@@ -131,14 +173,17 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       }
     }
 
-    const protectedHost = /youtube\.com|youtu\.be|instagram\.com|tiktok\.com|facebook\.com/.test(host);
+    const needsService = ["youtube", "instagram", "facebook", "twitch", "pinterest", "kwai"].includes(platform);
     return {
       ok: false,
       ...(title ? { title } : {}),
       source: host,
-      blocked: protectedHost,
-      message: protectedHost
-        ? `${host} não permite baixar o vídeo por link. Baixe o arquivo primeiro e arraste aqui, ou cole um link direto .mp4.`
-        : "Não encontrei um arquivo de vídeo nessa página. Cole um link direto .mp4 ou envie o arquivo.",
+      blocked: needsService,
+      message: needsService
+        ? cobaltConfigured()
+          ? `Não consegui obter esse vídeo do ${platform} pelo serviço configurado (pode ser privado, restrito por idade ou indisponível). Baixe o arquivo e arraste aqui.`
+          : `${platform} não expõe download direto por link. Configure um serviço de resolução (COBALT_API_URL) para importar automaticamente, ou baixe o arquivo e arraste aqui.`
+        : "Não encontrei um arquivo de vídeo nessa página. Cole um link direto do arquivo ou envie o vídeo.",
     };
+
   });
