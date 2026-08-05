@@ -1104,18 +1104,19 @@ function Home() {
                     />
                     {concurrency}x
                   </label>
-                  <label className="flex items-center gap-2">
+                  <label className={`flex items-center gap-2 ${autoBitrate ? "opacity-50" : ""}`}>
                     bitrate
                     <input
                       type="range"
                       min={4}
                       max={20}
                       value={bitrate}
-                      disabled={running}
+                      disabled={running || autoBitrate}
                       onChange={(e) => setBitrate(Number(e.target.value))}
                       className="w-24 accent-[var(--primary)]"
                     />
-                    {bitrate} Mbps
+                    {autoBitrate ? "auto (preset)" : `${bitrate} Mbps`}
+
                   </label>
                   <label className="flex items-center gap-2">
                     variações
