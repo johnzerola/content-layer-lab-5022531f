@@ -197,7 +197,9 @@ function Home() {
         return;
       }
       const blob = await dl.blob();
-      const base = (res.title ?? "video").replace(/[^\w\-. ]+/g, "").slice(0, 60) || "video";
+      const base =
+        (res.title ?? "video").replace(/\.(mp4|mov|webm|m4v)$/i, "").replace(/[^\w\-. ]+/g, "").trim().slice(0, 60) ||
+        "video";
       const file = new File([blob], `${base}.mp4`, { type: blob.type || "video/mp4" });
       await addVideos([file]);
       setLinkMsg(`importado: ${file.name} (${(file.size / 1e6).toFixed(1)} MB)`);
