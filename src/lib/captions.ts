@@ -151,11 +151,17 @@ export async function generateCaptions(
     signal?: AbortSignal | undefined;
   } = {},
 ): Promise<CaptionCue[]> {
-  const buf = await decodeMono(file);
+  let buf: AudioBuffer;
+  try {
+    buf = await decodeMono(file);
+  } catch {
+    throw new Error("não consegui ler o áudio deste vídeo (formato sem áudio ou não suportado pelo navegador)");
+  }
   const from = Math.max(0, opts.clip?.start ?? 0);
   const to = Math.min(buf.duration, opts.clip?.end ?? buf.duration);
   const segments = findSegments(buf, from, to);
   if (!segments.length) return [];
+
 
   const cues: CaptionCue[] = [];
   let done = 0;

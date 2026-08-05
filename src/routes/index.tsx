@@ -1168,7 +1168,7 @@ function Home() {
                         onChange={(e) => setAntiDup({ auto: e.target.checked })}
                         className="accent-[var(--primary)]"
                       />
-                      randomizar por vídeo
+                      {antiDup.auto ? "randomizar por vídeo" : "manual (valor exato)"}
                     </label>
                   </div>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -1204,7 +1204,6 @@ function Home() {
                           max={max}
                           step={max / 50}
                           value={antiDup[key]}
-                          disabled={!antiDup.auto}
                           onChange={(e) => setAntiDup({ [key]: Number(e.target.value) })}
                           className="w-full accent-[var(--primary)]"
                         />
