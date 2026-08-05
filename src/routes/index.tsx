@@ -349,9 +349,24 @@ function Home() {
                 ))}
               </select>
             )}
+            <select
+              className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm"
+              value={`${active.canvasW ?? 1080}x${active.canvasH ?? 1920}`}
+              onChange={(e) => {
+                const p = RATIO_PRESETS.find((r) => `${r.w}x${r.h}` === e.target.value);
+                if (p) setActive(applyRatio(active, p.w, p.h));
+              }}
+            >
+              {RATIO_PRESETS.map((r) => (
+                <option key={r.id} value={`${r.w}x${r.h}`}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
             <Button variant="outline" onClick={() => setActive(createTemplate("Novo template"))}>
               Novo
             </Button>
+
             <Button variant="outline" onClick={() => setLibraryOpen(true)}>
               <Library className="size-4" /> Biblioteca
             </Button>
