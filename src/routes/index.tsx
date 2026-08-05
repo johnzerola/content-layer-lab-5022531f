@@ -730,6 +730,7 @@ function Home() {
               {([
                 { id: "lote", label: "Lote com template" },
                 { id: "clip", label: "Só cortes" },
+                { id: "limpar", label: "Limpar vídeo" },
               ] as const).map((m) => (
                 <button
                   key={m.id}
