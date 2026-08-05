@@ -478,7 +478,7 @@ function Home() {
                   </div>
                   <div className="space-y-2">
                     <p className="mono-label">Preview final</p>
-                    <TemplateCanvas template={previewTemplate} interactive={false} poster={selected.poster} />
+                    <TemplateCanvas template={previewTemplate} interactive={false} poster={selected.poster} previewFile={selected.file} />
                   </div>
                 </div>
               ) : (
