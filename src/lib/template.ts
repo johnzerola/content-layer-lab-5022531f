@@ -47,6 +47,8 @@ export interface VideoLayer extends BoxLayer {
 export interface Template {
   id: string;
   name: string;
+  version?: number;
+  updatedAt?: number;
   background: string;
   video: VideoLayer;
   watermark: ImageLayer;
@@ -79,6 +81,8 @@ export function createTemplate(name = "Novo template"): Template {
   return {
     id: crypto.randomUUID(),
     name,
+    version: 1,
+    updatedAt: Date.now(),
     background: "#0a0a0a",
     video: {
       x: 60,
