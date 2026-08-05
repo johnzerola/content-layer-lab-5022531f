@@ -231,13 +231,14 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
           </Field>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           {(
             [
               ["Cor do texto", "color"],
               ["Cor do destaque", "activeColor"],
               ["Contorno", "strokeColor"],
               ["Caixa/realce", "highlightColor"],
+              ["Fundo (caixa)", "boxColor"],
             ] as const
           ).map(([label, key]) => (
             <Field key={key} label={label}>
@@ -250,6 +251,7 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
             </Field>
           ))}
         </div>
+
 
         <div className="grid gap-3 sm:grid-cols-2">
           <Range label="Tamanho" value={style.size} min={28} max={150} onChange={(v) => onChange({ size: v })} />
