@@ -622,7 +622,39 @@ function Home() {
           </div>
         </section>
 
-        {items.length > 0 && (
+        {mode === "clip" && items.length > 0 && (
+          <ClipStudio
+            sources={items.filter((i) => !i.clip)}
+            clips={items.filter((i) => i.clip)}
+            settings={{ minLen: clipMinLen, maxLen: clipMaxLen, max: clipMax, minScore: clipMinScore }}
+            onSettings={(p) => {
+              if (p.minLen !== undefined) setClipMinLen(p.minLen);
+              if (p.maxLen !== undefined) setClipMaxLen(p.maxLen);
+              if (p.max !== undefined) setClipMax(p.max);
+              if (p.minScore !== undefined) setClipMinScore(p.minScore);
+            }}
+            clipBusy={clipBusy}
+            onGenerate={(it) => void autoClip(items.find((x) => x.id === it.id)!)}
+            running={running}
+            paused={paused}
+            zipping={zipping}
+            eta={eta}
+            readyCount={readyCount}
+            fsAccess={fsAccessSupported()}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onProcess={(ids) => void processAll(ids)}
+            onTogglePause={togglePause}
+            onCancel={cancelAll}
+            onRemove={(id) => setItems((p) => p.filter((x) => x.id !== id))}
+            onDownload={(it) => it.blob && downloadBlob(it.blob, `corte-${it.id.slice(0, 6)}.${it.ext}`)}
+            onZip={() => void downloadZipAll()}
+            onSaveFolder={() => void saveFolder()}
+          />
+        )}
+
+        {mode === "lote" && items.length > 0 && (
+
           <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
             <section className="panel space-y-4 p-5">
               <div>
