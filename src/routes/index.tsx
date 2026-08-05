@@ -1000,7 +1000,7 @@ function Home() {
                       <CleanupStudio
                         regions={active.cleanup ?? []}
                         onChange={(cleanup) => setActive((t) => ({ ...t, cleanup }))}
-                        poster={selected.poster}
+                        poster={selected.poster ?? undefined}
                         aspect={active.video.w / active.video.h}
                       />
                     </div>
