@@ -108,41 +108,129 @@ function Home() {
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
-  const processAll = async () => {
+  const variationOf = useCallback(
+    (item: Item) =>
+      makeVariation(
+        { ...(active.antiDup ?? defaultAntiDup()), mirror: active.mirror, speed: active.speed },
+        `${item.file.name}:${item.file.size}:${item.id}`,
+      ),
+    [active],
+  );
+
+  const processAll = async (onlyIds?: string[]) => {
+    const ctrl = ctrlRef.current;
+    ctrl.paused = false;
+    ctrl.cancelled = false;
+    setPaused(false);
     setRunning(true);
-    for (const item of items) {
-      if (item.status === "pronto") continue;
-      setItems((p) => p.map((x) => (x.id === item.id ? { ...x, status: "processando", progress: 0 } : x)));
-      try {
-        const { blob, ext } = await renderVideo(item.file, active, {
-          mirror: active.mirror,
-          speed: active.speed,
-          offsetX: item.offsetX,
-          offsetY: item.offsetY,
-          headline: item.headline || undefined,
-          onProgress: (p) =>
-            setItems((prev) => prev.map((x) => (x.id === item.id ? { ...x, progress: p } : x))),
-        });
-        setItems((p) => p.map((x) => (x.id === item.id ? { ...x, status: "pronto", blob, ext, progress: 1 } : x)));
-      } catch {
-        setItems((p) => p.map((x) => (x.id === item.id ? { ...x, status: "erro" } : x)));
+    startedAt.current = performance.now();
+    doneCount.current = 0;
+
+    const pending = items
+      .filter((i) => (onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto"))
+      .map((i) => i.id);
+    const queue = [...pending];
+    setItems((p) => p.map((x) => (queue.includes(x.id) ? { ...x, status: "na fila", progress: 0 } : x)));
+
+    const worker = async () => {
+      while (queue.length) {
+        while (ctrl.paused && !ctrl.cancelled) await new Promise((r) => setTimeout(r, 200));
+        if (ctrl.cancelled) return;
+        const id = queue.shift();
+        if (!id) return;
+        const item = itemsRef.current.find((x) => x.id === id);
+        if (!item) continue;
+        const ac = new AbortController();
+        ctrl.aborts.set(id, ac);
+        setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)));
+        try {
+          const { blob, ext } = await renderVideo(item.file, active, {
+            variation: variationOf(item),
+            offsetX: item.offsetX,
+            offsetY: item.offsetY,
+            headline: item.headline || undefined,
+            bitrate: bitrate * 1_000_000,
+            signal: ac.signal,
+            onProgress: (p) => setItems((prev) => prev.map((x) => (x.id === id ? { ...x, progress: p } : x))),
+          });
+          doneCount.current++;
+          setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "pronto", blob, ext, progress: 1 } : x)));
+        } catch (err) {
+          const aborted = (err as Error)?.name === "AbortError";
+          setItems((p) =>
+            p.map((x) =>
+              x.id === id
+                ? { ...x, status: aborted ? "pendente" : "erro", error: aborted ? undefined : String((err as Error)?.message ?? err) }
+                : x,
+            ),
+          );
+        } finally {
+          ctrl.aborts.delete(id);
+        }
       }
-    }
+    };
+
+    await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
     setRunning(false);
   };
 
-  const readyCount = items.filter((i) => i.status === "pronto").length;
+  const togglePause = () => {
+    ctrlRef.current.paused = !ctrlRef.current.paused;
+    setPaused(ctrlRef.current.paused);
+  };
 
-  const downloadAll = () => {
+  const cancelAll = () => {
+    ctrlRef.current.cancelled = true;
+    ctrlRef.current.paused = false;
+    ctrlRef.current.aborts.forEach((a) => a.abort());
+    ctrlRef.current.aborts.clear();
+    setPaused(false);
+    setRunning(false);
+    setItems((p) => p.map((x) => (x.status === "processando" || x.status === "na fila" ? { ...x, status: "pendente" } : x)));
+  };
+
+  const retryErrors = () => {
+    const ids = items.filter((i) => i.status === "erro").map((i) => i.id);
+    if (ids.length) void processAll(ids);
+  };
+
+  const readyCount = items.filter((i) => i.status === "pronto").length;
+  const errorCount = items.filter((i) => i.status === "erro").length;
+  const pendingCount = items.filter((i) => i.status !== "pronto").length;
+
+  const eta = (() => {
+    if (!running || doneCount.current === 0) return null;
+    const per = (performance.now() - startedAt.current) / doneCount.current;
+    const left = (per * pendingCount) / Math.max(1, concurrency);
+    const s = Math.round(left / 1000);
+    return s > 90 ? `${Math.round(s / 60)} min` : `${s}s`;
+  })();
+
+  const outFiles = () =>
     items
       .filter((i) => i.blob)
-      .forEach((i, idx) =>
-        setTimeout(
-          () => downloadBlob(i.blob!, `${active.name.replace(/\s+/g, "-").toLowerCase()}-${idx + 1}.${i.ext}`),
-          idx * 600,
-        ),
-      );
+      .map((i, idx) => ({
+        name: `${active.name.replace(/\s+/g, "-").toLowerCase()}-${String(idx + 1).padStart(3, "0")}.${i.ext}`,
+        blob: i.blob!,
+      }));
+
+  const downloadZipAll = async () => {
+    setZipping(true);
+    try {
+      await downloadAsZip(outFiles(), `${active.name.replace(/\s+/g, "-").toLowerCase()}.zip`);
+    } finally {
+      setZipping(false);
+    }
   };
+
+  const saveFolder = async () => {
+    try {
+      await saveToFolder(outFiles());
+    } catch {
+      /* cancelado */
+    }
+  };
+
 
   const previewTemplate: Template = selected
     ? {
