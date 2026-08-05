@@ -987,7 +987,7 @@ function Home() {
                       </div>
                     </div>
                     <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-                      {selected.capStatus ?? "transcreve a fala e desenha no estilo karaokê definido no editor."}
+                      {selected.capStatus ?? "transcreve a fala e desenha no estilo escolhido abaixo."}
                     </p>
                     {!!selected.captions?.length && (
                       <div className="mt-2 flex items-center gap-2">
@@ -1025,7 +1025,42 @@ function Home() {
                         </button>
                       </div>
                     )}
+
+                    <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
+                      <p className="mono-label">Estilo das legendas (CapCut)</p>
+                      <label className="flex items-center gap-2 font-mono text-[11px]">
+                        <input
+                          type="checkbox"
+                          checked={(active.captions ?? defaultCaptions()).visible}
+                          onChange={(e) =>
+                            setActive((t) => ({
+                              ...t,
+                              captions: { ...(t.captions ?? defaultCaptions()), visible: e.target.checked },
+                            }))
+                          }
+                          className="size-4 accent-[var(--primary)]"
+                        />
+                        exibir no vídeo
+                      </label>
+                    </div>
+                    <div className="mt-3">
+                      <CaptionStudio
+                        style={active.captions ?? defaultCaptions()}
+                        cues={selected.captions}
+                        fonts={active.fonts}
+                        onAddFont={(f) =>
+                          setActive((t) => ({ ...t, fonts: [...(t.fonts ?? []), f] }))
+                        }
+                        onChange={(patch) =>
+                          setActive((t) => ({
+                            ...t,
+                            captions: { ...(t.captions ?? defaultCaptions()), ...patch },
+                          }))
+                        }
+                      />
+                    </div>
                   </div>
+
                 )}
 
 
