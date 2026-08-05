@@ -22,6 +22,8 @@ import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
 import { TemplateEditor } from "@/components/TemplateEditor";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
+import { ClipStudio } from "@/components/ClipStudio";
+
 import {
   applyRatio,
   commitTemplate,
