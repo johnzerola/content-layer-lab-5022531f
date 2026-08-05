@@ -40,7 +40,19 @@ const FROM: { id: NonNullable<CleanupRegion["from"]>; label: string }[] = [
   { id: "right", label: "da direita" },
 ];
 
-export function CleanupStudio({ regions, onChange, poster, aspect = 9 / 16 }: Props) {
+export function CleanupStudio({
+  regions,
+  onChange,
+  poster,
+  aspect = 9 / 16,
+  onDetect,
+  detecting,
+  detectMsg,
+  suggestions = [],
+  onUseSuggestion,
+  onUseAllSuggestions,
+  onClearSuggestions,
+}: Props) {
   const boxRef = useRef<HTMLDivElement | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
   const [sel, setSel] = useState<string | null>(regions[0]?.id ?? null);
