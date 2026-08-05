@@ -56,6 +56,7 @@ export function TemplateCanvas({
   interactive = true,
   poster,
   previewFile,
+  drawOpts,
 }: {
   template: Template;
   selected?: LayerId | null;
@@ -64,6 +65,7 @@ export function TemplateCanvas({
   interactive?: boolean;
   poster?: string | null;
   previewFile?: File | null;
+  drawOpts?: DrawOpts;
 }) {
   const W = template.canvasW ?? CANVAS_W;
   const H = template.canvasH ?? CANVAS_H;
