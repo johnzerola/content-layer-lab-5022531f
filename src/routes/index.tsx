@@ -152,6 +152,11 @@ function Home() {
   const [clipMaxLen, setClipMaxLen] = useState(45);
   const [clipMax, setClipMax] = useState(6);
   const [clipMinScore, setClipMinScore] = useState(60);
+  const [variants, setVariants] = useState(1);
+  const [capLang, setCapLang] = useState("pt");
+  const [capBusyId, setCapBusyId] = useState<string | null>(null);
+
+
 
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
