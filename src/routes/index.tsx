@@ -43,7 +43,7 @@ import { autoFrame } from "@/lib/autoframe";
 import { findClips, formatTime } from "@/lib/clips";
 import { resolveVideoLink } from "@/lib/import.functions";
 import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
-import { cuesToSrt, cuesToText, generateCaptions, type CaptionCue } from "@/lib/captions";
+import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } from "@/lib/captions";
 import { registerFonts } from "@/lib/fonts";
 import { CaptionStudio } from "@/components/CaptionStudio";
 
