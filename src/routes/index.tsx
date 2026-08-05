@@ -38,8 +38,10 @@ import {
   PLATFORM_PRESETS,
   RATIO_PRESETS,
 
+  type CleanupRegion,
   type Template,
 } from "@/lib/template";
+import { detectOverlays } from "@/lib/detect";
 import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
 import { webCodecsSupported } from "@/lib/encode";
 import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
