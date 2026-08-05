@@ -287,7 +287,7 @@ function Home() {
         setClipBusy(false);
       }
     },
-    [clipBusy, clipLen, clipMax],
+    [clipBusy, clipMinLen, clipMaxLen, clipMax, clipMinScore],
   );
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
