@@ -29,7 +29,9 @@ import { ClipStudio } from "@/components/ClipStudio";
 
 import {
   applyRatio,
+  CAPTION_PRESETS,
   commitTemplate,
+
   createTemplate,
   defaultCaptions,
   loadTemplates,
@@ -94,6 +96,8 @@ interface Item {
   outputs?: { blob: Blob; ext: string; label: string }[] | undefined;
   captions?: CaptionCue[] | undefined;
   capStatus?: string | undefined;
+  capError?: boolean | undefined;
+
   error?: string | undefined;
 }
 
@@ -338,7 +342,9 @@ function Home() {
     async (item: Item) => {
       if (capBusyId) return;
       setCapBusyId(item.id);
-      setItems((p) => p.map((x) => (x.id === item.id ? { ...x, capStatus: "ouvindo o áudio..." } : x)));
+      setItems((p) =>
+        p.map((x) => (x.id === item.id ? { ...x, capStatus: "ouvindo o áudio...", capError: false } : x)),
+      );
       try {
         const cues = await generateCaptions(item.file, {
           clip: item.clip,
@@ -354,17 +360,18 @@ function Home() {
               ? {
                   ...x,
                   captions: cues,
-                  capStatus: cues.length ? `${cues.length} blocos de legenda` : "nenhuma fala detectada",
+                  capError: false,
+                  capStatus: `${cues.length} blocos · ${cues.reduce((n, c) => n + c.words.length, 0)} palavras`,
                 }
               : x,
           ),
         );
         if (cues.length) setActive((t) => ({ ...t, captions: { ...(t.captions ?? defaultCaptions()), visible: true } }));
       } catch (err) {
-        setItems((p) =>
-          p.map((x) => (x.id === item.id ? { ...x, capStatus: `falhou: ${String((err as Error)?.message ?? err)}` } : x)),
-        );
+        const msg = String((err as Error)?.message ?? err);
+        setItems((p) => p.map((x) => (x.id === item.id ? { ...x, capStatus: msg, capError: true } : x)));
       } finally {
+
         setCapBusyId(null);
       }
     },
@@ -931,7 +938,45 @@ function Home() {
                       loopStart={previewLoop.start}
                       loopEnd={previewLoop.end}
                     />
+                    {/* estilo rápido de legenda direto na prévia */}
+                    <div className="flex flex-wrap items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setActive((t) => ({
+                            ...t,
+                            captions: {
+                              ...(t.captions ?? defaultCaptions()),
+                              visible: !(t.captions ?? defaultCaptions()).visible,
+                            },
+                          }))
+                        }
+                        className={`rounded-md border px-2 py-1 font-mono text-[10px] ${
+                          capStyle.visible
+                            ? "border-primary/60 bg-primary/15 text-primary"
+                            : "border-border text-muted-foreground"
+                        }`}
+                      >
+                        legenda {capStyle.visible ? "on" : "off"}
+                      </button>
+                      {CAPTION_PRESETS.slice(0, 6).map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() =>
+                            setActive((t) => ({
+                              ...t,
+                              captions: { ...(t.captions ?? defaultCaptions()), ...p.style, visible: true },
+                            }))
+                          }
+                          className="rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:border-primary/60 hover:text-foreground"
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
                     {previewVariation && (
+
                       <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
                         {variants > 1 ? `v${variantIdx + 1} · ` : ""}
                         {describeVariation(previewVariation)}
@@ -1061,9 +1106,26 @@ function Home() {
                         </Button>
                       </div>
                     </div>
-                    <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-                      {selected.capStatus ?? "transcreve a fala e desenha no estilo escolhido abaixo."}
-                    </p>
+                    {selected.capError ? (
+                      <div className="mt-2 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2">
+                        <AlertTriangle className="mt-[2px] size-3.5 shrink-0 text-destructive" />
+                        <div className="space-y-1">
+                          <p className="font-mono text-[11px] leading-relaxed text-destructive">{selected.capStatus}</p>
+                          <button
+                            type="button"
+                            className="font-mono text-[10px] underline underline-offset-2 text-muted-foreground hover:text-foreground"
+                            onClick={() => void makeCaptions(selected)}
+                          >
+                            tentar novamente
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                        {selected.capStatus ?? "transcreve a fala e desenha no estilo escolhido abaixo."}
+                      </p>
+                    )}
+
                     {!!selected.captions?.length && (
                       <div className="mt-2 flex items-center gap-2">
                         <span className="font-mono text-[11px] text-primary">

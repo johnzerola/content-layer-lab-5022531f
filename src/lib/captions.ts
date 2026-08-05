@@ -155,16 +155,49 @@ export async function generateCaptions(
   try {
     buf = await decodeMono(file);
   } catch {
-    throw new Error("não consegui ler o áudio deste vídeo (formato sem áudio ou não suportado pelo navegador)");
+    throw new Error(
+      "Não consegui ler o áudio deste vídeo. Ele pode estar sem faixa de áudio ou em um codec que o navegador não decodifica — exporte em MP4/AAC e tente de novo.",
+    );
   }
+
   const from = Math.max(0, opts.clip?.start ?? 0);
   const to = Math.min(buf.duration, opts.clip?.end ?? buf.duration);
-  const segments = findSegments(buf, from, to);
-  if (!segments.length) return [];
+  if (to - from < 0.4) {
+    throw new Error("O trecho selecionado é curto demais para transcrever (mínimo 0,4s). Aumente o corte.");
+  }
 
+  // validação de áudio: silêncio total / faixa muda
+  const ch = buf.getChannelData(0);
+  let peak = 0;
+  let energy = 0;
+  const i0 = Math.floor(from * SR);
+  const i1 = Math.min(ch.length, Math.floor(to * SR));
+  for (let i = i0; i < i1; i += 7) {
+    const v = Math.abs(ch[i] ?? 0);
+    if (v > peak) peak = v;
+    energy += v;
+  }
+  const avg = energy / Math.max(1, Math.floor((i1 - i0) / 7));
+  if (peak < 0.005) {
+    throw new Error("Este vídeo está mudo (sem sinal de áudio no trecho). Sem fala não dá para gerar legendas.");
+  }
+  if (avg < 0.0015) {
+    throw new Error(
+      "O áudio está baixo demais para transcrever com segurança. Aumente o volume do arquivo original e tente novamente.",
+    );
+  }
+
+  const segments = findSegments(buf, from, to);
+  if (!segments.length) {
+    throw new Error(
+      "Não detectei fala neste trecho — parece só música ou ruído. Ajuste o corte para uma parte falada e tente de novo.",
+    );
+  }
 
   const cues: CaptionCue[] = [];
   let done = 0;
+  let lastErr: string | null = null;
+  let failures = 0;
   for (const seg of segments) {
     if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
     const wav = encodeWav(buf, seg.start, seg.end);
@@ -175,13 +208,26 @@ export async function generateCaptions(
       const words = wordsFor(res.text ?? "", seg);
       if (words.length) cues.push({ start: seg.start, end: seg.end, words });
     } catch (err) {
+      failures++;
+      lastErr = String((err as Error)?.message ?? err);
       console.warn("segmento sem transcrição", err);
+      // erros de conta/limite não adianta insistir nos próximos segmentos
+      if (/crédito|limite|indisponível/i.test(lastErr)) throw new Error(lastErr);
     }
     done++;
     opts.onProgress?.({ done, total: segments.length });
   }
+
+  if (!cues.length) {
+    throw new Error(
+      failures
+        ? `A transcrição falhou em todos os ${failures} trechos. ${lastErr ?? ""}`.trim()
+        : "A transcrição voltou vazia — o áudio tem fala, mas nada foi reconhecido. Tente trocar o idioma para 'auto'.",
+    );
+  }
   return cues;
 }
+
 
 export function cuesToText(cues: CaptionCue[]) {
   return cues.map((c) => c.words.map((w) => w.text).join(" ")).join(" ");
