@@ -538,7 +538,9 @@ export function applyCleanup(
     ctx.rect(x, y, w, h);
     ctx.clip();
 
-    if (r.mode === "solid") {
+    if (r.mode === "inpaint") {
+      inpaintArea(ctx, x, y, w, h, k);
+    } else if (r.mode === "solid") {
       ctx.fillStyle = r.color ?? "#000000";
       ctx.fillRect(x, y, w, h);
     } else if (r.mode === "pixelate") {
