@@ -17,6 +17,9 @@ import {
   FolderDown,
   FileArchive,
   Sparkles,
+  Captions,
+  AlertTriangle,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
@@ -28,17 +31,21 @@ import {
   applyRatio,
   commitTemplate,
   createTemplate,
+  defaultCaptions,
   loadTemplates,
   RATIO_PRESETS,
   type Template,
 } from "@/lib/template";
-import { downloadBlob, grabPoster, renderVideo } from "@/lib/render";
+import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
 import { webCodecsSupported } from "@/lib/encode";
 import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
 import { autoFrame } from "@/lib/autoframe";
 import { findClips, formatTime } from "@/lib/clips";
 import { resolveVideoLink } from "@/lib/import.functions";
 import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
+import { cuesToSrt, cuesToText, generateCaptions, type CaptionCue } from "@/lib/captions";
+import { registerFonts } from "@/lib/fonts";
+
 
 
 export const Route = createFileRoute("/")({
