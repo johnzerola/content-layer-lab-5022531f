@@ -982,7 +982,7 @@ function Home() {
           />
         )}
 
-        {mode === "lote" && items.length > 0 && (
+        {mode !== "clip" && items.length > 0 && (
 
           <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
             <section className="panel space-y-4 p-5">
