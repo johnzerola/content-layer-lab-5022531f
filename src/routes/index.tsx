@@ -824,6 +824,35 @@ function Home() {
             </Button>
           </div>
         </section>
+        ) : mode === "limpar" ? (
+          <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
+            <div>
+              <p className="mono-label">Limpar vídeo</p>
+              <p className="text-lg font-semibold">Remover legenda queimada, marca d'água e textos</p>
+              <p className="font-mono text-[11px] text-muted-foreground">
+                marque as áreas sobre o quadro no preview — clonar vizinho, borrão, mosaico ou tarja
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-border px-3 py-1 font-mono text-[11px] text-muted-foreground">
+                {(active.cleanup ?? []).length} área{(active.cleanup ?? []).length === 1 ? "" : "s"}
+              </span>
+              <select
+                className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm"
+                value={`${active.canvasW ?? 1080}x${active.canvasH ?? 1920}`}
+                onChange={(e) => {
+                  const p = RATIO_PRESETS.find((r) => `${r.w}x${r.h}` === e.target.value);
+                  if (p) setActive(applyRatio(active, p.w, p.h));
+                }}
+              >
+                {RATIO_PRESETS.map((r) => (
+                  <option key={r.id} value={`${r.w}x${r.h}`}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </section>
         ) : (
           <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
             <div>
