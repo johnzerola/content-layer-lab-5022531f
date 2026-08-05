@@ -140,8 +140,14 @@ function stripBranding(t: Template): Template {
   };
 }
 
+/** Modo "limpar": vídeo cheio, sem marca e sem legenda nova — só as áreas de limpeza. */
+function cleanOnly(t: Template): Template {
+  const b = stripBranding(t);
+  return { ...b, captions: { ...(b.captions ?? defaultCaptions()), visible: false } };
+}
+
 function Home() {
-  const [mode, setMode] = useState<"lote" | "clip">("lote");
+  const [mode, setMode] = useState<"lote" | "clip" | "limpar">("lote");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
   const [editing, setEditing] = useState(false);
@@ -521,7 +527,12 @@ function Home() {
           const total = n * outs.length;
           const outputs: { blob: Blob; ext: string; label: string }[] = [];
           let step = 0;
-          const baseTpl = modeRef.current === "clip" ? stripBranding(active) : active;
+          const baseTpl =
+            modeRef.current === "clip"
+              ? stripBranding(active)
+              : modeRef.current === "limpar"
+                ? cleanOnly(active)
+                : active;
 
           // transcreve na hora do processamento, para queimar a legenda no vídeo
           let cues = item.captions;
@@ -651,7 +662,9 @@ function Home() {
   })();
 
   const outFiles = () => {
-    const base = (mode === "clip" ? "corte" : active.name).replace(/\s+/g, "-").toLowerCase();
+    const base = (mode === "clip" ? "corte" : mode === "limpar" ? "limpo" : active.name)
+      .replace(/\s+/g, "-")
+      .toLowerCase();
     const files: { name: string; blob: Blob }[] = [];
     items.forEach((i, idx) => {
       const outs = i.outputs ?? (i.blob ? [{ blob: i.blob, ext: i.ext ?? "mp4", label: "" }] : []);
@@ -667,7 +680,10 @@ function Home() {
   const downloadZipAll = async () => {
     setZipping(true);
     try {
-      await downloadAsZip(outFiles(), `${(mode === "clip" ? "cortes" : active.name).replace(/\s+/g, "-").toLowerCase()}.zip`);
+      await downloadAsZip(
+        outFiles(),
+        `${(mode === "clip" ? "cortes" : mode === "limpar" ? "limpos" : active.name).replace(/\s+/g, "-").toLowerCase()}.zip`,
+      );
     } finally {
       setZipping(false);
     }
@@ -682,7 +698,8 @@ function Home() {
   };
 
 
-  const baseTpl: Template = mode === "clip" ? stripBranding(active) : active;
+  const baseTpl: Template =
+    mode === "clip" ? stripBranding(active) : mode === "limpar" ? cleanOnly(active) : active;
   const previewTemplate: Template = selected
     ? {
         ...baseTpl,
@@ -704,7 +721,12 @@ function Home() {
             <div>
               <h1 className="font-mono text-sm tracking-[0.2em] text-foreground">VAIVIRAL</h1>
               <p className="font-mono text-[10px] text-muted-foreground">
-                {mode === "clip" ? "clipagem sem template" : "editor em lote"} · roda no navegador
+                {mode === "clip"
+                  ? "clipagem sem template"
+                  : mode === "limpar"
+                    ? "remover legenda e marca d'água"
+                    : "editor em lote"}{" "}
+                · roda no navegador
               </p>
             </div>
           </div>
@@ -713,6 +735,7 @@ function Home() {
               {([
                 { id: "lote", label: "Lote com template" },
                 { id: "clip", label: "Só cortes" },
+                { id: "limpar", label: "Limpar vídeo" },
               ] as const).map((m) => (
                 <button
                   key={m.id}
@@ -806,6 +829,35 @@ function Home() {
             </Button>
           </div>
         </section>
+        ) : mode === "limpar" ? (
+          <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
+            <div>
+              <p className="mono-label">Limpar vídeo</p>
+              <p className="text-lg font-semibold">Remover legenda queimada, marca d'água e textos</p>
+              <p className="font-mono text-[11px] text-muted-foreground">
+                marque as áreas sobre o quadro no preview — clonar vizinho, borrão, mosaico ou tarja
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="rounded-full border border-border px-3 py-1 font-mono text-[11px] text-muted-foreground">
+                {(active.cleanup ?? []).length} área{(active.cleanup ?? []).length === 1 ? "" : "s"}
+              </span>
+              <select
+                className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm"
+                value={`${active.canvasW ?? 1080}x${active.canvasH ?? 1920}`}
+                onChange={(e) => {
+                  const p = RATIO_PRESETS.find((r) => `${r.w}x${r.h}` === e.target.value);
+                  if (p) setActive(applyRatio(active, p.w, p.h));
+                }}
+              >
+                {RATIO_PRESETS.map((r) => (
+                  <option key={r.id} value={`${r.w}x${r.h}`}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </section>
         ) : (
           <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
             <div>
@@ -935,7 +987,7 @@ function Home() {
           />
         )}
 
-        {mode === "lote" && items.length > 0 && (
+        {mode !== "clip" && items.length > 0 && (
 
           <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
             <section className="panel space-y-4 p-5">
@@ -1220,7 +1272,7 @@ function Home() {
                   {eta && <span className="text-primary">● restam ~{eta}</span>}
                 </div>
 
-                {selected && (
+                {selected && mode !== "limpar" && (
                   <div className="rounded-xl border border-border bg-surface-2 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="mono-label">Legendas automáticas</p>
@@ -1365,7 +1417,7 @@ function Home() {
                 )}
 
 
-                {selected && (
+                {selected && mode !== "limpar" && (
                   <div className="rounded-xl border border-border bg-surface-2 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="mono-label">Cortes automáticos</p>
