@@ -1,4 +1,7 @@
+import { defaultAntiDup, type AntiDupConfig } from "./variation";
+
 export type LayerId =
+
   | "video"
   | "watermark"
   | "avatar"
