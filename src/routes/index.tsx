@@ -88,7 +88,34 @@ interface QueueCtrl {
   aborts: Map<string, AbortController>;
 }
 
+/** Modo "só cortes": remove toda a marca e usa o vídeo cheio no quadro. */
+function stripBranding(t: Template): Template {
+  const off = <T extends { visible: boolean }>(l: T): T => ({ ...l, visible: false });
+  return {
+    ...t,
+    background: "#000000",
+    video: {
+      ...t.video,
+      x: 0,
+      y: 0,
+      w: t.canvasW ?? 1080,
+      h: t.canvasH ?? 1920,
+      rotation: 0,
+      radius: 0,
+      visible: true,
+    },
+    watermark: off(t.watermark),
+    avatar: off(t.avatar),
+    name_: off(t.name_),
+    handle: off(t.handle),
+    headline: off(t.headline),
+    cta: off(t.cta),
+    extras: [],
+  };
+}
+
 function Home() {
+  const [mode, setMode] = useState<"lote" | "clip">("lote");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
   const [editing, setEditing] = useState(false);
@@ -116,6 +143,8 @@ function Home() {
   const startedAt = useRef(0);
   const doneCount = useRef(0);
   const smartRef = useRef(smartFrame);
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
 
   itemsRef.current = items;
   smartRef.current = smartFrame;
@@ -291,7 +320,7 @@ function Home() {
         ctrl.aborts.set(id, ac);
         setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)));
         try {
-          const { blob, ext } = await renderVideo(item.file, active, {
+          const { blob, ext } = await renderVideo(item.file, modeRef.current === "clip" ? stripBranding(active) : active, {
             variation: variationOf(item),
             offsetX: item.offsetX,
             offsetY: item.offsetY,
@@ -358,14 +387,14 @@ function Home() {
     items
       .filter((i) => i.blob)
       .map((i, idx) => ({
-        name: `${active.name.replace(/\s+/g, "-").toLowerCase()}-${String(idx + 1).padStart(3, "0")}.${i.ext}`,
+        name: `${(mode === "clip" ? "corte" : active.name).replace(/\s+/g, "-").toLowerCase()}-${String(idx + 1).padStart(3, "0")}.${i.ext}`,
         blob: i.blob!,
       }));
 
   const downloadZipAll = async () => {
     setZipping(true);
     try {
-      await downloadAsZip(outFiles(), `${active.name.replace(/\s+/g, "-").toLowerCase()}.zip`);
+      await downloadAsZip(outFiles(), `${(mode === "clip" ? "cortes" : active.name).replace(/\s+/g, "-").toLowerCase()}.zip`);
     } finally {
       setZipping(false);
     }
@@ -380,13 +409,14 @@ function Home() {
   };
 
 
+  const baseTpl: Template = mode === "clip" ? stripBranding(active) : active;
   const previewTemplate: Template = selected
     ? {
-        ...active,
-        headline: { ...active.headline, text: selected.headline || active.headline.text },
-        video: { ...active.video, offsetX: selected.offsetX, offsetY: selected.offsetY },
+        ...baseTpl,
+        headline: { ...baseTpl.headline, text: selected.headline || baseTpl.headline.text },
+        video: { ...baseTpl.video, offsetX: selected.offsetX, offsetY: selected.offsetY },
       }
-    : active;
+    : baseTpl;
 
   return (
     <main className="min-h-screen">
@@ -399,17 +429,36 @@ function Home() {
             <div>
               <h1 className="font-mono text-sm tracking-[0.2em] text-foreground">VAIVIRAL</h1>
               <p className="font-mono text-[10px] text-muted-foreground">
-                editor em lote · 9:16 · roda no navegador
+                {mode === "clip" ? "clipagem sem template" : "editor em lote"} · roda no navegador
               </p>
             </div>
           </div>
+          <div className="flex items-center gap-3">
+            <div className="flex rounded-lg border border-border bg-surface-2 p-0.5">
+              {([
+                { id: "lote", label: "Lote com template" },
+                { id: "clip", label: "Só cortes" },
+              ] as const).map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setMode(m.id)}
+                  className={`rounded-md px-3 py-1.5 font-mono text-[11px] transition ${
+                    mode === m.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
           <span className="rounded-full border border-primary/40 bg-accent px-3 py-1 font-mono text-[11px] text-accent-foreground">
             ● {items.length} vídeo{items.length === 1 ? "" : "s"}
           </span>
+          </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-6xl space-y-5 px-5 py-6">
+        {mode === "lote" ? (
         <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
           <div>
             <p className="mono-label">Template ativo</p>
@@ -469,6 +518,31 @@ function Home() {
             </Button>
           </div>
         </section>
+        ) : (
+          <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
+            <div>
+              <p className="mono-label">Só cortes</p>
+              <p className="text-lg font-semibold">Vídeo longo → clipes prontos</p>
+              <p className="font-mono text-[11px] text-muted-foreground">
+                sem marca, sem headline — só recorte, proporção e anti-duplicidade
+              </p>
+            </div>
+            <select
+              className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm"
+              value={`${active.canvasW ?? 1080}x${active.canvasH ?? 1920}`}
+              onChange={(e) => {
+                const p = RATIO_PRESETS.find((r) => `${r.w}x${r.h}` === e.target.value);
+                if (p) setActive(applyRatio(active, p.w, p.h));
+              }}
+            >
+              {RATIO_PRESETS.map((r) => (
+                <option key={r.id} value={`${r.w}x${r.h}`}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </section>
+        )}
 
 
         <section
@@ -559,6 +633,7 @@ function Home() {
                       </div>
                     )}
                     <div className="space-y-2 pt-1">
+                      {mode === "lote" && (
                       <input
                         className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
                         placeholder="Headline só deste vídeo (opcional)"
@@ -567,6 +642,7 @@ function Home() {
                           setItems((p) => p.map((x) => (x.id === selected.id ? { ...x, headline: e.target.value } : x)))
                         }
                       />
+                      )}
                       {(["offsetX", "offsetY"] as const).map((axis) => (
                         <label key={axis} className="block text-xs text-muted-foreground">
                           Corte {axis === "offsetX" ? "horizontal" : "vertical"}
