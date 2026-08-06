@@ -569,6 +569,11 @@ function Home() {
 
 
   const processAll = async (onlyIds?: string[]) => {
+    // a fila roda presa à ferramenta em que foi disparada
+    const runMode = modeRef.current;
+    const runFlow = FLOWS[runMode].export;
+    const setItems = (upd: Item[] | ((prev: Item[]) => Item[])) => setItemsIn(runMode, upd);
+    const listNow = () => queuesRef.current[runMode] ?? [];
     const ctrl = ctrlRef.current;
     ctrl.paused = false;
     ctrl.cancelled = false;
@@ -592,23 +597,25 @@ function Home() {
         if (ctrl.cancelled) return;
         const id = queue.shift();
         if (!id) return;
-        const item = itemsRef.current.find((x) => x.id === id);
+        const item = listNow().find((x) => x.id === id);
         if (!item) continue;
         const ac = new AbortController();
         ctrl.aborts.set(id, ac);
         setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0, stage: "preparando", stepIndex: 0, stepTotal: 0 } : x)));
         const runItem = async () => {
 
-          const n = Math.max(1, variants);
-          const targets = PLATFORM_PRESETS.filter((p) => platforms.includes(p.id));
+          const n = runFlow.variants ? Math.max(1, variants) : 1;
+          const targets = runFlow.platforms
+            ? PLATFORM_PRESETS.filter((p) => platforms.includes(p.id))
+            : [];
           const outs = targets.length ? targets : [PLATFORM_PRESETS[0]!];
           const total = n * outs.length;
           const outputs: { blob: Blob; ext: string; label: string }[] = [];
           let step = 0;
           const baseTpl =
-            modeRef.current === "clip"
+            runMode === "clip"
               ? stripBranding(active)
-              : modeRef.current === "limpar"
+              : runMode === "limpar"
                 ? cleanOnly(active)
                 : active;
 
@@ -658,7 +665,7 @@ function Home() {
             // cada plataforma recebe a resolução/fps/bitrate recomendados
             // no modo "limpar" o quadro segue a orientação real do vídeo (sem recorte)
             const tpl =
-              modeRef.current === "limpar"
+              runMode === "limpar"
                 ? cleanOnly(active, { w: item.w, h: item.h })
                 : applyRatio(baseTpl, plat.w, plat.h);
             for (let k = 0; k < n; k++) {
@@ -733,7 +740,7 @@ function Home() {
         } catch (err) {
           const aborted = (err as Error)?.name === "AbortError";
           const msg = String((err as Error)?.message ?? err);
-          if (!aborted) failures.current.push({ name: itemsRef.current.find((x) => x.id === id)?.file.name ?? id, error: msg });
+          if (!aborted) failures.current.push({ name: listNow().find((x) => x.id === id)?.file.name ?? id, error: msg });
           setItems((p) =>
             p.map((x) =>
               x.id === id
@@ -759,7 +766,7 @@ function Home() {
         fails: [...failures.current],
       });
       void logBatch({
-        mode,
+        mode: runMode,
         templateName: active.name,
         platforms,
         videos: items.length,
