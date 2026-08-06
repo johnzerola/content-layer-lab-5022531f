@@ -541,6 +541,9 @@ function Home() {
     setRunning(true);
     startedAt.current = performance.now();
     doneCount.current = 0;
+    failures.current = [];
+    setReport(null);
+
 
     const pending = items
       .filter((i) => (onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto"))
