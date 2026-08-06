@@ -761,12 +761,20 @@ function Home() {
 
 
   const baseTpl: Template =
-    mode === "clip" ? stripBranding(active) : mode === "limpar" ? cleanOnly(active) : active;
+    mode === "clip"
+      ? stripBranding(active)
+      : mode === "limpar"
+        ? cleanOnly(active, selected ? { w: selected.w, h: selected.h } : undefined)
+        : active;
   const previewTemplate: Template = selected
     ? {
         ...baseTpl,
         headline: { ...baseTpl.headline, text: selected.headline || baseTpl.headline.text },
-        video: { ...baseTpl.video, offsetX: selected.offsetX, offsetY: selected.offsetY },
+        video: {
+          ...baseTpl.video,
+          offsetX: mode === "limpar" ? 0 : selected.offsetX,
+          offsetY: mode === "limpar" ? 0 : selected.offsetY,
+        },
       }
     : baseTpl;
 
