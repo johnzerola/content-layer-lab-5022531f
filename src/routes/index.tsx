@@ -64,6 +64,8 @@ import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { canBrowserDecode, guessMime, isVideoFile, VIDEO_ACCEPT, VIDEO_EXT_RE } from "@/lib/media";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
+import { ImportPanel } from "@/components/ImportPanel";
+import { FLOWS, outputName, zipName, type Mode } from "@/lib/flows";
 import { Toaster } from "@/components/ui/sonner";
 
 
@@ -180,7 +182,7 @@ function cleanOnly(t: Template, src?: { w: number; h: number }): Template {
 }
 
 function Home() {
-  const [mode, setMode] = useState<"lote" | "clip" | "limpar">("lote");
+  const [mode, setMode] = useState<Mode>("lote");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
   const [editing, setEditing] = useState(false);
@@ -201,13 +203,13 @@ function Home() {
   queuesRef.current = queues;
   const setItemsIn = useCallback(
     (m: Mode, upd: Item[] | ((prev: Item[]) => Item[])) =>
-      setQueues((q) => ({ ...q, [m]: typeof upd === "function" ? upd(q[m]) : upd })),
+      setQueues((q) => ({ ...q, [m]: typeof upd === "function" ? upd(q[m] ?? []) : upd })),
     [],
   );
   const modeRef = useRef<Mode>(mode);
   modeRef.current = mode;
-  const items = queues[mode];
-  const selectedId = selectedIds[mode];
+  const items = queues[mode] ?? [];
+  const selectedId = selectedIds[mode] ?? null;
   const setItems = useCallback(
     (upd: Item[] | ((prev: Item[]) => Item[])) => setItemsIn(modeRef.current, upd),
     [setItemsIn],
@@ -269,8 +271,6 @@ function Home() {
   } | null>(null);
 
   const smartRef = useRef(smartFrame);
-  const modeRef = useRef(mode);
-  modeRef.current = mode;
 
   itemsRef.current = items;
   smartRef.current = smartFrame;
@@ -319,7 +319,7 @@ function Home() {
       progress: 0,
     }));
     setItems((prev) => [...prev, ...created]);
-    setSelectedId((cur) => cur ?? created[0]?.id ?? null);
+    if (!selectedIds[modeRef.current] && created[0]) setSelectedId(created[0].id);
     for (const it of created) {
       try {
         const meta = await grabPoster(it.file);
