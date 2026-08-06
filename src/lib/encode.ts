@@ -20,6 +20,8 @@ export interface EncodeOptions {
   clip?: { start: number; end: number } | undefined;
   /** legendas em tempo do vídeo fonte */
   captions?: CaptionCue[] | undefined;
+  /** placa de fundo (mediana temporal) para remover overlays com pixels reais */
+  plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null | undefined;
   onProgress?: ((p: number) => void) | undefined;
   signal?: AbortSignal | undefined;
 }
@@ -204,7 +206,9 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       border: v.border,
       borderColor: v.borderColor,
       ...(opts.captions?.length ? { captions: opts.captions } : {}),
+      ...(opts.plate ? { plate: opts.plate } : {}),
     };
+
 
     let frameIndex = 0;
     const frameDur = Math.round(1_000_000 / fps);

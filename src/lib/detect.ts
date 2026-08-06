@@ -3,12 +3,14 @@ import { makeCleanupRegion, type CleanupRegion } from "@/lib/template";
 /**
  * Detecção automática de legenda queimada / marca d'água / logo / texto fixo.
  *
- * Três sinais combinados por pixel (em baixa resolução):
- *  1. frequência de borda  → texto, mesmo que o conteúdo mude entre os quadros
- *  2. estabilidade temporal (variância baixa) → marca d'água fixa, mesmo transparente
- *  3. blob de cor constante → logo/imagem sem borda de texto
+ * Baseada em MEDIANA TEMPORAL (o que sites como Vmake fazem antes de reconstruir):
+ *  - a mediana por pixel remove o conteúdo que muda e preserva o que fica parado;
+ *  - um overlay estático (logo, @usuário, marca d'água transparente) aparece nítido
+ *    na mediana e quase não varia no tempo → estabilidade alta + borda nítida;
+ *  - legenda queimada é intermitente → bordas fortes que voltam sempre na mesma faixa.
  *
- * As células fortes são agrupadas em retângulos e classificadas.
+ * Os candidatos passam por um filtro de persistência (o sinal precisa se repetir na
+ * maioria dos quadros) e a caixa final é ajustada ao contorno real do overlay.
  */
 
 export type DetectOpts = {
@@ -19,11 +21,12 @@ export type DetectOpts = {
   onProgress?: (done: number, total: number) => void;
 };
 
-const COLS = 24;
-const ROWS = 40;
-const SAMPLE_W = 192;
-const EDGE_THR = 0.14;
-const VAR_THR = 0.0016;
+const COLS = 32;
+const ROWS = 56;
+const SAMPLE_W = 320;
+const EDGE_THR = 0.13;
+/** |g - mediana| abaixo disso = pixel “parado” naquele quadro */
+const STABLE_EPS = 0.035;
 
 function gray(data: Uint8ClampedArray, i: number) {
   return (data[i]! * 0.299 + data[i + 1]! * 0.587 + data[i + 2]! * 0.114) / 255;
@@ -52,6 +55,64 @@ export function safeZones(): Partial<CleanupRegion>[] {
   ];
 }
 
+/** agrupa células “quentes” vizinhas (8-direções) em retângulos — puro, testável */
+export function groupCells(
+  hot: boolean[],
+  score: number[],
+  cols: number,
+  rows: number,
+): { x0: number; y0: number; x1: number; y1: number; cells: number; s: number }[] {
+  const seen = new Uint8Array(hot.length);
+  const rects: { x0: number; y0: number; x1: number; y1: number; cells: number; s: number }[] = [];
+  for (let i = 0; i < hot.length; i++) {
+    if (!hot[i] || seen[i]) continue;
+    const queue = [i];
+    seen[i] = 1;
+    let x0 = cols,
+      y0 = rows,
+      x1 = -1,
+      y1 = -1,
+      cnt = 0,
+      acc = 0;
+    while (queue.length) {
+      const cur = queue.pop()!;
+      const cx = cur % cols;
+      const cy = Math.floor(cur / cols);
+      x0 = Math.min(x0, cx);
+      y0 = Math.min(y0, cy);
+      x1 = Math.max(x1, cx);
+      y1 = Math.max(y1, cy);
+      cnt++;
+      acc += score[cur] ?? 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = cx + dx,
+            ny = cy + dy;
+          if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
+          const j = ny * cols + nx;
+          if (hot[j] && !seen[j]) {
+            seen[j] = 1;
+            queue.push(j);
+          }
+        }
+      }
+    }
+    if (cnt >= 2) rects.push({ x0, y0, x1, y1, cells: cnt, s: acc / cnt });
+  }
+  return rects;
+}
+
+/** junta instantes em intervalos contínuos com folga — puro, testável */
+export function mergeRanges(times: number[], pad: number, gap: number) {
+  const out: { start: number; end: number }[] = [];
+  for (const t of [...times].sort((a, b) => a - b)) {
+    const last = out[out.length - 1];
+    if (last && t - last.end <= gap) last.end = t + pad;
+    else out.push({ start: Math.max(0, t - pad), end: t + pad });
+  }
+  return out;
+}
+
 export async function detectOverlays(
   file: File | string,
   opts: DetectOpts = {},
@@ -74,7 +135,7 @@ export async function detectOverlays(
     const start = Math.max(0, opts.clip?.start ?? 0);
     const end = Math.min(dur || 1e9, opts.clip?.end ?? (dur || 1));
     const span = Math.max(0.2, end - start);
-    const n = Math.max(8, Math.min(24, opts.frames ?? (span > 25 ? 20 : 14)));
+    const n = Math.max(8, Math.min(18, opts.frames ?? (span > 25 ? 16 : 12)));
 
     const w = SAMPLE_W;
     const h = Math.max(2, Math.round((v.videoHeight / Math.max(1, v.videoWidth)) * SAMPLE_W));
@@ -85,13 +146,10 @@ export async function detectOverlays(
     if (!ctx) throw new Error("canvas indisponível");
 
     const px = w * h;
-    const sum = new Float32Array(px);
-    const sumSq = new Float32Array(px);
-    const edgeHits = new Float32Array(px); // quantos quadros a borda apareceu
+    const frames: Float32Array[] = [];
+    const stamps: number[] = [];
+    const edgeHits = new Float32Array(px);
     const edgeSum = new Float32Array(px);
-    const satSum = new Float32Array(px);
-    const satSq = new Float32Array(px);
-    let used = 0;
 
     for (let k = 0; k < n; k++) {
       if (opts.signal?.aborted) throw new Error("cancelado");
@@ -101,19 +159,7 @@ export async function detectOverlays(
       const img = ctx.getImageData(0, 0, w, h).data;
 
       const g = new Float32Array(px);
-      for (let i = 0, p = 0; i < img.length; i += 4, p++) {
-        g[p] = gray(img, i);
-        const r = img[i]! / 255,
-          gg = img[i + 1]! / 255,
-          b = img[i + 2]! / 255;
-        const mx = Math.max(r, gg, b),
-          mn = Math.min(r, gg, b);
-        const s = mx <= 0 ? 0 : (mx - mn) / mx;
-        satSum[p]! += s;
-        satSq[p]! += s * s;
-        sum[p]! += g[p]!;
-        sumSq[p]! += g[p]! * g[p]!;
-      }
+      for (let i = 0, p = 0; i < img.length; i += 4, p++) g[p] = gray(img, i);
 
       for (let y = 1; y < h - 1; y++) {
         for (let x = 1; x < w - 1; x++) {
@@ -124,27 +170,53 @@ export async function detectOverlays(
         }
       }
 
-      used++;
+      frames.push(g);
+      stamps.push(t);
       opts.onProgress?.(k + 1, n);
     }
 
+    const used = frames.length;
     if (!used) return [];
 
-    // mapas por pixel
-    const varG = new Float32Array(px);
-    const satVar = new Float32Array(px);
+    // ---- mediana temporal por pixel ----
+    const med = new Float32Array(px);
+    const buf = new Float32Array(used);
     for (let p = 0; p < px; p++) {
-      const m = sum[p]! / used;
-      varG[p] = Math.max(0, sumSq[p]! / used - m * m);
-      const sm = satSum[p]! / used;
-      satVar[p] = Math.max(0, satSq[p]! / used - sm * sm);
+      for (let k = 0; k < used; k++) buf[k] = frames[k]![p]!;
+      const s = Array.prototype.slice.call(buf).sort((a: number, b: number) => a - b) as number[];
+      med[p] = used % 2 ? s[(used - 1) / 2]! : (s[used / 2 - 1]! + s[used / 2]!) / 2;
     }
 
-    // agregação por célula
+    // borda da imagem mediana (overlay estático fica nítido aqui)
+    const medEdge = new Float32Array(px);
+    for (let y = 1; y < h - 1; y++) {
+      for (let x = 1; x < w - 1; x++) {
+        const p = y * w + x;
+        medEdge[p] = Math.abs(med[p + 1]! - med[p - 1]!) + Math.abs(med[p + w]! - med[p - w]!);
+      }
+    }
+
+    // estabilidade e movimento por pixel
+    const stable = new Float32Array(px);
+    const motion = new Float32Array(px);
+    for (let p = 0; p < px; p++) {
+      let st = 0;
+      let mo = 0;
+      for (let k = 0; k < used; k++) {
+        const d = Math.abs(frames[k]![p]! - med[p]!);
+        if (d < STABLE_EPS) st++;
+        mo += d;
+      }
+      stable[p] = st / used;
+      motion[p] = mo / used;
+    }
+
+    // ---- agregação por célula ----
     const cellsN = COLS * ROWS;
     const textScore = new Float32Array(cellsN);
     const staticScore = new Float32Array(cellsN);
-    const logoScore = new Float32Array(cellsN);
+    const cellMotion = new Float32Array(cellsN);
+    const cellStable = new Float32Array(cellsN);
     const count = new Float32Array(cellsN);
 
     for (let y = 1; y < h - 1; y++) {
@@ -155,26 +227,53 @@ export async function detectOverlays(
         const ci = cy * COLS + cx;
         count[ci]! += 1;
 
-        const freq = edgeHits[p]! / used; // 0..1 — texto presente em parte dos quadros
+        const freq = edgeHits[p]! / used;
         const strong = Math.min(1, edgeSum[p]! / used / 0.5);
-        const stable = varG[p]! < VAR_THR ? 1 : Math.max(0, 1 - varG[p]! / (VAR_THR * 6));
-
-        // texto/legenda: bordas frequentes no mesmo lugar (intermitente também conta)
-        textScore[ci]! += Math.min(1, freq * 1.6) * (0.45 + 0.55 * strong);
-        // marca d'água: borda existe E o pixel quase não muda no tempo
-        staticScore[ci]! += strong * stable;
-        // logo/imagem: cor constante ao longo do vídeo, sem exigir texto
-        logoScore[ci]! += satVar[p]! < 0.004 && varG[p]! < VAR_THR ? 0.6 : 0;
+        // legenda: bordas fortes que reaparecem no mesmo lugar (intermitentes)
+        textScore[ci]! += freq >= 0.25 ? Math.min(1, freq * 1.3) * (0.35 + 0.65 * strong) : 0;
+        // overlay estático: nítido na mediana E parado no tempo
+        staticScore[ci]! += Math.min(1, medEdge[p]! / 0.45) * stable[p]!;
+        cellMotion[ci]! += motion[p]!;
+        cellStable[ci]! += stable[p]!;
       }
     }
 
-    const score = new Float32Array(cellsN);
+    const motionN = new Float32Array(cellsN);
     for (let i = 0; i < cellsN; i++) {
       const cN = Math.max(1, count[i]!);
-      const t = textScore[i]! / cN;
-      const s = staticScore[i]! / cN;
-      const l = logoScore[i]! / cN;
-      score[i] = Math.max(t, s * 1.15, Math.min(t + 0.15, l * 0.9));
+      motionN[i] = cellMotion[i]! / cN;
+      textScore[i] = textScore[i]! / cN;
+      staticScore[i] = staticScore[i]! / cN;
+      cellStable[i] = cellStable[i]! / cN;
+    }
+
+    // movimento médio da vizinhança (anel 5x5) — o fundo atrás de um overlay se mexe
+    const ringMotion = new Float32Array(cellsN);
+    for (let cy = 0; cy < ROWS; cy++) {
+      for (let cx = 0; cx < COLS; cx++) {
+        let acc = 0;
+        let k = 0;
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const nx = cx + dx,
+              ny = cy + dy;
+            if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
+            acc += motionN[ny * COLS + nx]!;
+            k++;
+          }
+        }
+        ringMotion[cy * COLS + cx] = k ? acc / k : 0;
+      }
+    }
+
+    const globalMotion = Array.from(motionN).reduce((a, b) => a + b, 0) / cellsN;
+    const score = new Float32Array(cellsN);
+    for (let i = 0; i < cellsN; i++) {
+      const t = textScore[i]!;
+      // overlay estático só conta se o entorno se mexe (cena parada = tudo estável)
+      const contrastMotion = Math.min(1, Math.max(0, ringMotion[i]! - motionN[i]!) / Math.max(0.01, globalMotion));
+      const s = staticScore[i]! * (0.25 + 0.75 * contrastMotion);
+      score[i] = Math.max(t, s * 1.2);
     }
 
     const arr = Array.from(score);
@@ -182,60 +281,64 @@ export async function detectOverlays(
     const sorted = [...arr].sort((a, b) => a - b);
     const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
     const norm = arr.map((s) => s / maxS);
-    const thr = Math.min(0.72, Math.max(0.3, (median / maxS) * 1.75 + 0.12));
+    const thr = Math.min(0.75, Math.max(0.34, (median / maxS) * 1.8 + 0.16));
     const hot = norm.map((s) => s >= thr);
 
-    // agrupa células vizinhas (flood fill 8-direções) em retângulos
-    const seen = new Uint8Array(hot.length);
-    const rects: { x0: number; y0: number; x1: number; y1: number; cells: number; s: number }[] = [];
-    for (let i = 0; i < hot.length; i++) {
-      if (!hot[i] || seen[i]) continue;
-      const queue = [i];
-      seen[i] = 1;
-      let x0 = COLS,
-        y0 = ROWS,
-        x1 = -1,
-        y1 = -1,
-        cnt = 0,
-        acc = 0;
-      while (queue.length) {
-        const cur = queue.pop()!;
-        const cx = cur % COLS;
-        const cy = Math.floor(cur / COLS);
-        x0 = Math.min(x0, cx);
-        y0 = Math.min(y0, cy);
-        x1 = Math.max(x1, cx);
-        y1 = Math.max(y1, cy);
-        cnt++;
-        acc += norm[cur]!;
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            const nx = cx + dx,
-              ny = cy + dy;
-            if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS) continue;
-            const j = ny * COLS + nx;
-            if (hot[j] && !seen[j]) {
-              seen[j] = 1;
-              queue.push(j);
+    const rects = groupCells(hot, norm, COLS, ROWS);
+
+    // ---- caixa refinada no nível do pixel ----
+    const pixelScore = (p: number, ci: number) => {
+      const freq = edgeHits[p]! / used;
+      const strong = Math.min(1, edgeSum[p]! / used / 0.5);
+      const t = freq >= 0.25 ? Math.min(1, freq * 1.3) * (0.35 + 0.65 * strong) : 0;
+      const s = Math.min(1, medEdge[p]! / 0.45) * stable[p]!;
+      return Math.max(t, s * (0.3 + 0.7 * Math.min(1, ringMotion[ci]! / Math.max(0.01, globalMotion))));
+    };
+
+    const padX = 1.0 / COLS;
+    const padY = 0.9 / ROWS;
+    let out = rects
+      .map((r) => {
+        // varre os pixels da caixa (com folga de uma célula) e acha o contorno real
+        const gx0 = Math.max(0, Math.floor(((r.x0 - 1) / COLS) * w));
+        const gx1 = Math.min(w, Math.ceil(((r.x1 + 2) / COLS) * w));
+        const gy0 = Math.max(0, Math.floor(((r.y0 - 1) / ROWS) * h));
+        const gy1 = Math.min(h, Math.ceil(((r.y1 + 2) / ROWS) * h));
+        let bx0 = gx1,
+          by0 = gy1,
+          bx1 = gx0,
+          by1 = gy0,
+          hits = 0;
+        for (let y = Math.max(1, gy0); y < Math.min(h - 1, gy1); y++) {
+          const cy = Math.min(ROWS - 1, Math.floor((y / h) * ROWS));
+          for (let x = Math.max(1, gx0); x < Math.min(w - 1, gx1); x++) {
+            const cx = Math.min(COLS - 1, Math.floor((x / w) * COLS));
+            const ps = pixelScore(y * w + x, cy * COLS + cx);
+            if (ps / maxS >= thr * 0.75) {
+              bx0 = Math.min(bx0, x);
+              by0 = Math.min(by0, y);
+              bx1 = Math.max(bx1, x);
+              by1 = Math.max(by1, y);
+              hits++;
             }
           }
         }
-      }
-      if (cnt >= 2) rects.push({ x0, y0, x1, y1, cells: cnt, s: acc / cnt });
-    }
-
-    // converte para regiões normalizadas, com folga e filtros de tamanho
-    const padX = 0.8 / COLS;
-    const padY = 0.7 / ROWS;
-    let out = rects
-      .map((r) => {
-        const x = Math.max(0, r.x0 / COLS - padX);
-        const y = Math.max(0, r.y0 / ROWS - padY);
-        const rw = Math.min(1 - x, (r.x1 + 1) / COLS - x + padX);
-        const rh = Math.min(1 - y, (r.y1 + 1) / ROWS - y + padY);
-        return { x, y, w: rw, h: rh, s: r.s, area: rw * rh };
+        const useRefined = hits > 12 && bx1 > bx0 && by1 > by0;
+        const x = useRefined ? Math.max(0, bx0 / w - padX) : Math.max(0, r.x0 / COLS - padX);
+        const y = useRefined ? Math.max(0, by0 / h - padY) : Math.max(0, r.y0 / ROWS - padY);
+        const rw = Math.min(
+          1 - x,
+          (useRefined ? (bx1 + 1) / w : (r.x1 + 1) / COLS) - x + padX,
+        );
+        const rh = Math.min(
+          1 - y,
+          (useRefined ? (by1 + 1) / h : (r.y1 + 1) / ROWS) - y + padY,
+        );
+        const ci = Math.min(ROWS - 1, Math.floor((y + rh / 2) * ROWS)) * COLS +
+          Math.min(COLS - 1, Math.floor((x + rw / 2) * COLS));
+        return { x, y, w: rw, h: rh, s: r.s, area: rw * rh, ci };
       })
-      .filter((r) => r.area > 0.003 && r.area < 0.5 && r.h < 0.55)
+      .filter((r) => r.area > 0.0025 && r.area < 0.5 && r.h < 0.55)
       .sort((a, b) => b.s * Math.sqrt(b.area) - a.s * Math.sqrt(a.area))
       .slice(0, 8);
 
@@ -246,31 +349,72 @@ export async function detectOverlays(
         const ix = Math.max(0, Math.min(r.x + r.w, k.x + k.w) - Math.max(r.x, k.x));
         const iy = Math.max(0, Math.min(r.y + r.h, k.y + k.h) - Math.max(r.y, k.y));
         const inter = ix * iy;
-        return inter > 0.45 * Math.min(r.area, k.area);
+        return inter > 0.4 * Math.min(r.area, k.area);
       });
       if (!overlaps) keep.push(r);
     }
     out = keep.slice(0, 5);
 
-    return out.map((r) => {
+    // ---- persistência + janelas de tempo por região ----
+    const step = span / used;
+    const regions: Partial<CleanupRegion>[] = [];
+    for (const r of out) {
+      const x0 = Math.max(1, Math.floor(r.x * w));
+      const x1 = Math.min(w - 1, Math.ceil((r.x + r.w) * w));
+      const y0 = Math.max(1, Math.floor(r.y * h));
+      const y1 = Math.min(h - 1, Math.ceil((r.y + r.h) * h));
+      if (x1 <= x0 || y1 <= y0) continue;
+
+      const energy: number[] = [];
+      for (let k = 0; k < used; k++) {
+        const g = frames[k]!;
+        let acc = 0;
+        let cnt = 0;
+        for (let y = y0; y < y1; y++) {
+          for (let x = x0; x < x1; x++) {
+            const p = y * w + x;
+            acc += Math.abs(g[p + 1]! - g[p - 1]!) + Math.abs(g[p + w]! - g[p - w]!);
+            cnt++;
+          }
+        }
+        energy.push(cnt ? acc / cnt : 0);
+      }
+      const eMax = Math.max(...energy);
+      const eMin = Math.min(...energy);
+      const cut = eMin + (eMax - eMin) * 0.45;
+      const onIdx = energy.map((e, i) => (e >= cut ? i : -1)).filter((i) => i >= 0);
+      const persistence = onIdx.length / used;
+      // sinal esporádico demais = provável falso positivo
+      if (persistence < 0.3) continue;
+
+      const alwaysOn = persistence > 0.85 || eMax - eMin < 0.05;
+      const timeRanges = alwaysOn
+        ? undefined
+        : mergeRanges(onIdx.map((i) => stamps[i]!), step * 0.75, step * 1.6);
+
       const middle = r.y + r.h / 2;
       const wide = r.w > 0.4;
       const small = r.area < 0.07;
-      const corner = (r.x < 0.12 || r.x + r.w > 0.88) && (r.y < 0.18 || r.y + r.h > 0.82);
-      const isCaption = wide && middle > 0.55;
-      const isWatermark = small && corner;
-      const isLogo = small && !corner && middle < 0.35;
+      const corner = (r.x < 0.14 || r.x + r.w > 0.86) && (r.y < 0.2 || r.y + r.h > 0.8);
+      const isCaption = wide && middle > 0.55 && !alwaysOn;
+      const isWatermark = alwaysOn && (small || corner);
       const label = isCaption
         ? "Legenda queimada"
         : isWatermark
           ? "Marca d'água"
-          : isLogo
+          : alwaysOn && middle < 0.35
             ? "Logo / imagem"
             : middle < 0.3
               ? "Texto no topo"
-              : "Texto sobreposto";
-      return {
-        ...makeCleanupRegion({
+              : wide && middle > 0.55
+                ? "Legenda queimada"
+                : "Texto sobreposto";
+
+      // mediana temporal só recupera o fundo real quando a cena atrás se mexe
+      const moves = ringMotion[r.ci]! > Math.max(0.012, globalMotion * 0.8);
+
+      regions.push(
+        makeCleanupRegion({
           label,
           x: Number(r.x.toFixed(4)),
           y: Number(r.y.toFixed(4)),
@@ -279,9 +423,13 @@ export async function detectOverlays(
           mode: "inpaint",
           strength: isCaption ? 55 : 65,
           from: middle > 0.5 ? "bottom" : "top",
+          recover: moves ? "median" : "inpaint",
+          ...(timeRanges?.length ? { timeRanges } : {}),
         }),
-      };
-    });
+      );
+    }
+
+    return regions;
   } finally {
     v.src = "";
     if (typeof file !== "string") URL.revokeObjectURL(url);

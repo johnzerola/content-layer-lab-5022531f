@@ -220,8 +220,13 @@ export interface CleanupRegion {
   color?: string;
   /** direção de onde copiar os pixels no modo smear */
   from?: "bottom" | "top" | "left" | "right";
+  /** trechos (s) em que o overlay aparece; vazio/ausente = o vídeo inteiro */
+  timeRanges?: { start: number; end: number }[];
+  /** como reconstruir: median = fundo real de outros quadros, inpaint = reconstrução IA */
+  recover?: "median" | "inpaint";
   enabled: boolean;
 }
+
 
 export function makeCleanupRegion(p: Partial<CleanupRegion> = {}): CleanupRegion {
   return {

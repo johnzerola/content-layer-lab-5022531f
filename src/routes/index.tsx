@@ -49,6 +49,7 @@ import {
   type Template,
 } from "@/lib/template";
 import { detectOverlays, safeZones } from "@/lib/detect";
+import { buildBackgroundPlate } from "@/lib/plate";
 import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
 import { webCodecsSupported } from "@/lib/encode";
 import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
@@ -587,6 +588,36 @@ function Home() {
     return { start, end: start + effDur };
   }, [previewVariation?.trimStart, previewVariation?.trimEnd, selected?.duration, selected?.clip?.start, selected?.clip?.end]);
 
+  // placa de fundo real (mediana temporal) usada no preview do LimpaVídeo
+  const [previewPlate, setPreviewPlate] = useState<{
+    canvas: HTMLCanvasElement;
+    ok: Set<string>;
+  } | null>(null);
+  const selRegionsKey = JSON.stringify(
+    (selected?.regions ?? []).filter((r) => r.enabled).map((r) => [r.id, r.x, r.y, r.w, r.h, r.mode]),
+  );
+  useEffect(() => {
+    if (mode !== "limpar" || !selected?.file) {
+      setPreviewPlate(null);
+      return;
+    }
+    let alive = true;
+    const regions = (selected.regions ?? []).filter((r) => r.enabled);
+    if (!regions.length) {
+      setPreviewPlate(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      buildBackgroundPlate(selected.file, regions, { frames: 14 })
+        .then((p) => alive && setPreviewPlate(p))
+        .catch(() => alive && setPreviewPlate(null));
+    }, 350);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [mode, selected?.id, selRegionsKey]);
+
   const previewDrawOpts = useMemo(
     () =>
       previewVariation
@@ -600,6 +631,7 @@ function Home() {
             border: previewVariation.border,
             borderColor: previewVariation.borderColor,
             ...(previewCues?.length ? { captions: previewCues } : {}),
+            ...(previewPlate ? { plate: previewPlate } : {}),
           }
         : undefined,
     [
@@ -612,8 +644,10 @@ function Home() {
       previewVariation?.border,
       previewVariation?.borderColor,
       previewCues,
+      previewPlate,
     ],
   );
+
 
 
 
@@ -711,6 +745,24 @@ function Home() {
             }
           }
 
+
+          // LimpaVídeo: recupera o fundo real por mediana temporal antes de renderizar
+          const itemRegions = item.regions?.length ? item.regions : (active.cleanup ?? []);
+          let plate: Awaited<ReturnType<typeof buildBackgroundPlate>> = null;
+          if (runMode === "limpar" && itemRegions.length) {
+            setItems((p) =>
+              p.map((x) => (x.id === id ? { ...x, stage: "recuperando fundo original" } : x)),
+            );
+            try {
+              plate = await buildBackgroundPlate(item.file, itemRegions, {
+                ...(item.clip ? { clip: item.clip } : {}),
+                signal: ac.signal,
+              });
+            } catch {
+              plate = null;
+            }
+          }
+
           for (const plat of outs) {
             // cada plataforma recebe a resolução/fps/bitrate recomendados
             // no modo "limpar" o quadro segue a orientação real do vídeo (sem recorte)
@@ -719,9 +771,10 @@ function Home() {
                 ? {
                     ...cleanOnly(active, { w: item.w, h: item.h }),
                     // cada vídeo usa as áreas detectadas para ele; sem detecção, usa as do template
-                    cleanup: item.regions?.length ? item.regions : (active.cleanup ?? []),
+                    cleanup: itemRegions,
                   }
                 : applyRatio(baseTpl, plat.w, plat.h);
+
             for (let k = 0; k < n; k++) {
               const at = step;
               const stageLabel = `render ${at + 1}/${total}${outs.length > 1 ? ` · ${plat.short}` : ""}${n > 1 ? ` · v${k + 1}` : ""}`;
@@ -739,6 +792,7 @@ function Home() {
                 bitrate: (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
                 clip: item.clip,
                 captions: cues,
+                plate,
                 signal: ac.signal,
                 onProgress: (p) =>
                   setItems((prev) =>

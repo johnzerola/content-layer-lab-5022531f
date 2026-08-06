@@ -14,6 +14,8 @@ export interface RenderOptions {
   turbo?: number | undefined;
   clip?: { start: number; end: number } | undefined;
   captions?: CaptionCue[] | undefined;
+  /** placa de fundo (mediana temporal) para reconstruir áreas limpas */
+  plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null | undefined;
   onProgress?: ((p: number) => void) | undefined;
   signal?: AbortSignal | undefined;
 }
@@ -104,6 +106,7 @@ async function recordVideo(
       time: video.currentTime,
       quality: "hq" as const,
       ...(opts.captions?.length ? { captions: opts.captions } : {}),
+      ...(opts.plate ? { plate: opts.plate } : {}),
     });
     if (video.duration) opts.onProgress?.(Math.min(1, video.currentTime / endAt));
     if (video.currentTime >= endAt) video.pause();
@@ -154,6 +157,7 @@ export async function renderVideo(
         turbo: opts.turbo ?? 4,
         clip: opts.clip,
         captions: opts.captions,
+        plate: opts.plate,
         onProgress: opts.onProgress,
         signal: opts.signal,
       });

@@ -576,12 +576,15 @@ export interface DrawOpts {
   /** moldura anti-duplicidade em px */
   border?: number;
   borderColor?: string;
-  /** tempo atual do vídeo fonte (segundos) — usado pelas legendas */
+  /** tempo atual do vídeo fonte (segundos) — usado pelas legendas e janelas de limpeza */
   time?: number;
   captions?: CaptionCue[];
+  /** placa de fundo (mediana temporal) para reconstruir áreas com pixels reais */
+  plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null;
   /** "hq" = reconstrução em resolução total (exportação). Padrão: preview rápido. */
   quality?: "preview" | "hq";
 }
+
 
 function drawVideoLayer(
   ctx: CanvasRenderingContext2D,
@@ -610,6 +613,7 @@ function drawVideoLayer(
   }
   roundRect(ctx, v.x, v.y, v.w, v.h, v.radius);
   ctx.clip();
+  let dest: { dx: number; dy: number; dw: number; dh: number; mirror: boolean } | null = null;
   if (source && source.width) {
     // a rotação exige um leve zoom extra pra não aparecer canto vazio
     const rotPad = rot ? 1 + Math.abs(rot) / 40 : 1;
@@ -629,7 +633,9 @@ function drawVideoLayer(
     const oy = (opts?.offsetY ?? v.offsetY) * (dh - v.h) * 0.5;
     const dx = v.x + (v.w - dw) / 2 + ox;
     const dy = v.y + (v.h - dh) / 2 + oy;
-    if (opts?.mirror ?? t.mirror) {
+    const mirror = Boolean(opts?.mirror ?? t.mirror);
+    dest = { dx, dy, dw, dh, mirror };
+    if (mirror) {
       ctx.translate(v.x * 2 + v.w, 0);
       ctx.scale(-1, 1);
     }
@@ -654,8 +660,13 @@ function drawVideoLayer(
     ctx.fillRect(v.x, v.y, v.w, v.h);
   }
   ctx.restore();
-  applyCleanup(ctx, v, t.cleanup, opts?.quality === "hq");
+  applyCleanup(ctx, v, t.cleanup, opts?.quality === "hq", {
+    ...(opts?.time !== undefined ? { time: opts.time } : {}),
+    ...(opts?.plate ? { plate: opts.plate } : {}),
+    ...(dest ? { dest } : {}),
+  });
 }
+
 
 let scratch: HTMLCanvasElement | null = null;
 function getScratch(w: number, h: number) {
@@ -667,14 +678,28 @@ function getScratch(w: number, h: number) {
   return scratch;
 }
 
+/** o overlay está presente neste instante? (janelas detectadas) */
+export function regionActiveAt(r: CleanupRegion, time?: number) {
+  const ranges = r.timeRanges;
+  if (!ranges?.length || time === undefined) return true;
+  return ranges.some((t) => time >= t.start && time <= t.end);
+}
+
 /** Remove legenda queimada / marca d'água / texto do vídeo original dentro das máscaras. */
 export function applyCleanup(
   ctx: CanvasRenderingContext2D,
   v: { x: number; y: number; w: number; h: number; radius: number },
   regions?: CleanupRegion[],
   hq = false,
+  extra?: {
+    time?: number;
+    plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null;
+    dest?: { dx: number; dy: number; dw: number; dh: number; mirror: boolean };
+  },
 ) {
-  const list = (regions ?? []).filter((r) => r.enabled && r.w > 0 && r.h > 0);
+  const list = (regions ?? []).filter(
+    (r) => r.enabled && r.w > 0 && r.h > 0 && regionActiveAt(r, extra?.time),
+  );
   if (!list.length) return;
   const canvas = ctx.canvas;
 
@@ -692,6 +717,25 @@ export function applyCleanup(
     ctx.beginPath();
     ctx.rect(x, y, w, h);
     ctx.clip();
+
+    // 1ª opção: fundo real recuperado por mediana temporal (pixels do próprio vídeo)
+    const plate = extra?.plate;
+    const dest = extra?.dest;
+    if (r.mode === "inpaint" && plate && dest && plate.ok.has(r.id)) {
+      ctx.save();
+      if (dest.mirror) {
+        ctx.translate(v.x * 2 + v.w, 0);
+        ctx.scale(-1, 1);
+      }
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(plate.canvas, dest.dx, dest.dy, dest.dw, dest.dh);
+      ctx.restore();
+      ctx.restore();
+      continue;
+    }
+
+
 
     if (r.mode === "inpaint") {
       inpaintArea(ctx, x, y, w, h, k, hq);
