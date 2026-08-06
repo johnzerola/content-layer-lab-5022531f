@@ -99,21 +99,157 @@ export async function resolveVimeo(url: string): Promise<ResolverHit | null> {
   };
 }
 
+
+/* ------------------------------------------------------------------ */
+/* YouTube — instâncias públicas Piped / Invidious (sem chave)          */
+/* ------------------------------------------------------------------ */
+
+const PIPED = [
+  "https://pipedapi.kavin.rocks",
+  "https://pipedapi.adminforge.de",
+  "https://api.piped.private.coffee",
+  "https://pipedapi.reallyaweso.me",
+];
+
+const INVIDIOUS = [
+  "https://inv.nadeko.net",
+  "https://invidious.nerdvpn.de",
+  "https://yewtu.be",
+];
+
+export function youtubeId(url: string): string | null {
+  const m =
+    url.match(/(?:youtube\.com\/(?:watch\?[^#]*v=|shorts\/|embed\/|live\/)|youtu\.be\/)([\w-]{6,})/i)?.[1];
+  return m ?? null;
+}
+
+function envList(name: string): string[] {
+  return (process.env[name] ?? "")
+    .split(",")
+    .map((s) => s.trim().replace(/\/$/, ""))
+    .filter(Boolean);
+}
+
+export async function resolveYouTube(url: string): Promise<ResolverHit | null> {
+  const id = youtubeId(url);
+  if (!id) return null;
+
+  for (const base of [...envList("PIPED_API_URL"), ...PIPED]) {
+    const j = await getJson(`${base}/streams/${id}`);
+    const streams: any[] = j?.videoStreams ?? [];
+    const muxed = streams
+      .filter((s) => s?.url && s?.videoOnly === false)
+      .sort((a, b) => (b?.height ?? 0) - (a?.height ?? 0))[0];
+    if (muxed?.url) {
+      return {
+        videoUrl: muxed.url,
+        ...(j?.title ? { title: String(j.title).slice(0, 80) } : {}),
+        ...(j?.thumbnailUrl ? { thumbnail: String(j.thumbnailUrl) } : {}),
+        source: "youtube",
+      };
+    }
+  }
+
+  for (const base of [...envList("INVIDIOUS_API_URL"), ...INVIDIOUS]) {
+    const j = await getJson(`${base}/api/v1/videos/${id}`);
+    const f: any[] = j?.formatStreams ?? [];
+    const best = f
+      .filter((s) => s?.url)
+      .sort((a, b) => (Number(b?.height ?? 0) || 0) - (Number(a?.height ?? 0) || 0))[0];
+    if (best?.url) {
+      return {
+        videoUrl: best.url,
+        ...(j?.title ? { title: String(j.title).slice(0, 80) } : {}),
+        source: "youtube",
+      };
+    }
+  }
+  return null;
+}
+
+/* ------------------------------------------------------------------ */
+/* Instagram — espelhos públicos que expõem og:video                    */
+/* ------------------------------------------------------------------ */
+
+async function ogVideo(url: string): Promise<{ video?: string; title?: string; thumb?: string } | null> {
+  try {
+    const res = await fetch(url, {
+      headers: { "user-agent": "facebookexternalhit/1.1", accept: "text/html" },
+      redirect: "follow",
+    });
+    if (!res.ok) return null;
+    const html = (await res.text()).slice(0, 800_000);
+    const meta = (k: string) =>
+      html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${k}["'][^>]*content=["']([^"']+)["']`, "i"))?.[1] ??
+      html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${k}["']`, "i"))?.[1];
+    const video = meta("og:video:secure_url") ?? meta("og:video:url") ?? meta("og:video");
+    const out: { video?: string; title?: string; thumb?: string } = {};
+    if (video) out.video = video.replace(/&amp;/g, "&");
+    const t = meta("og:title");
+    if (t) out.title = t.slice(0, 80);
+    const th = meta("og:image");
+    if (th) out.thumb = th;
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveInstagram(url: string): Promise<ResolverHit | null> {
+  const path = url.replace(/^https?:\/\/(?:www\.)?instagram\.com/i, "").split("?")[0] ?? "";
+  const mirrors = [`https://www.ddinstagram.com${path}`, `https://d.ddinstagram.com${path}`, `https://kkinstagram.com${path}`];
+  for (const m of mirrors) {
+    const og = await ogVideo(m);
+    if (og?.video) {
+      return {
+        videoUrl: og.video,
+        ...(og.title ? { title: og.title } : {}),
+        ...(og.thumb ? { thumbnail: og.thumb } : {}),
+        source: "instagram",
+      };
+    }
+  }
+  return null;
+}
+
+/** Facebook / Kwai / Pinterest — tenta og:video da própria página. */
+export async function resolveOpenGraph(url: string): Promise<ResolverHit | null> {
+  const og = await ogVideo(url);
+  if (!og?.video) return null;
+  return {
+    videoUrl: og.video,
+    ...(og.title ? { title: og.title } : {}),
+    ...(og.thumb ? { thumbnail: og.thumb } : {}),
+    source: new URL(url).hostname.replace(/^www\./, ""),
+  };
+}
+
 /**
  * Cobalt (self-host) — cobre YouTube, Instagram, Facebook, Twitch, Pinterest,
  * Snapchat, Bluesky, Dailymotion, SoundCloud e outros.
  * Configure COBALT_API_URL (e COBALT_API_KEY, se a instância exigir).
  */
+function cobaltBases(): string[] {
+  const list = [process.env["COBALT_API_URL"] ?? "", ...(process.env["COBALT_API_URLS"] ?? "").split(",")];
+  return list.map((s) => s.trim().replace(/\/$/, "")).filter(Boolean);
+}
+
 export function cobaltConfigured(): boolean {
-  return Boolean(process.env["COBALT_API_URL"]);
+  return cobaltBases().length > 0;
 }
 
 export async function resolveWithCobalt(url: string): Promise<ResolverHit | null> {
-  const base = process.env["COBALT_API_URL"];
-  if (!base) return null;
+  for (const base of cobaltBases()) {
+    const hit = await cobaltCall(base, url);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+async function cobaltCall(base: string, url: string): Promise<ResolverHit | null> {
   const key = process.env["COBALT_API_KEY"];
   try {
-    const res = await fetch(base.replace(/\/$/, "") + "/", {
+    const res = await fetch(base + "/", {
       method: "POST",
       headers: {
         "content-type": "application/json",
