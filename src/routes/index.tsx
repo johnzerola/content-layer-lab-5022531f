@@ -551,7 +551,8 @@ function Home() {
         const ac = new AbortController();
         ctrl.aborts.set(id, ac);
         setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)));
-        try {
+        const runItem = async () => {
+
           const n = Math.max(1, variants);
           const targets = PLATFORM_PRESETS.filter((p) => platforms.includes(p.id));
           const outs = targets.length ? targets : [PLATFORM_PRESETS[0]!];
