@@ -31,6 +31,8 @@ import { ClipStudio } from "@/components/ClipStudio";
 
 import {
   applyRatio,
+  CANVAS_H,
+  CANVAS_W,
   CAPTION_PRESETS,
   commitTemplate,
 
