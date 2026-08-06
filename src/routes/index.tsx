@@ -107,6 +107,10 @@ interface Item {
   score?: number | undefined;
   status: Status;
   progress: number;
+  /** etapa atual legível (transcrição, render de cada variação, etc.) */
+  stage?: string | undefined;
+  stepIndex?: number | undefined;
+  stepTotal?: number | undefined;
   blob?: Blob | undefined;
   ext?: string | undefined;
   /** todas as variações geradas deste vídeo */
@@ -553,7 +557,7 @@ function Home() {
       .filter((i) => (onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto"))
       .map((i) => i.id);
     const queue = [...pending];
-    setItems((p) => p.map((x) => (queue.includes(x.id) ? { ...x, status: "na fila", progress: 0 } : x)));
+    setItems((p) => p.map((x) => (queue.includes(x.id) ? { ...x, status: "na fila", progress: 0, stage: "na fila", stepIndex: 0, stepTotal: 0 } : x)));
 
     const worker = async () => {
       while (queue.length) {
@@ -565,7 +569,7 @@ function Home() {
         if (!item) continue;
         const ac = new AbortController();
         ctrl.aborts.set(id, ac);
-        setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)));
+        setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0, stage: "preparando", stepIndex: 0, stepTotal: 0 } : x)));
         const runItem = async () => {
 
           const n = Math.max(1, variants);
@@ -588,14 +592,18 @@ function Home() {
             const run = capChain.current.then(async () => {
               if (ctrl.cancelled || ac.signal.aborted) return undefined;
               setItems((p) =>
-                p.map((x) => (x.id === id ? { ...x, capStatus: "transcrevendo…", capError: false } : x)),
+                p.map((x) => (x.id === id ? { ...x, capStatus: "transcrevendo…", capError: false, stage: "transcrevendo áudio" } : x)),
               );
               return generateCaptions(item.file, {
                 clip: item.clip,
                 language: capLang || undefined,
                 onProgress: ({ done, total: t }) =>
                   setItems((p) =>
-                    p.map((x) => (x.id === id ? { ...x, capStatus: `transcrevendo ${done}/${t}` } : x)),
+                    p.map((x) =>
+                      x.id === id
+                        ? { ...x, capStatus: `transcrevendo ${done}/${t}`, stage: `transcrevendo ${done}/${t}` }
+                        : x,
+                    ),
                   ),
               });
             });
@@ -628,6 +636,12 @@ function Home() {
                 : applyRatio(baseTpl, plat.w, plat.h);
             for (let k = 0; k < n; k++) {
               const at = step;
+              const stageLabel = `render ${at + 1}/${total}${outs.length > 1 ? ` · ${plat.short}` : ""}${n > 1 ? ` · v${k + 1}` : ""}`;
+              setItems((prev) =>
+                prev.map((x) =>
+                  x.id === id ? { ...x, stage: stageLabel, stepIndex: at + 1, stepTotal: total } : x,
+                ),
+              );
               const { blob, ext } = await renderVideo(item.file, tpl, {
                 variation: variationOf(item, k),
                 offsetX: item.offsetX,
@@ -656,7 +670,15 @@ function Home() {
           setItems((p) =>
             p.map((x) =>
               x.id === id
-                ? { ...x, status: "pronto", blob: first.blob, ext: first.ext, outputs, progress: 1 }
+                ? {
+                    ...x,
+                    status: "pronto",
+                    blob: first.blob,
+                    ext: first.ext,
+                    outputs,
+                    progress: 1,
+                    stage: `${outputs.length} arquivo(s) prontos`,
+                  }
                 : x,
             ),
           );
@@ -675,7 +697,7 @@ function Home() {
               const aborted = (err as Error)?.name === "AbortError" || ctrl.cancelled;
               if (aborted || attempt === 2) break;
               setItems((p) =>
-                p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)),
+                p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0, stage: "nova tentativa…" } : x)),
               );
               await new Promise((r) => setTimeout(r, 500));
             }
@@ -772,6 +794,14 @@ function Home() {
 
   const readyCount = items.filter((i) => i.status === "pronto").length;
   const errorCount = items.filter((i) => i.status === "erro").length;
+  // progresso global do lote: soma do progresso de cada arquivo em andamento/concluído
+  const batchItems = items.filter((i) => i.status !== "pendente");
+  const batchDone = batchItems.filter((i) => i.status === "pronto" || i.status === "erro").length;
+  const batchProgress = batchItems.length
+    ? batchItems.reduce((a, i) => a + (i.status === "pronto" || i.status === "erro" ? 1 : i.progress), 0) /
+      batchItems.length
+    : 0;
+  const activeItem = items.find((i) => i.status === "processando");
   const pendingCount = items.filter((i) => i.status !== "pronto").length;
 
   const eta = (() => {
@@ -1381,6 +1411,41 @@ function Home() {
                   )}
                 </div>
 
+                {/* progresso detalhado do lote */}
+                {(running || batchItems.length > 0) && (
+                  <div className="space-y-1.5 rounded-xl border border-border bg-surface-2 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="mono-label">Progresso do lote</p>
+                      <p className="font-mono text-[11px] text-muted-foreground">
+                        {batchDone}/{batchItems.length} arquivos · {Math.round(batchProgress * 100)}%
+                      </p>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-primary transition-all"
+                        style={{ width: `${Math.round(batchProgress * 100)}%` }}
+                      />
+                    </div>
+                    {activeItem && (
+                      <>
+                        <p className="truncate font-mono text-[11px] text-muted-foreground">
+                          {activeItem.file.name} · {activeItem.stage ?? "processando"}
+                          {activeItem.stepTotal
+                            ? ` (etapa ${activeItem.stepIndex}/${activeItem.stepTotal})`
+                            : ""}
+                          {` · ${Math.round(activeItem.progress * 100)}%`}
+                        </p>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-warn transition-all"
+                            style={{ width: `${Math.round(activeItem.progress * 100)}%` }}
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
                 {/* relatório do lote */}
                 {report && !running && (
                   <div className="space-y-1 rounded-xl border border-border bg-surface-2 p-3">
@@ -1870,7 +1935,16 @@ function Home() {
                       >
                         ● {it.status}
                         {it.status === "processando" ? ` ${Math.round(it.progress * 100)}%` : ""}
+                        {it.stage && it.status !== "pendente" ? ` · ${it.stage}` : ""}
                       </p>
+                      {(it.status === "processando" || it.status === "na fila") && (
+                        <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-warn transition-all"
+                            style={{ width: `${Math.round(it.progress * 100)}%` }}
+                          />
+                        </div>
+                      )}
                     </div>
                     {it.blob && (
                       <span
