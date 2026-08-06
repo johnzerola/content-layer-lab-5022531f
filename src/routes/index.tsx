@@ -853,7 +853,7 @@ function Home() {
     if (ids.length) void processAll(ids);
   };
 
-  /** Analisa o vídeo selecionado e sugere as áreas com legenda queimada / marca d'água. */
+  /** Re-analisa o vídeo selecionado e grava as áreas encontradas NELE. */
   const runDetect = async () => {
     const it = itemsRef.current.find((x) => x.id === selectedId);
     if (!it) return;
@@ -866,12 +866,19 @@ function Home() {
         onProgress: (d, t) => setDetectMsg(`analisando quadros ${d}/${t}…`),
       });
       const regions = found.map((f) => makeCleanupRegion(f));
-      setSuggestions(regions);
-      setDetectMsg(
-        regions.length
-          ? `${regions.length} área(s) encontrada(s) — clique para usar`
-          : "nada fixo encontrado neste vídeo — marque manualmente",
+      setItems((p) =>
+        p.map((x) =>
+          x.id === it.id
+            ? { ...x, regions, detectStatus: regions.length ? "ok" : "vazio", detectMsg: undefined }
+            : x,
+        ),
       );
+      if (regions.length) {
+        setDetectMsg(`${regions.length} área(s) aplicada(s) automaticamente`);
+      } else {
+        setSuggestions(safeZones().map((z) => makeCleanupRegion(z)));
+        setDetectMsg("nada fixo encontrado — use as zonas sugeridas ou marque manualmente");
+      }
     } catch (err) {
       setSuggestions([]);
       setDetectMsg(`falha na detecção: ${String((err as Error)?.message ?? err)}`);
@@ -879,6 +886,30 @@ function Home() {
       setDetecting(false);
     }
   };
+
+  /** áreas de limpeza do vídeo selecionado (fallback: as do template) */
+  const cleanupRegions: CleanupRegion[] =
+    mode === "limpar" ? (selected?.regions ?? active.cleanup ?? []) : (active.cleanup ?? []);
+  const setCleanupRegions = (regions: CleanupRegion[]) => {
+    if (mode === "limpar" && selected) {
+      setItems((p) => p.map((x) => (x.id === selected.id ? { ...x, regions } : x)));
+    } else {
+      setActive((t) => ({ ...t, cleanup: regions }));
+    }
+  };
+  const applyRegionsToAll = () => {
+    const regions = cleanupRegions;
+    setItems((p) =>
+      p.map((x) => ({
+        ...x,
+        regions: regions.map((r) => ({ ...r, id: crypto.randomUUID() })),
+        detectStatus: "ok" as const,
+        detectMsg: `${regions.length} área(s) do vídeo modelo`,
+      })),
+    );
+    toast.success(`Áreas aplicadas em ${items.length} vídeo(s).`);
+  };
+
 
   const readyCount = items.filter((i) => i.status === "pronto").length;
   const errorCount = items.filter((i) => i.status === "erro").length;
