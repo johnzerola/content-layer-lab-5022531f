@@ -645,19 +645,42 @@ function Home() {
                 : x,
             ),
           );
+        };
 
+        // até 2 tentativas por vídeo: uma falha isolada não derruba o lote
+        try {
+          let lastErr: unknown = null;
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+              await runItem();
+              lastErr = null;
+              break;
+            } catch (err) {
+              lastErr = err;
+              const aborted = (err as Error)?.name === "AbortError" || ctrl.cancelled;
+              if (aborted || attempt === 2) break;
+              setItems((p) =>
+                p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)),
+              );
+              await new Promise((r) => setTimeout(r, 500));
+            }
+          }
+          if (lastErr) throw lastErr;
         } catch (err) {
           const aborted = (err as Error)?.name === "AbortError";
+          const msg = String((err as Error)?.message ?? err);
+          if (!aborted) failures.current.push({ name: itemsRef.current.find((x) => x.id === id)?.file.name ?? id, error: msg });
           setItems((p) =>
             p.map((x) =>
               x.id === id
-                ? { ...x, status: aborted ? "pendente" : "erro", error: aborted ? undefined : String((err as Error)?.message ?? err) }
+                ? { ...x, status: aborted ? "pendente" : "erro", error: aborted ? undefined : msg }
                 : x,
             ),
           );
         } finally {
           ctrl.aborts.delete(id);
         }
+
       }
     };
 
