@@ -444,6 +444,80 @@ function Home() {
     }
   }, [linkUrl, linkBusy, addVideos]);
 
+
+  /** Snapshot do projeto atual (metadados; o vídeo volta pelo link de origem). */
+  const buildSnapshot = useCallback((): ProjectSnapshot => {
+    const m = modeRef.current;
+    const list = queuesRef.current[m] ?? [];
+    return {
+      templateId: active.id,
+      settings: { platforms, variants, concurrency, bitrate, autoBitrate, smartFrame, capLang },
+      items: list.map((i) => ({
+        name: i.file.name,
+        sourceUrl: i.sourceUrl ?? null,
+        headline: i.headline,
+        offsetX: i.offsetX,
+        offsetY: i.offsetY,
+        clip: i.clip ?? null,
+        score: i.score ?? null,
+        regions: i.regions ?? null,
+        captions: i.captions ?? null,
+      })),
+    };
+  }, [active.id, platforms, variants, concurrency, bitrate, autoBitrate, smartFrame, capLang]);
+
+  /** Restaura um projeto da nuvem: rebaixa os vídeos que vieram por link. */
+  const restoreSnapshot = useCallback(
+    async (snap: ProjectSnapshot) => {
+      const st = snap.settings ?? {};
+      if (Array.isArray(st["platforms"])) setPlatforms(st["platforms"] as string[]);
+      if (typeof st["variants"] === "number") setVariants(st["variants"] as number);
+      if (typeof st["concurrency"] === "number") setConcurrency(st["concurrency"] as number);
+      if (typeof st["bitrate"] === "number") setBitrate(st["bitrate"] as number);
+      if (typeof st["autoBitrate"] === "boolean") setAutoBitrate(st["autoBitrate"] as boolean);
+      if (typeof st["smartFrame"] === "boolean") setSmartFrame(st["smartFrame"] as boolean);
+      if (typeof st["capLang"] === "string") setCapLang(st["capLang"] as string);
+
+      const tpl = templates.find((t) => t.id === snap.templateId);
+      if (tpl) setActive(tpl);
+
+      const linked = (snap.items ?? []).filter((i) => i.sourceUrl);
+      const missing = (snap.items ?? []).length - linked.length;
+      if (missing > 0) {
+        toast.warning(`${missing} vídeo(s) vieram de arquivos locais — reenvie-os manualmente.`);
+      }
+      for (const it of linked) {
+        try {
+          const dl = await fetch(`/api/public/media-proxy?u=${encodeURIComponent(it.sourceUrl!)}`);
+          if (!dl.ok) throw new Error("origem indisponível");
+          const blob = await dl.blob();
+          const file = new File([blob], it.name, { type: blob.type || guessMime(it.name) });
+          await addVideos([file], { sourceUrl: it.sourceUrl! });
+          setItems((prev) =>
+            prev.map((x) =>
+              x.file.name === it.name
+                ? {
+                    ...x,
+                    headline: it.headline ?? x.headline,
+                    offsetX: it.offsetX ?? x.offsetX,
+                    offsetY: it.offsetY ?? x.offsetY,
+                    clip: (it.clip ?? undefined) as Item["clip"],
+                    score: (it.score ?? undefined) as number | undefined,
+                    regions: (it.regions ?? undefined) as Item["regions"],
+                    captions: (it.captions ?? undefined) as Item["captions"],
+                  }
+                : x,
+            ),
+          );
+        } catch {
+          toast.error(`Não consegui rebaixar "${it.name}".`);
+        }
+      }
+      setCloudOpen(false);
+    },
+    [addVideos, setItems, templates],
+  );
+
   /** Clipagem automática: quebra um vídeo longo nos melhores trechos. */
   const autoClip = useCallback(
     async (item: Item) => {
@@ -2160,7 +2234,14 @@ function Home() {
       )}
 
       {cloudOpen && (
-        <CloudPanel templates={templates} onClose={() => setCloudOpen(false)} onChangeList={setTemplates} />
+        <CloudPanel
+          templates={templates}
+          onClose={() => setCloudOpen(false)}
+          onChangeList={setTemplates}
+          mode={mode}
+          buildSnapshot={buildSnapshot}
+          onRestore={restoreSnapshot}
+        />
       )}
     </AppShell>
   );
