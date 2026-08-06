@@ -106,6 +106,7 @@ async function recordVideo(
       time: video.currentTime,
       quality: "hq" as const,
       ...(opts.captions?.length ? { captions: opts.captions } : {}),
+      ...(opts.plate ? { plate: opts.plate } : {}),
     });
     if (video.duration) opts.onProgress?.(Math.min(1, video.currentTime / endAt));
     if (video.currentTime >= endAt) video.pause();
