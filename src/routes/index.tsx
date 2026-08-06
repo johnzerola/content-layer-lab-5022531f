@@ -759,6 +759,7 @@ function Home() {
                 bitrate: (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
                 clip: item.clip,
                 captions: cues,
+                plate,
                 signal: ac.signal,
                 onProgress: (p) =>
                   setItems((prev) =>
