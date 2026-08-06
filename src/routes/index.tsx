@@ -190,8 +190,21 @@ function Home() {
   const [webmWarn, setWebmWarn] = useState(false);
   useEffect(() => setWebmWarn(outputIsWebm()), []);
 
-  const [items, setItems] = useState<Item[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // filas totalmente separadas por ferramenta
+  const [queues, setQueues] = useState<Record<Mode, Item[]>>({ lote: [], clip: [], limpar: [] });
+  const [selectedIds, setSelectedIds] = useState<Record<Mode, string | null>>({
+    lote: null,
+    clip: null,
+    limpar: null,
+  });
+  const queuesRef = useRef(queues);
+  queuesRef.current = queues;
+  const setItemsIn = useCallback(
+    (m: Mode, upd: Item[] | ((prev: Item[]) => Item[])) =>
+      setQueues((q) => ({ ...q, [m]: typeof upd === "function" ? upd(q[m]) : upd })),
+    [],
+  );
+
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [zipping, setZipping] = useState(false);
