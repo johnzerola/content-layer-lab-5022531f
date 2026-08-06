@@ -204,6 +204,19 @@ function Home() {
       setQueues((q) => ({ ...q, [m]: typeof upd === "function" ? upd(q[m]) : upd })),
     [],
   );
+  const modeRef = useRef<Mode>(mode);
+  modeRef.current = mode;
+  const items = queues[mode];
+  const selectedId = selectedIds[mode];
+  const setItems = useCallback(
+    (upd: Item[] | ((prev: Item[]) => Item[])) => setItemsIn(modeRef.current, upd),
+    [setItemsIn],
+  );
+  const setSelectedId = useCallback(
+    (id: string | null) => setSelectedIds((s) => ({ ...s, [modeRef.current]: id })),
+    [],
+  );
+
 
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
