@@ -38,6 +38,8 @@ import {
 
   createTemplate,
   defaultCaptions,
+  fitCanvasToSource,
+  orientationOf,
   loadTemplates,
   PLATFORM_PRESETS,
   RATIO_PRESETS,
@@ -146,10 +148,11 @@ function stripBranding(t: Template): Template {
   };
 }
 
-/** Modo "limpar": vídeo cheio, sem marca e sem legenda nova — só as áreas de limpeza. */
-function cleanOnly(t: Template): Template {
+/** Modo "limpar": vídeo cheio, sem marca e sem legenda nova — só as áreas de limpeza.
+ *  Com as dimensões da fonte, o quadro assume a orientação real (sem zoom nem barras). */
+function cleanOnly(t: Template, src?: { w: number; h: number }): Template {
   const b = stripBranding(t);
-  return {
+  const base: Template = {
     ...b,
     background: "#000000",
     video: {
@@ -162,11 +165,12 @@ function cleanOnly(t: Template): Template {
       radius: 0,
       offsetX: 0,
       offsetY: 0,
-      fit: "contain",
+      fit: "auto",
       visible: true,
     },
     captions: { ...(b.captions ?? defaultCaptions()), visible: false },
   };
+  return src?.w && src?.h ? fitCanvasToSource(base, src.w, src.h) : base;
 }
 
 function Home() {
@@ -601,7 +605,11 @@ function Home() {
 
           for (const plat of outs) {
             // cada plataforma recebe a resolução/fps/bitrate recomendados
-            const tpl = applyRatio(baseTpl, plat.w, plat.h);
+            // no modo "limpar" o quadro segue a orientação real do vídeo (sem recorte)
+            const tpl =
+              modeRef.current === "limpar"
+                ? cleanOnly(active, { w: item.w, h: item.h })
+                : applyRatio(baseTpl, plat.w, plat.h);
             for (let k = 0; k < n; k++) {
               const at = step;
               const { blob, ext } = await renderVideo(item.file, tpl, {
@@ -753,12 +761,20 @@ function Home() {
 
 
   const baseTpl: Template =
-    mode === "clip" ? stripBranding(active) : mode === "limpar" ? cleanOnly(active) : active;
+    mode === "clip"
+      ? stripBranding(active)
+      : mode === "limpar"
+        ? cleanOnly(active, selected ? { w: selected.w, h: selected.h } : undefined)
+        : active;
   const previewTemplate: Template = selected
     ? {
         ...baseTpl,
         headline: { ...baseTpl.headline, text: selected.headline || baseTpl.headline.text },
-        video: { ...baseTpl.video, offsetX: selected.offsetX, offsetY: selected.offsetY },
+        video: {
+          ...baseTpl.video,
+          offsetX: mode === "limpar" ? 0 : selected.offsetX,
+          offsetY: mode === "limpar" ? 0 : selected.offsetY,
+        },
       }
     : baseTpl;
 
@@ -1131,7 +1147,19 @@ function Home() {
 
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="mono-label">Preview final</p>
+                      <p className="mono-label">
+                        Preview final
+                        {selected?.w ? (
+                          <span className="ml-2 font-mono text-[10px] text-muted-foreground">
+                            {orientationOf(selected.w, selected.h) === "horizontal"
+                              ? "horizontal"
+                              : orientationOf(selected.w, selected.h) === "square"
+                                ? "quadrado"
+                                : "vertical"}{" "}
+                            · {selected.w}×{selected.h}
+                          </span>
+                        ) : null}
+                      </p>
                       <div className="flex items-center gap-1">
                         <button
                           type="button"

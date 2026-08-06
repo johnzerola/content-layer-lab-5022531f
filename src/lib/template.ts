@@ -52,8 +52,8 @@ export interface VideoLayer extends BoxLayer {
   radius: number;
   offsetX: number;
   offsetY: number;
-  /** "cover" (padrão) recorta pra preencher; "contain" mostra o vídeo inteiro sem zoom. */
-  fit?: "cover" | "contain";
+  /** "cover" recorta pra preencher · "contain" mostra inteiro · "auto" decide pela orientação da fonte. */
+  fit?: "cover" | "contain" | "auto";
 }
 
 export type ExtraLayer = (TextLayer | ImageLayer) & { id: string; label: string };
@@ -542,6 +542,43 @@ export const PLATFORM_PRESETS: PlatformPreset[] = [
   },
 ];
 
+
+/** Orientação da fonte, com tolerância pra vídeos quase quadrados. */
+export function orientationOf(w: number, h: number): "vertical" | "horizontal" | "square" {
+  if (!w || !h) return "vertical";
+  const r = w / h;
+  if (r > 1.05) return "horizontal";
+  if (r < 0.95) return "vertical";
+  return "square";
+}
+
+/** Ajusta o canvas à proporção real da fonte (sem zoom nem recorte) e põe o vídeo inteiro nele. */
+export function fitCanvasToSource(t: Template, srcW: number, srcH: number, maxDim = 1080): Template {
+  if (!srcW || !srcH) return t;
+  const even = (n: number) => Math.max(2, Math.round(n / 2) * 2);
+  const scale = Math.min(1, maxDim / Math.max(srcW, srcH));
+  const w = even(srcW * scale);
+  const h = even(srcH * scale);
+  const scaled = applyRatio(t, w, h);
+  return {
+    ...scaled,
+    canvasW: w,
+    canvasH: h,
+    video: {
+      ...scaled.video,
+      x: 0,
+      y: 0,
+      w,
+      h,
+      rotation: 0,
+      radius: 0,
+      offsetX: 0,
+      offsetY: 0,
+      fit: "contain",
+      visible: true,
+    },
+  };
+}
 
 /** Troca a proporção reescalando todas as camadas proporcionalmente. */
 export function applyRatio(t: Template, w: number, h: number): Template {
