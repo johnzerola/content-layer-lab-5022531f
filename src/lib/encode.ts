@@ -206,7 +206,9 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       border: v.border,
       borderColor: v.borderColor,
       ...(opts.captions?.length ? { captions: opts.captions } : {}),
+      ...(opts.plate ? { plate: opts.plate } : {}),
     };
+
 
     let frameIndex = 0;
     const frameDur = Math.round(1_000_000 / fps);
