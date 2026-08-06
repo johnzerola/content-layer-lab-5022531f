@@ -77,6 +77,9 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       resolveReddit,
       resolveStreamable,
       resolveVimeo,
+      resolveYouTube,
+      resolveInstagram,
+      resolveOpenGraph,
       resolveWithCobalt,
       cobaltConfigured,
     } = await import("./resolvers.server");
@@ -94,8 +97,14 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       reddit: resolveReddit,
       streamable: resolveStreamable,
       vimeo: resolveVimeo,
+      youtube: resolveYouTube,
+      instagram: resolveInstagram,
+      facebook: resolveOpenGraph,
+      pinterest: resolveOpenGraph,
+      kwai: resolveOpenGraph,
+      dailymotion: resolveOpenGraph,
     };
-    const chain = [byPlatform[platform], resolveWithCobalt].filter(Boolean) as ((
+    const chain = [byPlatform[platform], resolveWithCobalt, resolveOpenGraph].filter(Boolean) as ((
       u: string,
     ) => Promise<import("./resolvers.server").ResolverHit | null>)[];
 
@@ -181,8 +190,8 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       blocked: needsService,
       message: needsService
         ? cobaltConfigured()
-          ? `Não consegui obter esse vídeo do ${platform} pelo serviço configurado (pode ser privado, restrito por idade ou indisponível). Baixe o arquivo e arraste aqui.`
-          : `${platform} não expõe download direto por link. Configure um serviço de resolução (COBALT_API_URL) para importar automaticamente, ou baixe o arquivo e arraste aqui.`
+          ? `Não consegui obter esse vídeo do ${platform} (pode ser privado, restrito por idade ou indisponível). Baixe o arquivo e arraste aqui.`
+          : `Não consegui baixar esse vídeo do ${platform} pelos serviços públicos (pode estar privado ou com restrição). Configure um resolvedor próprio (COBALT_API_URL) para importar sempre, ou baixe o arquivo e arraste aqui.`
         : "Não encontrei um arquivo de vídeo nessa página. Cole um link direto do arquivo ou envie o vídeo.",
     };
 
