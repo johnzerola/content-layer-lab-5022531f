@@ -227,6 +227,14 @@ function Home() {
   const itemsRef = useRef<Item[]>([]);
   const startedAt = useRef(0);
   const doneCount = useRef(0);
+  const failures = useRef<{ name: string; error: string }[]>([]);
+  const [report, setReport] = useState<{
+    ok: number;
+    fail: number;
+    seconds: number;
+    fails: { name: string; error: string }[];
+  } | null>(null);
+
   const smartRef = useRef(smartFrame);
   const modeRef = useRef(mode);
   modeRef.current = mode;
