@@ -505,6 +505,8 @@ export interface DrawOpts {
   /** tempo atual do vídeo fonte (segundos) — usado pelas legendas */
   time?: number;
   captions?: CaptionCue[];
+  /** "hq" = reconstrução em resolução total (exportação). Padrão: preview rápido. */
+  quality?: "preview" | "hq";
 }
 
 function drawVideoLayer(
@@ -570,7 +572,7 @@ function drawVideoLayer(
     ctx.fillRect(v.x, v.y, v.w, v.h);
   }
   ctx.restore();
-  applyCleanup(ctx, v, t.cleanup);
+  applyCleanup(ctx, v, t.cleanup, opts?.quality === "hq");
 }
 
 let scratch: HTMLCanvasElement | null = null;
@@ -588,6 +590,7 @@ export function applyCleanup(
   ctx: CanvasRenderingContext2D,
   v: { x: number; y: number; w: number; h: number; radius: number },
   regions?: CleanupRegion[],
+  hq = false,
 ) {
   const list = (regions ?? []).filter((r) => r.enabled && r.w > 0 && r.h > 0);
   if (!list.length) return;
@@ -609,7 +612,7 @@ export function applyCleanup(
     ctx.clip();
 
     if (r.mode === "inpaint") {
-      inpaintArea(ctx, x, y, w, h, k);
+      inpaintArea(ctx, x, y, w, h, k, hq);
     } else if (r.mode === "solid") {
       ctx.fillStyle = r.color ?? "#000000";
       ctx.fillRect(x, y, w, h);
