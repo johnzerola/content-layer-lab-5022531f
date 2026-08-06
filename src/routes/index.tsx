@@ -909,6 +909,7 @@ function Home() {
       mode={mode}
       onMode={setMode}
       count={items.length}
+      counts={{ lote: queues.lote.length, clip: queues.clip.length, limpar: queues.limpar.length }}
       onLibrary={() => setLibraryOpen(true)}
       onCloud={() => setCloudOpen(true)}
     >

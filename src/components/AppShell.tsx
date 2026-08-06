@@ -79,12 +79,14 @@ interface Props {
   mode: AppMode;
   onMode: (m: AppMode) => void;
   count: number;
+  /** total de vídeos na fila de cada ferramenta (filas independentes) */
+  counts?: Partial<Record<AppMode, number>>;
   onLibrary: () => void;
   onCloud: () => void;
   children: ReactNode;
 }
 
-export function AppShell({ mode, onMode, count, onLibrary, onCloud, children }: Props) {
+export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, children }: Props) {
   const [open, setOpen] = useState(true);
   const current = MODES.find((m) => m.id === mode)!;
   const Badge = current.badge;
@@ -143,9 +145,14 @@ export function AppShell({ mode, onMode, count, onLibrary, onCloud, children }: 
                   <m.icon className="size-[15px]" />
                 </span>
                 {open && (
-                  <span className="min-w-0">
+                  <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium">{m.brand}</span>
                     <span className="block truncate font-mono text-[10px] opacity-70">{m.hint}</span>
+                  </span>
+                )}
+                {open && (counts?.[m.id] ?? 0) > 0 && (
+                  <span className="shrink-0 rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
+                    {counts?.[m.id]}
                   </span>
                 )}
               </button>
