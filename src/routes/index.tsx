@@ -601,6 +601,7 @@ function Home() {
             border: previewVariation.border,
             borderColor: previewVariation.borderColor,
             ...(previewCues?.length ? { captions: previewCues } : {}),
+            ...(previewPlate ? { plate: previewPlate } : {}),
           }
         : undefined,
     [
@@ -613,8 +614,10 @@ function Home() {
       previewVariation?.border,
       previewVariation?.borderColor,
       previewCues,
+      previewPlate,
     ],
   );
+
 
 
 
