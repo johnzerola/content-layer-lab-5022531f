@@ -1035,76 +1035,17 @@ function Home() {
         )}
 
 
-        <section
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            void addFiles(e.dataTransfer.files);
-          }}
-          className="panel border-dashed p-10 text-center"
-        >
-          <div className="mx-auto grid size-12 place-items-center rounded-xl bg-accent">
-            <Upload className="size-5 text-primary" />
-          </div>
-          <p className="mt-4 text-lg font-semibold">
-            <span className="step-num mr-2">02</span>Solta os vídeos aqui
-          </p>
-          <p className="mt-1 font-mono text-xs text-muted-foreground">
-            clique ou arraste · mp4 · mov · webm · vários de uma vez
-          </p>
-          <div className="mt-5 flex justify-center gap-2">
-            <Button variant="outline" onClick={() => inputRef.current?.click()}>
-              Selecionar arquivos
-            </Button>
-            <Button variant="outline" onClick={() => folderRef.current?.click()}>
-              Selecionar pasta
-            </Button>
-          </div>
-          <input ref={inputRef} type="file" accept={VIDEO_ACCEPT} multiple hidden onChange={(e) => void addFiles(e.target.files)} />
-          <input
-            ref={folderRef}
-            type="file"
-            multiple
-            hidden
-            // @ts-expect-error atributo não tipado
-            webkitdirectory=""
-            onChange={(e) => void addFiles(e.target.files)}
-          />
-
-          <div className="mx-auto mt-6 max-w-xl border-t border-border pt-5">
-            <p className="mono-label">ou cole o link do vídeo</p>
-            <div className="mt-2 flex gap-2">
-              <input
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && void importFromLink()}
-                placeholder="https://... TikTok, X, Reddit, Vimeo, Streamable ou arquivo direto"
-                className="flex-1 rounded-lg border border-border bg-surface-2 px-3 py-2 font-mono text-xs outline-none focus:border-primary"
-              />
-              <Button onClick={() => void importFromLink()} disabled={linkBusy || !linkUrl.trim()}>
-                <LinkIcon className="mr-1 size-4" />
-                {linkBusy ? "baixando..." : "Importar"}
-              </Button>
-            </div>
-            <p className="mt-2 font-mono text-[10px] leading-relaxed text-muted-foreground">
-              importação automática: tiktok · x/twitter · reddit · vimeo · streamable · links diretos de arquivo.
-              youtube / instagram / facebook exigem um serviço de resolução próprio (COBALT_API_URL).
-            </p>
-            {linkMsg && <p className="mt-2 font-mono text-[11px] text-muted-foreground">{linkMsg}</p>}
-            {linkBlocked && (
-              <div className="mx-auto mt-3 max-w-xl rounded-lg border border-border bg-muted/30 p-3 text-left">
-                <p className="font-mono text-[11px] uppercase tracking-wider text-primary">como importar mesmo assim</p>
-                <ol className="mt-2 space-y-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
-                  <li>1. baixe o vídeo pelo próprio app (Instagram/YouTube: salvar em vídeos) ou por um downloader</li>
-                  <li>2. arraste o arquivo aqui em cima, ou use "Selecionar arquivos"</li>
-                  <li>3. links diretos de arquivo (.mp4, .mov, .webm, .mkv, .m4v...) importam normalmente</li>
-                  <li>4. para automatizar youtube/instagram, hospede uma instância cobalt e me peça para ligar a chave</li>
-                </ol>
-              </div>
-            )}
-
-          </div>
-        </section>
+        <ImportPanel
+          mode={mode}
+          count={items.length}
+          onFiles={(f) => void addFiles(f)}
+          linkUrl={linkUrl}
+          onLinkUrl={setLinkUrl}
+          linkBusy={linkBusy}
+          linkMsg={linkMsg}
+          linkBlocked={linkBlocked}
+          onImportLink={() => void importFromLink()}
+        />
 
         {mode === "clip" && items.length > 0 && (
           <ClipStudio
