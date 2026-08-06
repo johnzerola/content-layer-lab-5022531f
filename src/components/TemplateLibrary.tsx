@@ -76,10 +76,50 @@ export function TemplateLibrary({ templates, activeId, onClose, onChangeList, on
 
         {error && <p className="mb-3 font-mono text-xs text-destructive">{error}</p>}
 
+        <div className="mb-5">
+          <div className="mb-2 flex items-center gap-2">
+            <Sparkles className="size-4 text-primary" />
+            <p className="mono-label">Modelos prontos</p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {STARTER_PRESETS.map((p) => (
+              <div
+                key={p.id}
+                className="rounded-xl border border-border bg-surface-2 p-3 transition-colors hover:border-primary"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{p.name}</p>
+                    <span
+                      className="mt-1 inline-block rounded-full px-2 py-0.5 font-mono text-[10px]"
+                      style={{ color: p.accent, border: `1px solid ${p.accent}55` }}
+                    >
+                      {p.tag}
+                    </span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const t = p.build();
+                      onCommit(t, "modelo pronto");
+                      onUse(t);
+                    }}
+                  >
+                    Usar
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs leading-snug text-muted-foreground">{p.description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {templates.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            Nenhum template salvo ainda. Edite o template ativo e clique em salvar.
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            Nenhum template seu ainda — comece por um modelo pronto acima.
           </p>
+
         ) : (
           <div className="space-y-2">
             {templates.map((t) => (
