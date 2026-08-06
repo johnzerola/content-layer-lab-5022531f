@@ -38,6 +38,8 @@ import {
 
   createTemplate,
   defaultCaptions,
+  fitCanvasToSource,
+  orientationOf,
   loadTemplates,
   PLATFORM_PRESETS,
   RATIO_PRESETS,
