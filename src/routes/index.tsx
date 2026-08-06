@@ -65,6 +65,7 @@ import { CleanupStudio } from "@/components/CleanupStudio";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { canBrowserDecode, guessMime, isVideoFile, VIDEO_ACCEPT, VIDEO_EXT_RE } from "@/lib/media";
 import { toast } from "sonner";
+import { AppShell } from "@/components/AppShell";
 import { Toaster } from "@/components/ui/sonner";
 
 
@@ -1994,6 +1995,6 @@ function Home() {
       {cloudOpen && (
         <CloudPanel templates={templates} onClose={() => setCloudOpen(false)} onChangeList={setTemplates} />
       )}
-    </main>
+    </AppShell>
   );
 }
