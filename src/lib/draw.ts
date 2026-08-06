@@ -168,6 +168,12 @@ function inpaintArea(
   const rw = Math.max(1, mx1 - mx0);
   const rh = Math.max(1, my1 - my0);
 
+  const store = (patch: HTMLCanvasElement) => {
+    if (!sig || !keep) return;
+    if (patchCache.size > 24) patchCache.clear();
+    patchCache.set(key, { sig: new Uint8ClampedArray(sig), keep, patch });
+  };
+
   // mistura suave nas bordas para não deixar emenda entre reconstruído e original
   const feather = hq ? Math.max(1.5, Math.min(6, Math.min(w, h) * 0.06)) : 0;
   if (feather > 0.5) {
@@ -184,6 +190,7 @@ function inpaintArea(
       fx.filter = "none";
       fx.globalCompositeOperation = "source-over";
       ctx.drawImage(fc, 0, 0, rw, rh, x, y, w, h);
+      store(fc);
       return;
     }
   }
@@ -193,7 +200,13 @@ function inpaintArea(
   ctx.imageSmoothingEnabled = scale < 1;
   ctx.drawImage(work, mx0, my0, rw, rh, x, y, w, h);
   ctx.imageSmoothingEnabled = smooth;
+  const keepC = document.createElement("canvas");
+  keepC.width = rw;
+  keepC.height = rh;
+  keepC.getContext("2d")?.drawImage(work, mx0, my0, rw, rh, 0, 0, rw, rh);
+  store(keepC);
 }
+
 
 
 
