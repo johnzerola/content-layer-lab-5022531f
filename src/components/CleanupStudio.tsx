@@ -13,6 +13,12 @@ type Props = {
   onDetect?: () => void;
   detecting?: boolean;
   detectMsg?: string | undefined;
+  /** true quando as áreas pertencem ao vídeo selecionado (LimpaVídeo) */
+  perVideo?: boolean;
+  /** copia estas áreas para todos os vídeos da fila */
+  onApplyAll?: (() => void) | undefined;
+  /** adiciona as zonas típicas (rodapé de legenda / canto da marca d'água) */
+  onUseSafeZones?: () => void;
   /** áreas encontradas pela detecção, ainda não aplicadas */
   suggestions?: CleanupRegion[];
   onUseSuggestion?: (r: CleanupRegion) => void;
