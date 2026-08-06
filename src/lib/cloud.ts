@@ -1,5 +1,6 @@
 /** Sincronização opcional da biblioteca com a nuvem (login por e-mail ou Google). */
 import { supabase } from "@/integrations/supabase/client";
+import type { Json } from "@/integrations/supabase/types";
 import { migrate, type Template } from "@/lib/template";
 
 export type CloudUser = { id: string; email: string | null };
@@ -43,7 +44,7 @@ export async function pushTemplates(list: Template[]) {
     user_id: user.id,
     local_id: t.id,
     name: t.name,
-    data: t as unknown as Record<string, unknown>,
+    data: t as unknown as Json,
   }));
   const { data, error } = await supabase
     .from("templates")
