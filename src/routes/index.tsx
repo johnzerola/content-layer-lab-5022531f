@@ -694,7 +694,16 @@ function Home() {
 
     await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
     setRunning(false);
+    if (!ctrl.cancelled) {
+      setReport({
+        ok: doneCount.current,
+        fail: failures.current.length,
+        seconds: Math.max(1, Math.round((performance.now() - startedAt.current) / 1000)),
+        fails: [...failures.current],
+      });
+    }
   };
+
 
   const togglePause = () => {
     ctrlRef.current.paused = !ctrlRef.current.paused;
