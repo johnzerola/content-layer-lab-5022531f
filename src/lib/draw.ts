@@ -613,6 +613,7 @@ function drawVideoLayer(
   }
   roundRect(ctx, v.x, v.y, v.w, v.h, v.radius);
   ctx.clip();
+  let dest: { dx: number; dy: number; dw: number; dh: number; mirror: boolean } | null = null;
   if (source && source.width) {
     // a rotação exige um leve zoom extra pra não aparecer canto vazio
     const rotPad = rot ? 1 + Math.abs(rot) / 40 : 1;
@@ -632,7 +633,9 @@ function drawVideoLayer(
     const oy = (opts?.offsetY ?? v.offsetY) * (dh - v.h) * 0.5;
     const dx = v.x + (v.w - dw) / 2 + ox;
     const dy = v.y + (v.h - dh) / 2 + oy;
-    if (opts?.mirror ?? t.mirror) {
+    const mirror = Boolean(opts?.mirror ?? t.mirror);
+    dest = { dx, dy, dw, dh, mirror };
+    if (mirror) {
       ctx.translate(v.x * 2 + v.w, 0);
       ctx.scale(-1, 1);
     }
@@ -657,8 +660,13 @@ function drawVideoLayer(
     ctx.fillRect(v.x, v.y, v.w, v.h);
   }
   ctx.restore();
-  applyCleanup(ctx, v, t.cleanup, opts?.quality === "hq");
+  applyCleanup(ctx, v, t.cleanup, opts?.quality === "hq", {
+    ...(opts?.time !== undefined ? { time: opts.time } : {}),
+    ...(opts?.plate ? { plate: opts.plate } : {}),
+    ...(dest ? { dest } : {}),
+  });
 }
+
 
 let scratch: HTMLCanvasElement | null = null;
 function getScratch(w: number, h: number) {
