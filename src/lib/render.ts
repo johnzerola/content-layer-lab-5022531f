@@ -102,6 +102,7 @@ async function recordVideo(
       border: v.border,
       borderColor: v.borderColor,
       time: video.currentTime,
+      quality: "hq" as const,
       ...(opts.captions?.length ? { captions: opts.captions } : {}),
     });
     if (video.duration) opts.onProgress?.(Math.min(1, video.currentTime / endAt));
