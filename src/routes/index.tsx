@@ -147,7 +147,24 @@ function stripBranding(t: Template): Template {
 /** Modo "limpar": vídeo cheio, sem marca e sem legenda nova — só as áreas de limpeza. */
 function cleanOnly(t: Template): Template {
   const b = stripBranding(t);
-  return { ...b, captions: { ...(b.captions ?? defaultCaptions()), visible: false } };
+  return {
+    ...b,
+    background: "#000000",
+    video: {
+      ...b.video,
+      x: 0,
+      y: 0,
+      w: b.canvasW ?? CANVAS_W,
+      h: b.canvasH ?? CANVAS_H,
+      rotation: 0,
+      radius: 0,
+      offsetX: 0,
+      offsetY: 0,
+      fit: "contain",
+      visible: true,
+    },
+    captions: { ...(b.captions ?? defaultCaptions()), visible: false },
+  };
 }
 
 function Home() {
