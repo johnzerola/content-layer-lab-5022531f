@@ -868,53 +868,17 @@ function Home() {
     : baseTpl;
 
   return (
-    <main className="min-h-screen">
+    <AppShell
+      mode={mode}
+      onMode={setMode}
+      count={items.length}
+      onLibrary={() => setLibraryOpen(true)}
+      onCloud={() => setCloudOpen(true)}
+    >
       <Toaster />
 
-      <header className="sticky top-0 z-30 border-b border-border bg-background/85 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-5 py-3">
-          <div className="flex items-center gap-3">
-            <div className="grid size-9 place-items-center rounded-lg bg-primary font-mono text-sm font-bold text-primary-foreground">
-              vv
-            </div>
-            <div>
-              <h1 className="font-mono text-sm tracking-[0.2em] text-foreground">VAIVIRAL</h1>
-              <p className="font-mono text-[10px] text-muted-foreground">
-                {mode === "clip"
-                  ? "clipagem sem template"
-                  : mode === "limpar"
-                    ? "remover legenda e marca d'água"
-                    : "editor em lote"}{" "}
-                · roda no navegador
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex rounded-lg border border-border bg-surface-2 p-0.5">
-              {([
-                { id: "lote", label: "Lote com template" },
-                { id: "clip", label: "Só cortes" },
-                { id: "limpar", label: "Limpar vídeo" },
-              ] as const).map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => setMode(m.id)}
-                  className={`rounded-md px-3 py-1.5 font-mono text-[11px] transition ${
-                    mode === m.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {m.label}
-                </button>
-              ))}
-            </div>
-          <span className="rounded-full border border-primary/40 bg-accent px-3 py-1 font-mono text-[11px] text-accent-foreground">
-            ● {items.length} vídeo{items.length === 1 ? "" : "s"}
-          </span>
-          </div>
-        </div>
-      </header>
+      <div className="space-y-5">
 
-      <div className="mx-auto max-w-6xl space-y-5 px-5 py-6">
         {webmWarn && (
           <div className="flex items-start gap-3 rounded-xl border border-warn/50 bg-warn/10 p-4">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" />
