@@ -201,6 +201,8 @@ function Home() {
   });
   const queuesRef = useRef(queues);
   queuesRef.current = queues;
+  const selectedIdsRef = useRef(selectedIds);
+  selectedIdsRef.current = selectedIds;
   const setItemsIn = useCallback(
     (m: Mode, upd: Item[] | ((prev: Item[]) => Item[])) =>
       setQueues((q) => ({ ...q, [m]: typeof upd === "function" ? upd(q[m] ?? []) : upd })),
@@ -319,7 +321,7 @@ function Home() {
       progress: 0,
     }));
     setItems((prev) => [...prev, ...created]);
-    if (!selectedIds[modeRef.current] && created[0]) setSelectedId(created[0].id);
+    if (!selectedIdsRef.current[modeRef.current] && created[0]) setSelectedId(created[0].id);
     for (const it of created) {
       try {
         const meta = await grabPoster(it.file);
