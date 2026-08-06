@@ -325,27 +325,72 @@ function Home() {
       status: "pendente",
       progress: 0,
     }));
-    setItems((prev) => [...prev, ...created]);
-    if (!selectedIdsRef.current[modeRef.current] && created[0]) setSelectedId(created[0].id);
+    const runMode = modeRef.current;
+    const setQ = (upd: Item[] | ((prev: Item[]) => Item[])) => setItemsIn(runMode, upd);
+    setQ((prev) => [...prev, ...created]);
+    if (!selectedIdsRef.current[runMode] && created[0]) setSelectedId(created[0].id);
     for (const it of created) {
       try {
         const meta = await grabPoster(it.file);
-        setItems((prev) =>
+        setQ((prev) =>
           prev.map((p) => (p.id === it.id ? { ...p, poster: meta.url, w: meta.w, h: meta.h, duration: meta.duration } : p)),
         );
-        if (smartRef.current) {
+        if (runMode !== "limpar" && smartRef.current) {
           const af = await autoFrame(it.file);
-          setItems((prev) =>
+          setQ((prev) =>
             prev.map((p) =>
               p.id === it.id ? { ...p, offsetX: af.offsetX, offsetY: af.offsetY, autoFrameSource: af.source } : p,
             ),
           );
         }
       } catch {
-        setItems((prev) => prev.map((p) => (p.id === it.id ? { ...p, status: "erro" } : p)));
+        setQ((prev) => prev.map((p) => (p.id === it.id ? { ...p, status: "erro" } : p)));
       }
     }
-  }, []);
+    // LimpaVídeo: analisa cada vídeo automaticamente (2 por vez) e guarda as áreas encontradas
+    if (runMode === "limpar") {
+      const pool = [...created];
+      const worker = async () => {
+        for (;;) {
+          const it = pool.shift();
+          if (!it) return;
+          setQ((prev) => prev.map((p) => (p.id === it.id ? { ...p, detectStatus: "analisando", detectMsg: "analisando quadros…" } : p)));
+          try {
+            const found = await detectOverlays(it.file, {
+              onProgress: (d, t) =>
+                setQ((prev) =>
+                  prev.map((p) => (p.id === it.id ? { ...p, detectMsg: `analisando ${d}/${t}` } : p)),
+                ),
+            });
+            const regions = found.map((f) => makeCleanupRegion(f));
+            setQ((prev) =>
+              prev.map((p) =>
+                p.id === it.id
+                  ? {
+                      ...p,
+                      regions,
+                      detectStatus: regions.length ? "ok" : "vazio",
+                      detectMsg: regions.length
+                        ? `${regions.length} área(s) detectada(s)`
+                        : "nada fixo encontrado",
+                    }
+                  : p,
+              ),
+            );
+          } catch (err) {
+            setQ((prev) =>
+              prev.map((p) =>
+                p.id === it.id
+                  ? { ...p, detectStatus: "erro", detectMsg: String((err as Error)?.message ?? err) }
+                  : p,
+              ),
+            );
+          }
+        }
+      };
+      void Promise.all([worker(), worker()]);
+    }
+  }, [setItemsIn, setSelectedId]);
 
   const addFiles = useCallback(
     (files: FileList | null) => (files ? addVideos(Array.from(files)) : Promise.resolve()),
