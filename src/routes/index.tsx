@@ -1147,7 +1147,19 @@ function Home() {
 
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="mono-label">Preview final</p>
+                      <p className="mono-label">
+                        Preview final
+                        {selected?.w ? (
+                          <span className="ml-2 font-mono text-[10px] text-muted-foreground">
+                            {orientationOf(selected.w, selected.h) === "horizontal"
+                              ? "horizontal"
+                              : orientationOf(selected.w, selected.h) === "square"
+                                ? "quadrado"
+                                : "vertical"}{" "}
+                            · {selected.w}×{selected.h}
+                          </span>
+                        ) : null}
+                      </p>
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
