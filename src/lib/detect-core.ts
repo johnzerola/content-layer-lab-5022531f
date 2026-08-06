@@ -203,6 +203,7 @@ export function detectFromFrames(set: FrameSet): Partial<CleanupRegion>[] {
   const hot = norm.map((s) => s >= thr);
 
   const rects = groupCells(hot, norm, COLS, ROWS);
+  if (process.env.DBG) console.log("maxS", maxS, "median", median, "thr", thr, "rawTop", rects.map((r)=>Number((r.s*maxS).toFixed(4))));
 
   const pixelScore = (p: number, ci: number) => {
     const freq = edgeHits[p]! / used;
