@@ -73,6 +73,27 @@ function inpaintArea(
   const sh = Math.min(canvas.height - sy, h + pad * 2);
   if (sw < 4 || sh < 4) return;
 
+  // Cache: enquanto o fundo em volta da área não muda (marca d'água / barra de legenda
+  // sobre cena estática), a reconstrução anterior é reaproveitada em vez de recalculada.
+  const key = `${Math.round(x)}:${Math.round(y)}:${Math.round(w)}:${Math.round(h)}:${detail.toFixed(2)}:${hq ? 1 : 0}`;
+  const sig = areaSignature(canvas, sw, sh) ?? null;
+  let keep: Uint8Array | null = null;
+  if (sig) {
+    keep = new Uint8Array(SIG * SIG);
+    const kx0 = Math.floor(((x - sx) / sw) * SIG);
+    const kx1 = Math.ceil(((x - sx + w) / sw) * SIG);
+    const ky0 = Math.floor(((y - sy) / sh) * SIG);
+    const ky1 = Math.ceil(((y - sy + h) / sh) * SIG);
+    for (let j = 0; j < SIG; j++)
+      for (let i = 0; i < SIG; i++)
+        keep[j * SIG + i] = i >= kx0 && i < kx1 && j >= ky0 && j < ky1 ? 0 : 1;
+    const hit = patchCache.get(key);
+    if (hit && sigDiff(hit.sig, sig, keep) < 4) {
+      ctx.drawImage(hit.patch, 0, 0, hit.patch.width, hit.patch.height, x, y, w, h);
+      return;
+    }
+  }
+
 
   // preview: buracos grandes resolvem em escala menor (fluidez).
   // alta qualidade: sempre resolução total.
