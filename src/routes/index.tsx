@@ -21,12 +21,15 @@ import {
   AlertTriangle,
   Copy,
   Columns2,
+  Cloud,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
 import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { TemplateEditor } from "@/components/TemplateEditor";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
+import { CloudPanel } from "@/components/CloudPanel";
+import { logBatch } from "@/lib/cloud";
 import { ClipStudio } from "@/components/ClipStudio";
 
 import {
@@ -179,6 +182,7 @@ function Home() {
   const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
   const [editing, setEditing] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [cloudOpen, setCloudOpen] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [webmWarn, setWebmWarn] = useState(false);
   useEffect(() => setWebmWarn(outputIsWebm()), []);
@@ -1936,6 +1940,10 @@ function Home() {
           }}
           onCommit={commit}
         />
+      )}
+
+      {cloudOpen && (
+        <CloudPanel templates={templates} onClose={() => setCloudOpen(false)} onChangeList={setTemplates} />
       )}
     </main>
   );
