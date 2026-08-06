@@ -30,7 +30,7 @@ export function AppShell({ mode, onMode, count, onLibrary, onCloud, children }: 
         }`}
       >
         <div className="flex items-center gap-3 px-4 py-5">
-          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-[image:var(--gradient-primary)] font-display text-sm font-bold text-primary-foreground shadow-[var(--shadow-glow)]">
+          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary font-display text-sm font-bold text-primary-foreground shadow-[var(--shadow-glow)]">
             vv
           </div>
           {open && (
