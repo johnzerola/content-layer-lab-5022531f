@@ -9,7 +9,6 @@ import {
   Download,
   Pencil,
   Repeat,
-  Library,
   Save,
   Pause,
   StopCircle,
@@ -21,7 +20,6 @@ import {
   AlertTriangle,
   Copy,
   Columns2,
-  Cloud,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
