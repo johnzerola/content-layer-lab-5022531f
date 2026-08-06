@@ -21,12 +21,15 @@ import {
   AlertTriangle,
   Copy,
   Columns2,
+  Cloud,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
 import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { TemplateEditor } from "@/components/TemplateEditor";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
+import { CloudPanel } from "@/components/CloudPanel";
+import { logBatch } from "@/lib/cloud";
 import { ClipStudio } from "@/components/ClipStudio";
 
 import {
@@ -179,6 +182,7 @@ function Home() {
   const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
   const [editing, setEditing] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
+  const [cloudOpen, setCloudOpen] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
   const [webmWarn, setWebmWarn] = useState(false);
   useEffect(() => setWebmWarn(outputIsWebm()), []);
@@ -227,6 +231,14 @@ function Home() {
   const itemsRef = useRef<Item[]>([]);
   const startedAt = useRef(0);
   const doneCount = useRef(0);
+  const failures = useRef<{ name: string; error: string }[]>([]);
+  const [report, setReport] = useState<{
+    ok: number;
+    fail: number;
+    seconds: number;
+    fails: { name: string; error: string }[];
+  } | null>(null);
+
   const smartRef = useRef(smartFrame);
   const modeRef = useRef(mode);
   modeRef.current = mode;
@@ -533,6 +545,9 @@ function Home() {
     setRunning(true);
     startedAt.current = performance.now();
     doneCount.current = 0;
+    failures.current = [];
+    setReport(null);
+
 
     const pending = items
       .filter((i) => (onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto"))
@@ -551,7 +566,8 @@ function Home() {
         const ac = new AbortController();
         ctrl.aborts.set(id, ac);
         setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)));
-        try {
+        const runItem = async () => {
+
           const n = Math.max(1, variants);
           const targets = PLATFORM_PRESETS.filter((p) => platforms.includes(p.id));
           const outs = targets.length ? targets : [PLATFORM_PRESETS[0]!];
@@ -644,25 +660,68 @@ function Home() {
                 : x,
             ),
           );
+        };
 
+        // até 2 tentativas por vídeo: uma falha isolada não derruba o lote
+        try {
+          let lastErr: unknown = null;
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+              await runItem();
+              lastErr = null;
+              break;
+            } catch (err) {
+              lastErr = err;
+              const aborted = (err as Error)?.name === "AbortError" || ctrl.cancelled;
+              if (aborted || attempt === 2) break;
+              setItems((p) =>
+                p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)),
+              );
+              await new Promise((r) => setTimeout(r, 500));
+            }
+          }
+          if (lastErr) throw lastErr;
         } catch (err) {
           const aborted = (err as Error)?.name === "AbortError";
+          const msg = String((err as Error)?.message ?? err);
+          if (!aborted) failures.current.push({ name: itemsRef.current.find((x) => x.id === id)?.file.name ?? id, error: msg });
           setItems((p) =>
             p.map((x) =>
               x.id === id
-                ? { ...x, status: aborted ? "pendente" : "erro", error: aborted ? undefined : String((err as Error)?.message ?? err) }
+                ? { ...x, status: aborted ? "pendente" : "erro", error: aborted ? undefined : msg }
                 : x,
             ),
           );
         } finally {
           ctrl.aborts.delete(id);
         }
+
       }
     };
 
     await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
     setRunning(false);
+    if (!ctrl.cancelled) {
+      const seconds = Math.max(1, Math.round((performance.now() - startedAt.current) / 1000));
+      setReport({
+        ok: doneCount.current,
+        fail: failures.current.length,
+        seconds,
+        fails: [...failures.current],
+      });
+      void logBatch({
+        mode,
+        templateName: active.name,
+        platforms,
+        videos: items.length,
+        ok: doneCount.current,
+        failed: failures.current.length,
+        seconds,
+      }).catch(() => {});
+    }
+
   };
+
 
   const togglePause = () => {
     ctrlRef.current.paused = !ctrlRef.current.paused;
@@ -891,6 +950,10 @@ function Home() {
             <Button variant="outline" onClick={() => setLibraryOpen(true)}>
               <Library className="size-4" /> Biblioteca
             </Button>
+            <Button variant="outline" onClick={() => setCloudOpen(true)}>
+              <Cloud className="size-4" /> Nuvem
+            </Button>
+
             <Button variant="outline" onClick={() => commit(active, "salvo manualmente")}>
               <Save className="size-4" /> Salvar versão
             </Button>
@@ -1317,6 +1380,36 @@ function Home() {
                     </Button>
                   )}
                 </div>
+
+                {/* relatório do lote */}
+                {report && !running && (
+                  <div className="space-y-1 rounded-xl border border-border bg-surface-2 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="mono-label">Relatório do lote</p>
+                      <button
+                        type="button"
+                        onClick={() => setReport(null)}
+                        className="font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                      >
+                        fechar
+                      </button>
+                    </div>
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      {report.ok} vídeo(s) exportado(s) · {report.fail} com erro · {report.seconds}s
+                    </p>
+                    {report.fails.length > 0 && (
+                      <ul className="max-h-24 space-y-0.5 overflow-auto">
+                        {report.fails.map((f, i) => (
+                          <li key={`${f.name}-${i}`} className="font-mono text-[10px] text-destructive">
+                            {f.name}: {f.error}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+
 
                 {/* presets de entrega por plataforma (MP4 H.264) */}
                 <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
@@ -1858,6 +1951,10 @@ function Home() {
           }}
           onCommit={commit}
         />
+      )}
+
+      {cloudOpen && (
+        <CloudPanel templates={templates} onClose={() => setCloudOpen(false)} onChangeList={setTemplates} />
       )}
     </main>
   );

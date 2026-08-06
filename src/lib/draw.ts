@@ -16,6 +16,45 @@ import { exemplarDetail, inpaintTelea, resetInpaintCache } from "./inpaint";
  * `hq` (exportação / pausa) roda em resolução total, com inicialização coarse-to-fine
  * e mistura suave nas bordas — sem borrão e sem emenda visível.
  */
+type PatchCache = {
+  sig: Uint8ClampedArray;
+  /** máscara das amostras válidas (fora do buraco) */
+  keep: Uint8Array;
+  patch: HTMLCanvasElement;
+};
+const patchCache = new Map<string, PatchCache>();
+const SIG = 16;
+let sigCanvas: HTMLCanvasElement | null = null;
+
+/** assinatura barata (16x16) do entorno da área — detecta se o fundo mudou */
+function areaSignature(src: CanvasImageSource, sw: number, sh: number) {
+  if (!sigCanvas) sigCanvas = document.createElement("canvas");
+  sigCanvas.width = SIG;
+  sigCanvas.height = SIG;
+  const c = sigCanvas.getContext("2d", { willReadFrequently: true });
+  if (!c) return null;
+  c.clearRect(0, 0, SIG, SIG);
+  c.drawImage(src, 0, 0, sw, sh, 0, 0, SIG, SIG);
+  return c.getImageData(0, 0, SIG, SIG).data;
+}
+
+function sigDiff(a: Uint8ClampedArray, b: Uint8ClampedArray, keep: Uint8Array) {
+  let s = 0;
+  let n = 0;
+  for (let i = 0; i < keep.length; i++) {
+    if (!keep[i]) continue;
+    const p = i * 4;
+    s += Math.abs(a[p]! - b[p]!) + Math.abs(a[p + 1]! - b[p + 1]!) + Math.abs(a[p + 2]! - b[p + 2]!);
+    n += 3;
+  }
+  return n ? s / n : 255;
+}
+
+/** limpa o cache de reconstrução (trocou de vídeo / de regiões) */
+export function resetPatchCache() {
+  patchCache.clear();
+}
+
 function inpaintArea(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -33,6 +72,28 @@ function inpaintArea(
   const sw = Math.min(canvas.width - sx, w + pad * 2);
   const sh = Math.min(canvas.height - sy, h + pad * 2);
   if (sw < 4 || sh < 4) return;
+
+  // Cache: enquanto o fundo em volta da área não muda (marca d'água / barra de legenda
+  // sobre cena estática), a reconstrução anterior é reaproveitada em vez de recalculada.
+  const key = `${Math.round(x)}:${Math.round(y)}:${Math.round(w)}:${Math.round(h)}:${detail.toFixed(2)}:${hq ? 1 : 0}`;
+  const sig = areaSignature(canvas, sw, sh) ?? null;
+  let keep: Uint8Array | null = null;
+  if (sig) {
+    keep = new Uint8Array(SIG * SIG);
+    const kx0 = Math.floor(((x - sx) / sw) * SIG);
+    const kx1 = Math.ceil(((x - sx + w) / sw) * SIG);
+    const ky0 = Math.floor(((y - sy) / sh) * SIG);
+    const ky1 = Math.ceil(((y - sy + h) / sh) * SIG);
+    for (let j = 0; j < SIG; j++)
+      for (let i = 0; i < SIG; i++)
+        keep[j * SIG + i] = i >= kx0 && i < kx1 && j >= ky0 && j < ky1 ? 0 : 1;
+    const hit = patchCache.get(key);
+    if (hit && sigDiff(hit.sig, sig, keep) < 4) {
+      ctx.drawImage(hit.patch, 0, 0, hit.patch.width, hit.patch.height, x, y, w, h);
+      return;
+    }
+  }
+
 
   // preview: buracos grandes resolvem em escala menor (fluidez).
   // alta qualidade: sempre resolução total.
@@ -107,6 +168,12 @@ function inpaintArea(
   const rw = Math.max(1, mx1 - mx0);
   const rh = Math.max(1, my1 - my0);
 
+  const store = (patch: HTMLCanvasElement) => {
+    if (!sig || !keep) return;
+    if (patchCache.size > 24) patchCache.clear();
+    patchCache.set(key, { sig: new Uint8ClampedArray(sig), keep, patch });
+  };
+
   // mistura suave nas bordas para não deixar emenda entre reconstruído e original
   const feather = hq ? Math.max(1.5, Math.min(6, Math.min(w, h) * 0.06)) : 0;
   if (feather > 0.5) {
@@ -123,6 +190,7 @@ function inpaintArea(
       fx.filter = "none";
       fx.globalCompositeOperation = "source-over";
       ctx.drawImage(fc, 0, 0, rw, rh, x, y, w, h);
+      store(fc);
       return;
     }
   }
@@ -132,7 +200,13 @@ function inpaintArea(
   ctx.imageSmoothingEnabled = scale < 1;
   ctx.drawImage(work, mx0, my0, rw, rh, x, y, w, h);
   ctx.imageSmoothingEnabled = smooth;
+  const keepC = document.createElement("canvas");
+  keepC.width = rw;
+  keepC.height = rh;
+  keepC.getContext("2d")?.drawImage(work, mx0, my0, rw, rh, 0, 0, rw, rh);
+  store(keepC);
 }
+
 
 
 
