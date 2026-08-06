@@ -130,3 +130,130 @@ export async function listBatches(): Promise<BatchRow[]> {
   if (error) throw error;
   return (data ?? []) as BatchRow[];
 }
+
+/* ------------------------------------------------------------------ */
+/* Projetos (filas + ajustes) sincronizados por ferramenta             */
+/* ------------------------------------------------------------------ */
+
+export type ProjectItem = {
+  name: string;
+  sourceUrl?: string | null;
+  headline?: string;
+  offsetX?: number;
+  offsetY?: number;
+  clip?: { start: number; end: number } | null;
+  score?: number | null;
+  regions?: unknown;
+  captions?: unknown;
+};
+
+export type ProjectSnapshot = {
+  templateId?: string | null;
+  settings?: Record<string, unknown>;
+  items: ProjectItem[];
+};
+
+export type ProjectRow = {
+  id: string;
+  mode: string;
+  name: string;
+  updated_at: string;
+  data: ProjectSnapshot;
+};
+
+/** Salva (ou atualiza) o projeto de uma ferramenta na conta do usuário. */
+export async function saveProject(mode: string, name: string, snap: ProjectSnapshot) {
+  const user = await currentUser();
+  if (!user) throw new Error("Faça login para salvar o projeto na nuvem.");
+  const { error } = await supabase.from("projects").upsert(
+    {
+      user_id: user.id,
+      mode,
+      name,
+      data: snap as unknown as Json,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id,mode,name" },
+  );
+  if (error) throw error;
+}
+
+export async function listProjects(mode?: string): Promise<ProjectRow[]> {
+  const user = await currentUser();
+  if (!user) return [];
+  let q = supabase.from("projects").select("id,mode,name,updated_at,data").order("updated_at", { ascending: false });
+  if (mode) q = q.eq("mode", mode);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ ...r, data: (r.data ?? { items: [] }) as unknown as ProjectSnapshot }));
+}
+
+export async function deleteProject(id: string) {
+  const { error } = await supabase.from("projects").delete().eq("id", id);
+  if (error) throw error;
+}
+
+/* ------------------------------------------------------------------ */
+/* Histórico de arquivos exportados                                    */
+/* ------------------------------------------------------------------ */
+
+export type ExportLog = {
+  mode: string;
+  fileName: string;
+  sourceName?: string;
+  platform?: string;
+  variant?: string;
+  bytes?: number;
+  seconds?: number;
+};
+
+/** Registra os arquivos gerados (silencioso quando não há login). */
+export async function logExports(list: ExportLog[]) {
+  if (!list.length) return;
+  const user = await currentUser();
+  if (!user) return;
+  await supabase.from("exports").insert(
+    list.map((e) => ({
+      user_id: user.id,
+      mode: e.mode,
+      file_name: e.fileName,
+      source_name: e.sourceName ?? null,
+      platform: e.platform ?? null,
+      variant: e.variant ?? null,
+      bytes: Math.round(e.bytes ?? 0),
+      seconds: e.seconds ?? 0,
+    })),
+  );
+}
+
+export type ExportRow = {
+  id: string;
+  mode: string;
+  file_name: string;
+  source_name: string | null;
+  platform: string | null;
+  variant: string | null;
+  bytes: number;
+  created_at: string;
+};
+
+export async function listExports(limit = 30): Promise<ExportRow[]> {
+  const { data, error } = await supabase
+    .from("exports")
+    .select("id,mode,file_name,source_name,platform,variant,bytes,created_at")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []) as ExportRow[];
+}
+
+/** Sincronização automática dos templates (silenciosa, com debounce). */
+let syncTimer: ReturnType<typeof setTimeout> | null = null;
+export function autoSyncTemplates(list: Template[], delay = 4000) {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    void currentUser().then((u) => {
+      if (u && list.length) void pushTemplates(list).catch(() => undefined);
+    });
+  }, delay);
+}

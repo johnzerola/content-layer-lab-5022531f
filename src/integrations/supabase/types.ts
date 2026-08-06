@@ -53,6 +53,75 @@ export type Database = {
         }
         Relationships: []
       }
+      exports: {
+        Row: {
+          bytes: number
+          created_at: string
+          file_name: string
+          id: string
+          mode: string
+          platform: string | null
+          seconds: number
+          source_name: string | null
+          user_id: string
+          variant: string | null
+        }
+        Insert: {
+          bytes?: number
+          created_at?: string
+          file_name: string
+          id?: string
+          mode: string
+          platform?: string | null
+          seconds?: number
+          source_name?: string | null
+          user_id: string
+          variant?: string | null
+        }
+        Update: {
+          bytes?: number
+          created_at?: string
+          file_name?: string
+          id?: string
+          mode?: string
+          platform?: string | null
+          seconds?: number
+          source_name?: string | null
+          user_id?: string
+          variant?: string | null
+        }
+        Relationships: []
+      }
+      projects: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          mode: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data?: Json
+          id?: string
+          mode: string
+          name?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          mode?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       template_versions: {
         Row: {
           created_at: string

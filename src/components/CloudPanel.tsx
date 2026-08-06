@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LogIn, LogOut, CloudUpload, CloudDownload, X, History } from "lucide-react";
+import { LogIn, LogOut, CloudUpload, CloudDownload, X, History, FolderSync, Trash2, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { lovable } from "@/integrations/lovable/index";
 import {
@@ -11,8 +11,15 @@ import {
   signIn,
   signOut,
   signUp,
+  deleteProject,
+  listExports,
+  listProjects,
+  saveProject,
   type BatchRow,
   type CloudUser,
+  type ExportRow,
+  type ProjectRow,
+  type ProjectSnapshot,
 } from "@/lib/cloud";
 import type { Template } from "@/lib/template";
 
@@ -20,9 +27,15 @@ interface Props {
   templates: Template[];
   onClose: () => void;
   onChangeList: (list: Template[]) => void;
+  /** ferramenta atual (lote, clip, limpar) */
+  mode: string;
+  /** monta o snapshot do projeto atual para salvar na nuvem */
+  buildSnapshot: () => ProjectSnapshot;
+  /** restaura um projeto salvo (rebaixa os vídeos que vieram por link) */
+  onRestore: (snap: ProjectSnapshot) => Promise<void> | void;
 }
 
-export function CloudPanel({ templates, onClose, onChangeList }: Props) {
+export function CloudPanel({ templates, onClose, onChangeList, mode, buildSnapshot, onRestore }: Props) {
   const [user, setUser] = useState<CloudUser | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,6 +43,9 @@ export function CloudPanel({ templates, onClose, onChangeList }: Props) {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [batches, setBatches] = useState<BatchRow[]>([]);
+  const [projects, setProjects] = useState<ProjectRow[]>([]);
+  const [exportsList, setExportsList] = useState<ExportRow[]>([]);
+  const [projName, setProjName] = useState("Projeto 1");
 
   useEffect(() => {
     void currentUser().then(setUser);
@@ -44,7 +60,15 @@ export function CloudPanel({ templates, onClose, onChangeList }: Props) {
     void listBatches()
       .then(setBatches)
       .catch(() => setBatches([]));
+    void listProjects()
+      .then(setProjects)
+      .catch(() => setProjects([]));
+    void listExports(20)
+      .then(setExportsList)
+      .catch(() => setExportsList([]));
   }, [user]);
+
+  const refreshProjects = async () => setProjects(await listProjects().catch(() => []));
 
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -157,6 +181,94 @@ export function CloudPanel({ templates, onClose, onChangeList }: Props) {
               >
                 <CloudDownload className="size-4" /> Baixar templates
               </Button>
+            </div>
+
+
+            <div className="space-y-2 rounded-lg border border-border bg-surface-2 p-3">
+              <p className="mono-label flex items-center gap-1">
+                <FolderSync className="size-3" /> Projetos ({mode})
+              </p>
+              <div className="flex gap-2">
+                <input
+                  value={projName}
+                  onChange={(e) => setProjName(e.target.value)}
+                  placeholder="nome do projeto"
+                  className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary"
+                />
+                <Button
+                  size="sm"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      await saveProject(mode, projName.trim() || "Projeto", buildSnapshot());
+                      await refreshProjects();
+                      setMsg("Projeto salvo na nuvem.");
+                    })
+                  }
+                >
+                  Salvar
+                </Button>
+              </div>
+              {projects.length === 0 ? (
+                <p className="font-mono text-[11px] text-muted-foreground">Nenhum projeto salvo ainda.</p>
+              ) : (
+                <ul className="max-h-40 space-y-1 overflow-auto">
+                  {projects.map((p) => (
+                    <li key={p.id} className="flex items-center justify-between gap-2 rounded-md bg-background px-2 py-1">
+                      <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
+                        [{p.mode}] {p.name} · {p.data?.items?.length ?? 0} vídeo(s) ·{" "}
+                        {new Date(p.updated_at).toLocaleDateString("pt-BR")}
+                      </span>
+                      <span className="flex shrink-0 gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(async () => {
+                              await onRestore(p.data);
+                              setMsg("Projeto restaurado.");
+                            })
+                          }
+                        >
+                          Abrir
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          disabled={busy}
+                          onClick={() =>
+                            void run(async () => {
+                              await deleteProject(p.id);
+                              await refreshProjects();
+                            })
+                          }
+                        >
+                          <Trash2 className="size-3" />
+                        </Button>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="space-y-2 rounded-lg border border-border bg-surface-2 p-3">
+              <p className="mono-label flex items-center gap-1">
+                <FileDown className="size-3" /> Arquivos exportados
+              </p>
+              {exportsList.length === 0 ? (
+                <p className="font-mono text-[11px] text-muted-foreground">Nenhuma exportação registrada.</p>
+              ) : (
+                <ul className="max-h-40 space-y-1 overflow-auto">
+                  {exportsList.map((e) => (
+                    <li key={e.id} className="truncate font-mono text-[10px] text-muted-foreground">
+                      {new Date(e.created_at).toLocaleDateString("pt-BR")} · [{e.mode}] {e.file_name} ·{" "}
+                      {(Number(e.bytes) / 1e6).toFixed(1)} MB
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <div className="space-y-2 rounded-lg border border-border bg-surface-2 p-3">

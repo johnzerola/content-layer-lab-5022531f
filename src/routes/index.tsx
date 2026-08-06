@@ -27,7 +27,7 @@ import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { TemplateEditor } from "@/components/TemplateEditor";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
-import { logBatch } from "@/lib/cloud";
+import { autoSyncTemplates, logBatch, logExports, type ProjectSnapshot } from "@/lib/cloud";
 import { ClipStudio } from "@/components/ClipStudio";
 
 import {
@@ -97,6 +97,8 @@ type Status = "pendente" | "na fila" | "processando" | "pronto" | "erro";
 interface Item {
   id: string;
   file: File;
+  /** link de origem quando o vídeo veio por URL (permite retomar o projeto na nuvem) */
+  sourceUrl?: string | undefined;
   poster: string | null;
   w: number;
   h: number;
@@ -295,6 +297,10 @@ function Home() {
 
 
   useEffect(() => {
+    if (templates.length) autoSyncTemplates(templates);
+  }, [templates]);
+
+  useEffect(() => {
     const list = loadTemplates();
     setTemplates(list);
     if (list[0]) setActive(list[0]);
@@ -302,7 +308,7 @@ function Home() {
   }, []);
 
 
-  const addVideos = useCallback(async (list: File[]) => {
+  const addVideos = useCallback(async (list: File[], meta?: { sourceUrl?: string }) => {
     const vids = list.filter(isVideoFile);
     const ignored = list.length - vids.length;
     if (ignored > 0) toast.warning(`${ignored} arquivo(s) ignorado(s): não são vídeos.`);
@@ -316,6 +322,7 @@ function Home() {
 
       id: crypto.randomUUID(),
       file,
+      ...(meta?.sourceUrl ? { sourceUrl: meta.sourceUrl } : {}),
       poster: null,
       w: 0,
       h: 0,
@@ -427,7 +434,7 @@ function Home() {
       const name = `${base}.${urlExt}`;
       const file = new File([blob], name, { type: blob.type || guessMime(name) });
 
-      await addVideos([file]);
+      await addVideos([file], { sourceUrl: url });
       setLinkMsg(`importado: ${file.name} (${(file.size / 1e6).toFixed(1)} MB)`);
       setLinkUrl("");
     } catch (err) {
@@ -436,6 +443,80 @@ function Home() {
       setLinkBusy(false);
     }
   }, [linkUrl, linkBusy, addVideos]);
+
+
+  /** Snapshot do projeto atual (metadados; o vídeo volta pelo link de origem). */
+  const buildSnapshot = useCallback((): ProjectSnapshot => {
+    const m = modeRef.current;
+    const list = queuesRef.current[m] ?? [];
+    return {
+      templateId: active.id,
+      settings: { platforms, variants, concurrency, bitrate, autoBitrate, smartFrame, capLang },
+      items: list.map((i) => ({
+        name: i.file.name,
+        sourceUrl: i.sourceUrl ?? null,
+        headline: i.headline,
+        offsetX: i.offsetX,
+        offsetY: i.offsetY,
+        clip: i.clip ?? null,
+        score: i.score ?? null,
+        regions: i.regions ?? null,
+        captions: i.captions ?? null,
+      })),
+    };
+  }, [active.id, platforms, variants, concurrency, bitrate, autoBitrate, smartFrame, capLang]);
+
+  /** Restaura um projeto da nuvem: rebaixa os vídeos que vieram por link. */
+  const restoreSnapshot = useCallback(
+    async (snap: ProjectSnapshot) => {
+      const st = snap.settings ?? {};
+      if (Array.isArray(st["platforms"])) setPlatforms(st["platforms"] as string[]);
+      if (typeof st["variants"] === "number") setVariants(st["variants"] as number);
+      if (typeof st["concurrency"] === "number") setConcurrency(st["concurrency"] as number);
+      if (typeof st["bitrate"] === "number") setBitrate(st["bitrate"] as number);
+      if (typeof st["autoBitrate"] === "boolean") setAutoBitrate(st["autoBitrate"] as boolean);
+      if (typeof st["smartFrame"] === "boolean") setSmartFrame(st["smartFrame"] as boolean);
+      if (typeof st["capLang"] === "string") setCapLang(st["capLang"] as string);
+
+      const tpl = templates.find((t) => t.id === snap.templateId);
+      if (tpl) setActive(tpl);
+
+      const linked = (snap.items ?? []).filter((i) => i.sourceUrl);
+      const missing = (snap.items ?? []).length - linked.length;
+      if (missing > 0) {
+        toast.warning(`${missing} vídeo(s) vieram de arquivos locais — reenvie-os manualmente.`);
+      }
+      for (const it of linked) {
+        try {
+          const dl = await fetch(`/api/public/media-proxy?u=${encodeURIComponent(it.sourceUrl!)}`);
+          if (!dl.ok) throw new Error("origem indisponível");
+          const blob = await dl.blob();
+          const file = new File([blob], it.name, { type: blob.type || guessMime(it.name) });
+          await addVideos([file], { sourceUrl: it.sourceUrl! });
+          setItems((prev) =>
+            prev.map((x) =>
+              x.file.name === it.name
+                ? {
+                    ...x,
+                    headline: it.headline ?? x.headline,
+                    offsetX: it.offsetX ?? x.offsetX,
+                    offsetY: it.offsetY ?? x.offsetY,
+                    clip: (it.clip ?? undefined) as Item["clip"],
+                    score: (it.score ?? undefined) as number | undefined,
+                    regions: (it.regions ?? undefined) as Item["regions"],
+                    captions: (it.captions ?? undefined) as Item["captions"],
+                  }
+                : x,
+            ),
+          );
+        } catch {
+          toast.error(`Não consegui rebaixar "${it.name}".`);
+        }
+      }
+      setCloudOpen(false);
+    },
+    [addVideos, setItems, templates],
+  );
 
   /** Clipagem automática: quebra um vídeo longo nos melhores trechos. */
   const autoClip = useCallback(
@@ -873,6 +954,23 @@ function Home() {
         seconds,
         fails: [...failures.current],
       });
+      void logExports(
+        listNow()
+          .filter((i) => i.status === "pronto")
+          .flatMap((i) =>
+            (i.outputs?.length ? i.outputs : i.blob ? [{ blob: i.blob, ext: i.ext ?? "mp4", label: "" }] : []).map(
+              (o) => ({
+                mode: runMode,
+                fileName: `${i.file.name.replace(/\.[^.]+$/, "")}${o.label ? `-${o.label}` : ""}.${o.ext}`,
+                sourceName: i.file.name,
+                platform: platforms.join(","),
+                ...(o.label ? { variant: o.label } : {}),
+                bytes: o.blob.size,
+                seconds: i.duration,
+              }),
+            ),
+          ),
+      ).catch(() => {});
       void logBatch({
         mode: runMode,
         templateName: active.name,
@@ -2136,7 +2234,14 @@ function Home() {
       )}
 
       {cloudOpen && (
-        <CloudPanel templates={templates} onClose={() => setCloudOpen(false)} onChangeList={setTemplates} />
+        <CloudPanel
+          templates={templates}
+          onClose={() => setCloudOpen(false)}
+          onChangeList={setTemplates}
+          mode={mode}
+          buildSnapshot={buildSnapshot}
+          onRestore={restoreSnapshot}
+        />
       )}
     </AppShell>
   );
