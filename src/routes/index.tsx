@@ -588,6 +588,36 @@ function Home() {
     return { start, end: start + effDur };
   }, [previewVariation?.trimStart, previewVariation?.trimEnd, selected?.duration, selected?.clip?.start, selected?.clip?.end]);
 
+  // placa de fundo real (mediana temporal) usada no preview do LimpaVídeo
+  const [previewPlate, setPreviewPlate] = useState<{
+    canvas: HTMLCanvasElement;
+    ok: Set<string>;
+  } | null>(null);
+  const selRegionsKey = JSON.stringify(
+    (selected?.regions ?? []).filter((r) => r.enabled).map((r) => [r.id, r.x, r.y, r.w, r.h, r.mode]),
+  );
+  useEffect(() => {
+    if (mode !== "limpar" || !selected?.file) {
+      setPreviewPlate(null);
+      return;
+    }
+    let alive = true;
+    const regions = (selected.regions ?? []).filter((r) => r.enabled);
+    if (!regions.length) {
+      setPreviewPlate(null);
+      return;
+    }
+    const timer = setTimeout(() => {
+      buildBackgroundPlate(selected.file, regions, { frames: 14 })
+        .then((p) => alive && setPreviewPlate(p))
+        .catch(() => alive && setPreviewPlate(null));
+    }, 350);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+  }, [mode, selected?.id, selRegionsKey]);
+
   const previewDrawOpts = useMemo(
     () =>
       previewVariation
