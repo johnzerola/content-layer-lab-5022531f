@@ -137,7 +137,10 @@ export async function renderVideo(
   template: Template,
   opts: RenderOptions,
 ): Promise<{ blob: Blob; ext: string }> {
+  // cada render começa com o cache de reconstrução limpo (vídeo/regiões diferentes)
+  resetPatchCache();
   if (webCodecsSupported()) {
+
     try {
       const blob = await encodeMp4({
         file,
