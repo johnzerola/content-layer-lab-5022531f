@@ -216,7 +216,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
         ctx,
         tpl,
         { el: video, width: video.videoWidth, height: video.videoHeight },
-        { ...drawOpts, time: srcTime },
+        { ...drawOpts, time: srcTime, quality: "hq" as const },
       );
       const frame = new VideoFrame(canvas, {
         timestamp: frameIndex * frameDur,
