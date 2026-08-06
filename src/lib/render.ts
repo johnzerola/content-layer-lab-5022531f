@@ -157,6 +157,7 @@ export async function renderVideo(
         turbo: opts.turbo ?? 4,
         clip: opts.clip,
         captions: opts.captions,
+        plate: opts.plate,
         onProgress: opts.onProgress,
         signal: opts.signal,
       });
