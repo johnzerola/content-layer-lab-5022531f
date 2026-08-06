@@ -48,7 +48,7 @@ import {
   type CleanupRegion,
   type Template,
 } from "@/lib/template";
-import { detectOverlays } from "@/lib/detect";
+import { detectOverlays, safeZones } from "@/lib/detect";
 import { downloadBlob, grabPoster, outputIsWebm, renderVideo } from "@/lib/render";
 import { webCodecsSupported } from "@/lib/encode";
 import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
@@ -119,6 +119,11 @@ interface Item {
   captions?: CaptionCue[] | undefined;
   capStatus?: string | undefined;
   capError?: boolean | undefined;
+  /** áreas de limpeza detectadas/ajustadas para ESTE vídeo (modo LimpaVídeo) */
+  regions?: CleanupRegion[] | undefined;
+  /** estado da análise automática de legenda/marca d'água */
+  detectStatus?: "analisando" | "ok" | "vazio" | "erro" | undefined;
+  detectMsg?: string | undefined;
 
   error?: string | undefined;
 }
@@ -320,27 +325,72 @@ function Home() {
       status: "pendente",
       progress: 0,
     }));
-    setItems((prev) => [...prev, ...created]);
-    if (!selectedIdsRef.current[modeRef.current] && created[0]) setSelectedId(created[0].id);
+    const runMode = modeRef.current;
+    const setQ = (upd: Item[] | ((prev: Item[]) => Item[])) => setItemsIn(runMode, upd);
+    setQ((prev) => [...prev, ...created]);
+    if (!selectedIdsRef.current[runMode] && created[0]) setSelectedId(created[0].id);
     for (const it of created) {
       try {
         const meta = await grabPoster(it.file);
-        setItems((prev) =>
+        setQ((prev) =>
           prev.map((p) => (p.id === it.id ? { ...p, poster: meta.url, w: meta.w, h: meta.h, duration: meta.duration } : p)),
         );
-        if (smartRef.current) {
+        if (runMode !== "limpar" && smartRef.current) {
           const af = await autoFrame(it.file);
-          setItems((prev) =>
+          setQ((prev) =>
             prev.map((p) =>
               p.id === it.id ? { ...p, offsetX: af.offsetX, offsetY: af.offsetY, autoFrameSource: af.source } : p,
             ),
           );
         }
       } catch {
-        setItems((prev) => prev.map((p) => (p.id === it.id ? { ...p, status: "erro" } : p)));
+        setQ((prev) => prev.map((p) => (p.id === it.id ? { ...p, status: "erro" } : p)));
       }
     }
-  }, []);
+    // LimpaVídeo: analisa cada vídeo automaticamente (2 por vez) e guarda as áreas encontradas
+    if (runMode === "limpar") {
+      const pool = [...created];
+      const worker = async () => {
+        for (;;) {
+          const it = pool.shift();
+          if (!it) return;
+          setQ((prev) => prev.map((p) => (p.id === it.id ? { ...p, detectStatus: "analisando", detectMsg: "analisando quadros…" } : p)));
+          try {
+            const found = await detectOverlays(it.file, {
+              onProgress: (d, t) =>
+                setQ((prev) =>
+                  prev.map((p) => (p.id === it.id ? { ...p, detectMsg: `analisando ${d}/${t}` } : p)),
+                ),
+            });
+            const regions = found.map((f) => makeCleanupRegion(f));
+            setQ((prev) =>
+              prev.map((p) =>
+                p.id === it.id
+                  ? {
+                      ...p,
+                      regions,
+                      detectStatus: regions.length ? "ok" : "vazio",
+                      detectMsg: regions.length
+                        ? `${regions.length} área(s) detectada(s)`
+                        : "nada fixo encontrado",
+                    }
+                  : p,
+              ),
+            );
+          } catch (err) {
+            setQ((prev) =>
+              prev.map((p) =>
+                p.id === it.id
+                  ? { ...p, detectStatus: "erro", detectMsg: String((err as Error)?.message ?? err) }
+                  : p,
+              ),
+            );
+          }
+        }
+      };
+      void Promise.all([worker(), worker()]);
+    }
+  }, [setItemsIn, setSelectedId]);
 
   const addFiles = useCallback(
     (files: FileList | null) => (files ? addVideos(Array.from(files)) : Promise.resolve()),
@@ -666,7 +716,11 @@ function Home() {
             // no modo "limpar" o quadro segue a orientação real do vídeo (sem recorte)
             const tpl =
               runMode === "limpar"
-                ? cleanOnly(active, { w: item.w, h: item.h })
+                ? {
+                    ...cleanOnly(active, { w: item.w, h: item.h }),
+                    // cada vídeo usa as áreas detectadas para ele; sem detecção, usa as do template
+                    cleanup: item.regions?.length ? item.regions : (active.cleanup ?? []),
+                  }
                 : applyRatio(baseTpl, plat.w, plat.h);
             for (let k = 0; k < n; k++) {
               const at = step;
@@ -799,7 +853,7 @@ function Home() {
     if (ids.length) void processAll(ids);
   };
 
-  /** Analisa o vídeo selecionado e sugere as áreas com legenda queimada / marca d'água. */
+  /** Re-analisa o vídeo selecionado e grava as áreas encontradas NELE. */
   const runDetect = async () => {
     const it = itemsRef.current.find((x) => x.id === selectedId);
     if (!it) return;
@@ -812,12 +866,19 @@ function Home() {
         onProgress: (d, t) => setDetectMsg(`analisando quadros ${d}/${t}…`),
       });
       const regions = found.map((f) => makeCleanupRegion(f));
-      setSuggestions(regions);
-      setDetectMsg(
-        regions.length
-          ? `${regions.length} área(s) encontrada(s) — clique para usar`
-          : "nada fixo encontrado neste vídeo — marque manualmente",
+      setItems((p) =>
+        p.map((x) =>
+          x.id === it.id
+            ? { ...x, regions, detectStatus: regions.length ? "ok" : "vazio", detectMsg: undefined }
+            : x,
+        ),
       );
+      if (regions.length) {
+        setDetectMsg(`${regions.length} área(s) aplicada(s) automaticamente`);
+      } else {
+        setSuggestions(safeZones().map((z) => makeCleanupRegion(z)));
+        setDetectMsg("nada fixo encontrado — use as zonas sugeridas ou marque manualmente");
+      }
     } catch (err) {
       setSuggestions([]);
       setDetectMsg(`falha na detecção: ${String((err as Error)?.message ?? err)}`);
@@ -825,6 +886,30 @@ function Home() {
       setDetecting(false);
     }
   };
+
+  /** áreas de limpeza do vídeo selecionado (fallback: as do template) */
+  const cleanupRegions: CleanupRegion[] =
+    mode === "limpar" ? (selected?.regions ?? active.cleanup ?? []) : (active.cleanup ?? []);
+  const setCleanupRegions = (regions: CleanupRegion[]) => {
+    if (mode === "limpar" && selected) {
+      setItems((p) => p.map((x) => (x.id === selected.id ? { ...x, regions } : x)));
+    } else {
+      setActive((t) => ({ ...t, cleanup: regions }));
+    }
+  };
+  const applyRegionsToAll = () => {
+    const regions = cleanupRegions;
+    setItems((p) =>
+      p.map((x) => ({
+        ...x,
+        regions: regions.map((r) => ({ ...r, id: crypto.randomUUID() })),
+        detectStatus: "ok" as const,
+        detectMsg: `${regions.length} área(s) do vídeo modelo`,
+      })),
+    );
+    toast.success(`Áreas aplicadas em ${items.length} vídeo(s).`);
+  };
+
 
   const readyCount = items.filter((i) => i.status === "pronto").length;
   const errorCount = items.filter((i) => i.status === "erro").length;
@@ -896,6 +981,7 @@ function Home() {
     ? {
         ...baseTpl,
         headline: { ...baseTpl.headline, text: selected.headline || baseTpl.headline.text },
+        cleanup: mode === "limpar" ? cleanupRegions : (baseTpl.cleanup ?? []),
         video: {
           ...baseTpl.video,
           offsetX: mode === "limpar" ? 0 : selected.offsetX,
@@ -1149,20 +1235,32 @@ function Home() {
                     </div>
                     <div className="mt-3 border-t border-border pt-3">
                       <CleanupStudio
-                        regions={active.cleanup ?? []}
-                        onChange={(cleanup) => setActive((t) => ({ ...t, cleanup }))}
+                        regions={cleanupRegions}
+                        onChange={setCleanupRegions}
                         poster={selected.poster ?? undefined}
-                        aspect={active.video.w / active.video.h}
+                        aspect={previewTemplate.video.w / previewTemplate.video.h}
                         onDetect={() => void runDetect()}
-                        detecting={detecting}
-                        detectMsg={detectMsg}
+                        detecting={detecting || selected.detectStatus === "analisando"}
+                        detectMsg={
+                          selected.detectStatus === "analisando"
+                            ? (selected.detectMsg ?? "analisando quadros…")
+                            : (detectMsg ?? selected.detectMsg)
+                        }
+                        perVideo={mode === "limpar"}
+                        onApplyAll={mode === "limpar" && items.length > 1 ? applyRegionsToAll : undefined}
+                        onUseSafeZones={() =>
+                          setCleanupRegions([
+                            ...cleanupRegions,
+                            ...safeZones().map((z) => makeCleanupRegion(z)),
+                          ])
+                        }
                         suggestions={suggestions}
                         onUseSuggestion={(r) => {
-                          setActive((t) => ({ ...t, cleanup: [...(t.cleanup ?? []), r] }));
+                          setCleanupRegions([...cleanupRegions, r]);
                           setSuggestions((s) => s.filter((x) => x.id !== r.id));
                         }}
                         onUseAllSuggestions={() => {
-                          setActive((t) => ({ ...t, cleanup: [...(t.cleanup ?? []), ...suggestions] }));
+                          setCleanupRegions([...cleanupRegions, ...suggestions]);
                           setSuggestions([]);
                           setDetectMsg(undefined);
                         }}
@@ -1874,6 +1972,25 @@ function Home() {
                         {it.status === "processando" ? ` ${Math.round(it.progress * 100)}%` : ""}
                         {it.stage && it.status !== "pendente" ? ` · ${it.stage}` : ""}
                       </p>
+                      {mode === "limpar" && it.detectStatus && (
+                        <p
+                          className={`font-mono text-[10px] ${
+                            it.detectStatus === "ok"
+                              ? "text-primary"
+                              : it.detectStatus === "erro"
+                                ? "text-destructive"
+                                : "text-muted-foreground"
+                          }`}
+                        >
+                          {it.detectStatus === "analisando"
+                            ? (it.detectMsg ?? "analisando…")
+                            : it.detectStatus === "ok"
+                              ? `${(it.regions ?? []).length} área(s) detectada(s)`
+                              : it.detectStatus === "vazio"
+                                ? "nada encontrado — marque manual"
+                                : `falha na análise`}
+                        </p>
+                      )}
                       {(it.status === "processando" || it.status === "na fila") && (
                         <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
                           <div

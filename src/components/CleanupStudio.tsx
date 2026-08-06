@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { Eraser, Plus, ScanSearch, Trash2 } from "lucide-react";
+import { CopyCheck, Eraser, Plus, ScanSearch, Trash2 } from "lucide-react";
 import { CLEANUP_PRESETS, makeCleanupRegion, type CleanupRegion } from "@/lib/template";
 
 type Props = {
@@ -13,6 +13,12 @@ type Props = {
   onDetect?: () => void;
   detecting?: boolean;
   detectMsg?: string | undefined;
+  /** true quando as áreas pertencem ao vídeo selecionado (LimpaVídeo) */
+  perVideo?: boolean;
+  /** copia estas áreas para todos os vídeos da fila */
+  onApplyAll?: (() => void) | undefined;
+  /** adiciona as zonas típicas (rodapé de legenda / canto da marca d'água) */
+  onUseSafeZones?: () => void;
   /** áreas encontradas pela detecção, ainda não aplicadas */
   suggestions?: CleanupRegion[];
   onUseSuggestion?: (r: CleanupRegion) => void;
@@ -49,6 +55,9 @@ export function CleanupStudio({
   onDetect,
   detecting,
   detectMsg,
+  perVideo = false,
+  onApplyAll,
+  onUseSafeZones,
   suggestions = [],
   onUseSuggestion,
   onUseAllSuggestions,
@@ -123,8 +132,13 @@ export function CleanupStudio({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="mono-label flex items-center gap-1.5">
           <Eraser className="size-3.5" /> Remover legenda / marca d'água / texto
+          {perVideo && (
+            <span className="rounded bg-primary/15 px-1.5 py-0.5 font-mono text-[9px] text-primary">
+              áreas deste vídeo · {regions.length}
+            </span>
+          )}
         </p>
-        <div className="flex items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           {onDetect && (
             <button
               type="button"
@@ -132,7 +146,25 @@ export function CleanupStudio({
               onClick={onDetect}
               className="flex items-center gap-1 rounded-md border border-primary/50 bg-primary/10 px-2 py-1 font-mono text-[10px] text-primary disabled:opacity-60"
             >
-              <ScanSearch className="size-3" /> {detecting ? "analisando…" : "detectar automático"}
+              <ScanSearch className="size-3" /> {detecting ? "analisando…" : "re-analisar"}
+            </button>
+          )}
+          {onApplyAll && (
+            <button
+              type="button"
+              onClick={onApplyAll}
+              className="flex items-center gap-1 rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:border-primary/60 hover:text-foreground"
+            >
+              <CopyCheck className="size-3" /> aplicar em todos
+            </button>
+          )}
+          {onUseSafeZones && (
+            <button
+              type="button"
+              onClick={onUseSafeZones}
+              className="flex items-center gap-1 rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:border-primary/60 hover:text-foreground"
+            >
+              zonas típicas
             </button>
           )}
           <button
@@ -148,6 +180,14 @@ export function CleanupStudio({
           </button>
         </div>
       </div>
+
+      {perVideo && (
+        <p className="font-mono text-[10px] text-muted-foreground">
+          a análise roda sozinha ao importar: cada vídeo recebe suas próprias áreas e elas já entram no
+          processamento em lote.
+        </p>
+      )}
+
 
       {(detectMsg || suggestions.length > 0) && (
         <div className="rounded-lg border border-warn/50 bg-warn/10 p-2">
