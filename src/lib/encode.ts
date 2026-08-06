@@ -20,6 +20,8 @@ export interface EncodeOptions {
   clip?: { start: number; end: number } | undefined;
   /** legendas em tempo do vídeo fonte */
   captions?: CaptionCue[] | undefined;
+  /** placa de fundo (mediana temporal) para remover overlays com pixels reais */
+  plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null | undefined;
   onProgress?: ((p: number) => void) | undefined;
   signal?: AbortSignal | undefined;
 }
