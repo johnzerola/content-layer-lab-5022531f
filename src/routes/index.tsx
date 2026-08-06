@@ -605,7 +605,11 @@ function Home() {
 
           for (const plat of outs) {
             // cada plataforma recebe a resolução/fps/bitrate recomendados
-            const tpl = applyRatio(baseTpl, plat.w, plat.h);
+            // no modo "limpar" o quadro segue a orientação real do vídeo (sem recorte)
+            const tpl =
+              modeRef.current === "limpar"
+                ? cleanOnly(active, { w: item.w, h: item.h })
+                : applyRatio(baseTpl, plat.w, plat.h);
             for (let k = 0; k < n; k++) {
               const at = step;
               const { blob, ext } = await renderVideo(item.file, tpl, {
