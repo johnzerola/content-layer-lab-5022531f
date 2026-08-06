@@ -52,8 +52,8 @@ export interface VideoLayer extends BoxLayer {
   radius: number;
   offsetX: number;
   offsetY: number;
-  /** "cover" (padrão) recorta pra preencher; "contain" mostra o vídeo inteiro sem zoom. */
-  fit?: "cover" | "contain";
+  /** "cover" recorta pra preencher · "contain" mostra inteiro · "auto" decide pela orientação da fonte. */
+  fit?: "cover" | "contain" | "auto";
 }
 
 export type ExtraLayer = (TextLayer | ImageLayer) & { id: string; label: string };
