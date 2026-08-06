@@ -14,7 +14,110 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      batches: {
+        Row: {
+          created_at: string
+          failed: number
+          id: string
+          mode: string
+          ok: number
+          platforms: string[]
+          seconds: number
+          template_name: string | null
+          user_id: string
+          videos: number
+        }
+        Insert: {
+          created_at?: string
+          failed?: number
+          id?: string
+          mode?: string
+          ok?: number
+          platforms?: string[]
+          seconds?: number
+          template_name?: string | null
+          user_id: string
+          videos?: number
+        }
+        Update: {
+          created_at?: string
+          failed?: number
+          id?: string
+          mode?: string
+          ok?: number
+          platforms?: string[]
+          seconds?: number
+          template_name?: string | null
+          user_id?: string
+          videos?: number
+        }
+        Relationships: []
+      }
+      template_versions: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          label: string
+          template_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          label?: string
+          template_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          label?: string
+          template_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      templates: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          local_id: string | null
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          local_id?: string | null
+          name?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          local_id?: string | null
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
