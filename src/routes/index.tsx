@@ -794,6 +794,14 @@ function Home() {
 
   const readyCount = items.filter((i) => i.status === "pronto").length;
   const errorCount = items.filter((i) => i.status === "erro").length;
+  // progresso global do lote: soma do progresso de cada arquivo em andamento/concluído
+  const batchItems = items.filter((i) => i.status !== "pendente");
+  const batchDone = batchItems.filter((i) => i.status === "pronto" || i.status === "erro").length;
+  const batchProgress = batchItems.length
+    ? batchItems.reduce((a, i) => a + (i.status === "pronto" || i.status === "erro" ? 1 : i.progress), 0) /
+      batchItems.length
+    : 0;
+  const activeItem = items.find((i) => i.status === "processando");
   const pendingCount = items.filter((i) => i.status !== "pronto").length;
 
   const eta = (() => {
