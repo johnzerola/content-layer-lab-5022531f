@@ -99,7 +99,7 @@ export const FLOWS: Record<Mode, Flow> = {
     import: {
       step: "02",
       title: "Importe os vídeos para limpar",
-      hint: "arquivos ou pasta · a limpeza preserva a resolução e a proporção originais",
+      hint: "arquivos ou pasta · a análise de legenda e marca d'água começa sozinha ao importar",
       folder: true,
       link: false,
       linkPlaceholder: "",
