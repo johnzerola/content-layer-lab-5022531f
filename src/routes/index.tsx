@@ -585,7 +585,7 @@ function Home() {
     setReport(null);
 
 
-    const pending = items
+    const pending = listNow()
       .filter((i) => (onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto"))
       .map((i) => i.id);
     const queue = [...pending];
@@ -769,7 +769,7 @@ function Home() {
         mode: runMode,
         templateName: active.name,
         platforms,
-        videos: items.length,
+        videos: listNow().length,
         ok: doneCount.current,
         failed: failures.current.length,
         seconds,
@@ -1411,10 +1411,10 @@ function Home() {
 
 
 
-                {/* presets de entrega por plataforma (MP4 H.264) */}
+                {/* entrega — cada ferramenta tem a sua própria saída */}
                 <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="mono-label">Exportar MP4 H.264 para</p>
+                    <p className="mono-label">{flow.export.title}</p>
                     <span className="font-mono text-[10px] text-muted-foreground">
                       {platforms.length} formato{platforms.length > 1 ? "s" : ""} × {Math.max(1, variants)} variação
                       {variants > 1 ? "ões" : ""} = {platforms.length * Math.max(1, variants)} arquivos por vídeo
