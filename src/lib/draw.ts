@@ -540,7 +540,11 @@ function drawVideoLayer(
     // a rotação exige um leve zoom extra pra não aparecer canto vazio
     const rotPad = rot ? 1 + Math.abs(rot) / 40 : 1;
     const zoom = (opts?.zoom ?? 1) * rotPad;
-    const scale = Math.max(v.w / source.width, v.h / source.height) * zoom;
+    const fitScale =
+      v.fit === "contain"
+        ? Math.min(v.w / source.width, v.h / source.height)
+        : Math.max(v.w / source.width, v.h / source.height);
+    const scale = fitScale * zoom;
     const dw = source.width * scale;
     const dh = source.height * scale;
     const ox = (opts?.offsetX ?? v.offsetX) * (dw - v.w) * 0.5;
