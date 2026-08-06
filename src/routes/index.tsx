@@ -557,7 +557,7 @@ function Home() {
       .filter((i) => (onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto"))
       .map((i) => i.id);
     const queue = [...pending];
-    setItems((p) => p.map((x) => (queue.includes(x.id) ? { ...x, status: "na fila", progress: 0 } : x)));
+    setItems((p) => p.map((x) => (queue.includes(x.id) ? { ...x, status: "na fila", progress: 0, stage: "na fila", stepIndex: 0, stepTotal: 0 } : x)));
 
     const worker = async () => {
       while (queue.length) {
@@ -569,7 +569,7 @@ function Home() {
         if (!item) continue;
         const ac = new AbortController();
         ctrl.aborts.set(id, ac);
-        setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)));
+        setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0, stage: "preparando", stepIndex: 0, stepTotal: 0 } : x)));
         const runItem = async () => {
 
           const n = Math.max(1, variants);
@@ -592,14 +592,18 @@ function Home() {
             const run = capChain.current.then(async () => {
               if (ctrl.cancelled || ac.signal.aborted) return undefined;
               setItems((p) =>
-                p.map((x) => (x.id === id ? { ...x, capStatus: "transcrevendo…", capError: false } : x)),
+                p.map((x) => (x.id === id ? { ...x, capStatus: "transcrevendo…", capError: false, stage: "transcrevendo áudio" } : x)),
               );
               return generateCaptions(item.file, {
                 clip: item.clip,
                 language: capLang || undefined,
                 onProgress: ({ done, total: t }) =>
                   setItems((p) =>
-                    p.map((x) => (x.id === id ? { ...x, capStatus: `transcrevendo ${done}/${t}` } : x)),
+                    p.map((x) =>
+                      x.id === id
+                        ? { ...x, capStatus: `transcrevendo ${done}/${t}`, stage: `transcrevendo ${done}/${t}` }
+                        : x,
+                    ),
                   ),
               });
             });
@@ -632,6 +636,12 @@ function Home() {
                 : applyRatio(baseTpl, plat.w, plat.h);
             for (let k = 0; k < n; k++) {
               const at = step;
+              const stageLabel = `render ${at + 1}/${total}${outs.length > 1 ? ` · ${plat.short}` : ""}${n > 1 ? ` · v${k + 1}` : ""}`;
+              setItems((prev) =>
+                prev.map((x) =>
+                  x.id === id ? { ...x, stage: stageLabel, stepIndex: at + 1, stepTotal: total } : x,
+                ),
+              );
               const { blob, ext } = await renderVideo(item.file, tpl, {
                 variation: variationOf(item, k),
                 offsetX: item.offsetX,
@@ -660,7 +670,15 @@ function Home() {
           setItems((p) =>
             p.map((x) =>
               x.id === id
-                ? { ...x, status: "pronto", blob: first.blob, ext: first.ext, outputs, progress: 1 }
+                ? {
+                    ...x,
+                    status: "pronto",
+                    blob: first.blob,
+                    ext: first.ext,
+                    outputs,
+                    progress: 1,
+                    stage: `${outputs.length} arquivo(s) prontos`,
+                  }
                 : x,
             ),
           );
@@ -679,7 +697,7 @@ function Home() {
               const aborted = (err as Error)?.name === "AbortError" || ctrl.cancelled;
               if (aborted || attempt === 2) break;
               setItems((p) =>
-                p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0 } : x)),
+                p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0, stage: "nova tentativa…" } : x)),
               );
               await new Promise((r) => setTimeout(r, 500));
             }
