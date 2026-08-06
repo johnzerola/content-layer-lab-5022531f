@@ -64,6 +64,8 @@ import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { canBrowserDecode, guessMime, isVideoFile, VIDEO_ACCEPT, VIDEO_EXT_RE } from "@/lib/media";
 import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
+import { ImportPanel } from "@/components/ImportPanel";
+import { FLOWS, outputName, zipName, type Mode } from "@/lib/flows";
 import { Toaster } from "@/components/ui/sonner";
 
 
@@ -180,7 +182,7 @@ function cleanOnly(t: Template, src?: { w: number; h: number }): Template {
 }
 
 function Home() {
-  const [mode, setMode] = useState<"lote" | "clip" | "limpar">("lote");
+  const [mode, setMode] = useState<Mode>("lote");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
   const [editing, setEditing] = useState(false);
@@ -190,8 +192,36 @@ function Home() {
   const [webmWarn, setWebmWarn] = useState(false);
   useEffect(() => setWebmWarn(outputIsWebm()), []);
 
-  const [items, setItems] = useState<Item[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // filas totalmente separadas por ferramenta
+  const [queues, setQueues] = useState<Record<Mode, Item[]>>({ lote: [], clip: [], limpar: [] });
+  const [selectedIds, setSelectedIds] = useState<Record<Mode, string | null>>({
+    lote: null,
+    clip: null,
+    limpar: null,
+  });
+  const queuesRef = useRef(queues);
+  queuesRef.current = queues;
+  const selectedIdsRef = useRef(selectedIds);
+  selectedIdsRef.current = selectedIds;
+  const setItemsIn = useCallback(
+    (m: Mode, upd: Item[] | ((prev: Item[]) => Item[])) =>
+      setQueues((q) => ({ ...q, [m]: typeof upd === "function" ? upd(q[m] ?? []) : upd })),
+    [],
+  );
+  const modeRef = useRef<Mode>(mode);
+  modeRef.current = mode;
+  const items = queues[mode] ?? [];
+  const selectedId = selectedIds[mode] ?? null;
+  const setItems = useCallback(
+    (upd: Item[] | ((prev: Item[]) => Item[])) => setItemsIn(modeRef.current, upd),
+    [setItemsIn],
+  );
+  const setSelectedId = useCallback(
+    (id: string | null) => setSelectedIds((s) => ({ ...s, [modeRef.current]: id })),
+    [],
+  );
+
+
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [zipping, setZipping] = useState(false);
@@ -243,8 +273,6 @@ function Home() {
   } | null>(null);
 
   const smartRef = useRef(smartFrame);
-  const modeRef = useRef(mode);
-  modeRef.current = mode;
 
   itemsRef.current = items;
   smartRef.current = smartFrame;
@@ -293,7 +321,7 @@ function Home() {
       progress: 0,
     }));
     setItems((prev) => [...prev, ...created]);
-    setSelectedId((cur) => cur ?? created[0]?.id ?? null);
+    if (!selectedIdsRef.current[modeRef.current] && created[0]) setSelectedId(created[0].id);
     for (const it of created) {
       try {
         const meta = await grabPoster(it.file);
@@ -541,6 +569,11 @@ function Home() {
 
 
   const processAll = async (onlyIds?: string[]) => {
+    // a fila roda presa à ferramenta em que foi disparada
+    const runMode = modeRef.current;
+    const runFlow = FLOWS[runMode].export;
+    const setItems = (upd: Item[] | ((prev: Item[]) => Item[])) => setItemsIn(runMode, upd);
+    const listNow = () => queuesRef.current[runMode] ?? [];
     const ctrl = ctrlRef.current;
     ctrl.paused = false;
     ctrl.cancelled = false;
@@ -552,7 +585,7 @@ function Home() {
     setReport(null);
 
 
-    const pending = items
+    const pending = listNow()
       .filter((i) => (onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto"))
       .map((i) => i.id);
     const queue = [...pending];
@@ -564,23 +597,25 @@ function Home() {
         if (ctrl.cancelled) return;
         const id = queue.shift();
         if (!id) return;
-        const item = itemsRef.current.find((x) => x.id === id);
+        const item = listNow().find((x) => x.id === id);
         if (!item) continue;
         const ac = new AbortController();
         ctrl.aborts.set(id, ac);
         setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0, stage: "preparando", stepIndex: 0, stepTotal: 0 } : x)));
         const runItem = async () => {
 
-          const n = Math.max(1, variants);
-          const targets = PLATFORM_PRESETS.filter((p) => platforms.includes(p.id));
+          const n = runFlow.variants ? Math.max(1, variants) : 1;
+          const targets = runFlow.platforms
+            ? PLATFORM_PRESETS.filter((p) => platforms.includes(p.id))
+            : [];
           const outs = targets.length ? targets : [PLATFORM_PRESETS[0]!];
           const total = n * outs.length;
           const outputs: { blob: Blob; ext: string; label: string }[] = [];
           let step = 0;
           const baseTpl =
-            modeRef.current === "clip"
+            runMode === "clip"
               ? stripBranding(active)
-              : modeRef.current === "limpar"
+              : runMode === "limpar"
                 ? cleanOnly(active)
                 : active;
 
@@ -630,7 +665,7 @@ function Home() {
             // cada plataforma recebe a resolução/fps/bitrate recomendados
             // no modo "limpar" o quadro segue a orientação real do vídeo (sem recorte)
             const tpl =
-              modeRef.current === "limpar"
+              runMode === "limpar"
                 ? cleanOnly(active, { w: item.w, h: item.h })
                 : applyRatio(baseTpl, plat.w, plat.h);
             for (let k = 0; k < n; k++) {
@@ -705,7 +740,7 @@ function Home() {
         } catch (err) {
           const aborted = (err as Error)?.name === "AbortError";
           const msg = String((err as Error)?.message ?? err);
-          if (!aborted) failures.current.push({ name: itemsRef.current.find((x) => x.id === id)?.file.name ?? id, error: msg });
+          if (!aborted) failures.current.push({ name: listNow().find((x) => x.id === id)?.file.name ?? id, error: msg });
           setItems((p) =>
             p.map((x) =>
               x.id === id
@@ -731,10 +766,10 @@ function Home() {
         fails: [...failures.current],
       });
       void logBatch({
-        mode,
+        mode: runMode,
         templateName: active.name,
         platforms,
-        videos: items.length,
+        videos: listNow().length,
         ok: doneCount.current,
         failed: failures.current.length,
         seconds,
@@ -811,29 +846,32 @@ function Home() {
     return s > 90 ? `${Math.round(s / 60)} min` : `${s}s`;
   })();
 
+  const flow = FLOWS[mode];
+
   const outFiles = () => {
-    const base = (mode === "clip" ? "corte" : mode === "limpar" ? "limpo" : active.name)
-      .replace(/\s+/g, "-")
-      .toLowerCase();
     const files: { name: string; blob: Blob }[] = [];
     items.forEach((i, idx) => {
       const outs = i.outputs ?? (i.blob ? [{ blob: i.blob, ext: i.ext ?? "mp4", label: "" }] : []);
       outs.forEach((o) => {
-        const suffix = o.label ? `-${o.label}` : "";
-        files.push({ name: `${base}-${String(idx + 1).padStart(3, "0")}${suffix}.${o.ext}`, blob: o.blob });
+        files.push({
+          name: outputName(mode, {
+            index: idx,
+            sourceName: i.file.name,
+            templateName: active.name,
+            label: o.label,
+            ext: o.ext,
+          }),
+          blob: o.blob,
+        });
       });
     });
     return files;
   };
 
-
   const downloadZipAll = async () => {
     setZipping(true);
     try {
-      await downloadAsZip(
-        outFiles(),
-        `${(mode === "clip" ? "cortes" : mode === "limpar" ? "limpos" : active.name).replace(/\s+/g, "-").toLowerCase()}.zip`,
-      );
+      await downloadAsZip(outFiles(), zipName(mode, active.name));
     } finally {
       setZipping(false);
     }
@@ -871,6 +909,7 @@ function Home() {
       mode={mode}
       onMode={setMode}
       count={items.length}
+      counts={{ lote: queues.lote.length, clip: queues.clip.length, limpar: queues.limpar.length }}
       onLibrary={() => setLibraryOpen(true)}
       onCloud={() => setCloudOpen(true)}
     >
@@ -1004,76 +1043,17 @@ function Home() {
         )}
 
 
-        <section
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={(e) => {
-            e.preventDefault();
-            void addFiles(e.dataTransfer.files);
-          }}
-          className="panel border-dashed p-10 text-center"
-        >
-          <div className="mx-auto grid size-12 place-items-center rounded-xl bg-accent">
-            <Upload className="size-5 text-primary" />
-          </div>
-          <p className="mt-4 text-lg font-semibold">
-            <span className="step-num mr-2">02</span>Solta os vídeos aqui
-          </p>
-          <p className="mt-1 font-mono text-xs text-muted-foreground">
-            clique ou arraste · mp4 · mov · webm · vários de uma vez
-          </p>
-          <div className="mt-5 flex justify-center gap-2">
-            <Button variant="outline" onClick={() => inputRef.current?.click()}>
-              Selecionar arquivos
-            </Button>
-            <Button variant="outline" onClick={() => folderRef.current?.click()}>
-              Selecionar pasta
-            </Button>
-          </div>
-          <input ref={inputRef} type="file" accept={VIDEO_ACCEPT} multiple hidden onChange={(e) => void addFiles(e.target.files)} />
-          <input
-            ref={folderRef}
-            type="file"
-            multiple
-            hidden
-            // @ts-expect-error atributo não tipado
-            webkitdirectory=""
-            onChange={(e) => void addFiles(e.target.files)}
-          />
-
-          <div className="mx-auto mt-6 max-w-xl border-t border-border pt-5">
-            <p className="mono-label">ou cole o link do vídeo</p>
-            <div className="mt-2 flex gap-2">
-              <input
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && void importFromLink()}
-                placeholder="https://... TikTok, X, Reddit, Vimeo, Streamable ou arquivo direto"
-                className="flex-1 rounded-lg border border-border bg-surface-2 px-3 py-2 font-mono text-xs outline-none focus:border-primary"
-              />
-              <Button onClick={() => void importFromLink()} disabled={linkBusy || !linkUrl.trim()}>
-                <LinkIcon className="mr-1 size-4" />
-                {linkBusy ? "baixando..." : "Importar"}
-              </Button>
-            </div>
-            <p className="mt-2 font-mono text-[10px] leading-relaxed text-muted-foreground">
-              importação automática: tiktok · x/twitter · reddit · vimeo · streamable · links diretos de arquivo.
-              youtube / instagram / facebook exigem um serviço de resolução próprio (COBALT_API_URL).
-            </p>
-            {linkMsg && <p className="mt-2 font-mono text-[11px] text-muted-foreground">{linkMsg}</p>}
-            {linkBlocked && (
-              <div className="mx-auto mt-3 max-w-xl rounded-lg border border-border bg-muted/30 p-3 text-left">
-                <p className="font-mono text-[11px] uppercase tracking-wider text-primary">como importar mesmo assim</p>
-                <ol className="mt-2 space-y-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
-                  <li>1. baixe o vídeo pelo próprio app (Instagram/YouTube: salvar em vídeos) ou por um downloader</li>
-                  <li>2. arraste o arquivo aqui em cima, ou use "Selecionar arquivos"</li>
-                  <li>3. links diretos de arquivo (.mp4, .mov, .webm, .mkv, .m4v...) importam normalmente</li>
-                  <li>4. para automatizar youtube/instagram, hospede uma instância cobalt e me peça para ligar a chave</li>
-                </ol>
-              </div>
-            )}
-
-          </div>
-        </section>
+        <ImportPanel
+          mode={mode}
+          count={items.length}
+          onFiles={(f) => void addFiles(f)}
+          linkUrl={linkUrl}
+          onLinkUrl={setLinkUrl}
+          linkBusy={linkBusy}
+          linkMsg={linkMsg}
+          linkBlocked={linkBlocked}
+          onImportLink={() => void importFromLink()}
+        />
 
         {mode === "clip" && items.length > 0 && (
           <ClipStudio
@@ -1432,16 +1412,17 @@ function Home() {
 
 
 
-                {/* presets de entrega por plataforma (MP4 H.264) */}
+                {/* entrega — cada ferramenta tem a sua própria saída */}
                 <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="mono-label">Exportar MP4 H.264 para</p>
+                    <p className="mono-label">{flow.export.title}</p>
                     <span className="font-mono text-[10px] text-muted-foreground">
-                      {platforms.length} formato{platforms.length > 1 ? "s" : ""} × {Math.max(1, variants)} variação
-                      {variants > 1 ? "ões" : ""} = {platforms.length * Math.max(1, variants)} arquivos por vídeo
+                      {flow.export.platforms
+                        ? `${platforms.length} formato${platforms.length > 1 ? "s" : ""} × ${Math.max(1, flow.export.variants ? variants : 1)} variação${flow.export.variants && variants > 1 ? "ões" : ""} = ${platforms.length * Math.max(1, flow.export.variants ? variants : 1)} arquivos por vídeo`
+                        : "1 arquivo por vídeo · resolução e proporção originais"}
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className={`flex-wrap gap-2 ${flow.export.platforms ? "flex" : "hidden"}`}>
                     {PLATFORM_PRESETS.map((p) => {
                       const on = platforms.includes(p.id);
                       return (
@@ -1504,7 +1485,7 @@ function Home() {
                     {autoBitrate ? "auto (preset)" : `${bitrate} Mbps`}
 
                   </label>
-                  <label className="flex items-center gap-2">
+                  <label className={`items-center gap-2 ${flow.export.variants ? "flex" : "hidden"}`}>
                     variações
                     <input
                       type="range"
