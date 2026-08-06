@@ -27,7 +27,7 @@ import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { TemplateEditor } from "@/components/TemplateEditor";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
-import { logBatch } from "@/lib/cloud";
+import { autoSyncTemplates, logBatch, logExports, type ProjectSnapshot } from "@/lib/cloud";
 import { ClipStudio } from "@/components/ClipStudio";
 
 import {
@@ -97,6 +97,8 @@ type Status = "pendente" | "na fila" | "processando" | "pronto" | "erro";
 interface Item {
   id: string;
   file: File;
+  /** link de origem quando o vídeo veio por URL (permite retomar o projeto na nuvem) */
+  sourceUrl?: string | undefined;
   poster: string | null;
   w: number;
   h: number;
@@ -295,6 +297,10 @@ function Home() {
 
 
   useEffect(() => {
+    if (templates.length) autoSyncTemplates(templates);
+  }, [templates]);
+
+  useEffect(() => {
     const list = loadTemplates();
     setTemplates(list);
     if (list[0]) setActive(list[0]);
@@ -302,7 +308,7 @@ function Home() {
   }, []);
 
 
-  const addVideos = useCallback(async (list: File[]) => {
+  const addVideos = useCallback(async (list: File[], meta?: { sourceUrl?: string }) => {
     const vids = list.filter(isVideoFile);
     const ignored = list.length - vids.length;
     if (ignored > 0) toast.warning(`${ignored} arquivo(s) ignorado(s): não são vídeos.`);
@@ -316,6 +322,7 @@ function Home() {
 
       id: crypto.randomUUID(),
       file,
+      ...(meta?.sourceUrl ? { sourceUrl: meta.sourceUrl } : {}),
       poster: null,
       w: 0,
       h: 0,
@@ -427,7 +434,7 @@ function Home() {
       const name = `${base}.${urlExt}`;
       const file = new File([blob], name, { type: blob.type || guessMime(name) });
 
-      await addVideos([file]);
+      await addVideos([file], { sourceUrl: url });
       setLinkMsg(`importado: ${file.name} (${(file.size / 1e6).toFixed(1)} MB)`);
       setLinkUrl("");
     } catch (err) {
@@ -873,6 +880,23 @@ function Home() {
         seconds,
         fails: [...failures.current],
       });
+      void logExports(
+        listNow()
+          .filter((i) => i.status === "pronto")
+          .flatMap((i) =>
+            (i.outputs?.length ? i.outputs : i.blob ? [{ blob: i.blob, ext: i.ext ?? "mp4", label: "" }] : []).map(
+              (o) => ({
+                mode: runMode,
+                fileName: `${i.file.name.replace(/\.[^.]+$/, "")}${o.label ? `-${o.label}` : ""}.${o.ext}`,
+                sourceName: i.file.name,
+                platform: platforms.join(","),
+                ...(o.label ? { variant: o.label } : {}),
+                bytes: o.blob.size,
+                seconds: i.duration,
+              }),
+            ),
+          ),
+      ).catch(() => {});
       void logBatch({
         mode: runMode,
         templateName: active.name,
