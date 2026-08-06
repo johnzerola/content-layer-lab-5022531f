@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Copy, Download, History, RotateCcw, Trash2, Upload, X, Check } from "lucide-react";
+import { Copy, Download, History, RotateCcw, Trash2, Upload, X, Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { STARTER_PRESETS } from "@/lib/presets";
 import {
   deleteTemplate,
   duplicateTemplate,
