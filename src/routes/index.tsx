@@ -716,7 +716,11 @@ function Home() {
             // no modo "limpar" o quadro segue a orientação real do vídeo (sem recorte)
             const tpl =
               runMode === "limpar"
-                ? cleanOnly(active, { w: item.w, h: item.h })
+                ? {
+                    ...cleanOnly(active, { w: item.w, h: item.h }),
+                    // cada vídeo usa as áreas detectadas para ele; sem detecção, usa as do template
+                    cleanup: item.regions?.length ? item.regions : (active.cleanup ?? []),
+                  }
                 : applyRatio(baseTpl, plat.w, plat.h);
             for (let k = 0; k < n; k++) {
               const at = step;
