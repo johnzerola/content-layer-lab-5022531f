@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
+import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { TemplateEditor } from "@/components/TemplateEditor";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { ClipStudio } from "@/components/ClipStudio";
@@ -1140,9 +1141,10 @@ function Home() {
                       </div>
                     </div>
                     {compare ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <p className="font-mono text-[10px] text-muted-foreground">original</p>
+                      <BeforeAfterSlider
+                        beforeLabel="original"
+                        afterLabel={`limpo${variants > 1 ? ` · v${variantIdx + 1}` : ""}`}
+                        before={
                           <TemplateCanvas
                             template={{ ...previewTemplate, cleanup: [] }}
                             interactive={false}
@@ -1153,11 +1155,8 @@ function Home() {
                             loopStart={previewLoop.start}
                             loopEnd={previewLoop.end}
                           />
-                        </div>
-                        <div className="space-y-1">
-                          <p className="font-mono text-[10px] text-primary">
-                            limpo{variants > 1 ? ` · v${variantIdx + 1}` : ""}
-                          </p>
+                        }
+                        after={
                           <TemplateCanvas
                             template={previewTemplate}
                             interactive={false}
@@ -1168,9 +1167,10 @@ function Home() {
                             loopStart={previewLoop.start}
                             loopEnd={previewLoop.end}
                           />
-                        </div>
-                      </div>
+                        }
+                      />
                     ) : (
+
                       <TemplateCanvas
                         template={previewTemplate}
                         interactive={false}
