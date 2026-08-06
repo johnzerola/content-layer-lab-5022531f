@@ -839,29 +839,32 @@ function Home() {
     return s > 90 ? `${Math.round(s / 60)} min` : `${s}s`;
   })();
 
+  const flow = FLOWS[mode];
+
   const outFiles = () => {
-    const base = (mode === "clip" ? "corte" : mode === "limpar" ? "limpo" : active.name)
-      .replace(/\s+/g, "-")
-      .toLowerCase();
     const files: { name: string; blob: Blob }[] = [];
     items.forEach((i, idx) => {
       const outs = i.outputs ?? (i.blob ? [{ blob: i.blob, ext: i.ext ?? "mp4", label: "" }] : []);
       outs.forEach((o) => {
-        const suffix = o.label ? `-${o.label}` : "";
-        files.push({ name: `${base}-${String(idx + 1).padStart(3, "0")}${suffix}.${o.ext}`, blob: o.blob });
+        files.push({
+          name: outputName(mode, {
+            index: idx,
+            sourceName: i.file.name,
+            templateName: active.name,
+            label: o.label,
+            ext: o.ext,
+          }),
+          blob: o.blob,
+        });
       });
     });
     return files;
   };
 
-
   const downloadZipAll = async () => {
     setZipping(true);
     try {
-      await downloadAsZip(
-        outFiles(),
-        `${(mode === "clip" ? "cortes" : mode === "limpar" ? "limpos" : active.name).replace(/\s+/g, "-").toLowerCase()}.zip`,
-      );
+      await downloadAsZip(outFiles(), zipName(mode, active.name));
     } finally {
       setZipping(false);
     }
