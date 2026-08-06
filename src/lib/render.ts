@@ -14,6 +14,8 @@ export interface RenderOptions {
   turbo?: number | undefined;
   clip?: { start: number; end: number } | undefined;
   captions?: CaptionCue[] | undefined;
+  /** placa de fundo (mediana temporal) para reconstruir áreas limpas */
+  plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null | undefined;
   onProgress?: ((p: number) => void) | undefined;
   signal?: AbortSignal | undefined;
 }
