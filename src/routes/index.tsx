@@ -935,6 +935,10 @@ function Home() {
             <Button variant="outline" onClick={() => setLibraryOpen(true)}>
               <Library className="size-4" /> Biblioteca
             </Button>
+            <Button variant="outline" onClick={() => setCloudOpen(true)}>
+              <Cloud className="size-4" /> Nuvem
+            </Button>
+
             <Button variant="outline" onClick={() => commit(active, "salvo manualmente")}>
               <Save className="size-4" /> Salvar versão
             </Button>
