@@ -702,13 +702,24 @@ function Home() {
     await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
     setRunning(false);
     if (!ctrl.cancelled) {
+      const seconds = Math.max(1, Math.round((performance.now() - startedAt.current) / 1000));
       setReport({
         ok: doneCount.current,
         fail: failures.current.length,
-        seconds: Math.max(1, Math.round((performance.now() - startedAt.current) / 1000)),
+        seconds,
         fails: [...failures.current],
       });
+      void logBatch({
+        mode,
+        templateName: active.name,
+        platforms,
+        videos: items.length,
+        ok: doneCount.current,
+        failed: failures.current.length,
+        seconds,
+      }).catch(() => {});
     }
+
   };
 
 
