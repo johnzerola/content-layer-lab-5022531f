@@ -678,14 +678,28 @@ function getScratch(w: number, h: number) {
   return scratch;
 }
 
+/** o overlay está presente neste instante? (janelas detectadas) */
+export function regionActiveAt(r: CleanupRegion, time?: number) {
+  const ranges = r.timeRanges;
+  if (!ranges?.length || time === undefined) return true;
+  return ranges.some((t) => time >= t.start && time <= t.end);
+}
+
 /** Remove legenda queimada / marca d'água / texto do vídeo original dentro das máscaras. */
 export function applyCleanup(
   ctx: CanvasRenderingContext2D,
   v: { x: number; y: number; w: number; h: number; radius: number },
   regions?: CleanupRegion[],
   hq = false,
+  extra?: {
+    time?: number;
+    plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null;
+    dest?: { dx: number; dy: number; dw: number; dh: number; mirror: boolean };
+  },
 ) {
-  const list = (regions ?? []).filter((r) => r.enabled && r.w > 0 && r.h > 0);
+  const list = (regions ?? []).filter(
+    (r) => r.enabled && r.w > 0 && r.h > 0 && regionActiveAt(r, extra?.time),
+  );
   if (!list.length) return;
   const canvas = ctx.canvas;
 
@@ -703,6 +717,25 @@ export function applyCleanup(
     ctx.beginPath();
     ctx.rect(x, y, w, h);
     ctx.clip();
+
+    // 1ª opção: fundo real recuperado por mediana temporal (pixels do próprio vídeo)
+    const plate = extra?.plate;
+    const dest = extra?.dest;
+    if (r.mode === "inpaint" && plate && dest && plate.ok.has(r.id)) {
+      ctx.save();
+      if (dest.mirror) {
+        ctx.translate(v.x * 2 + v.w, 0);
+        ctx.scale(-1, 1);
+      }
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(plate.canvas, dest.dx, dest.dy, dest.dw, dest.dh);
+      ctx.restore();
+      ctx.restore();
+      continue;
+    }
+
+
 
     if (r.mode === "inpaint") {
       inpaintArea(ctx, x, y, w, h, k, hq);
