@@ -230,47 +230,82 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       }
     };
 
-    // leitura acelerada do vídeo fonte
+    const seekTo = (time: number) =>
+      new Promise<void>((res) => {
+        let done = false;
+        const finish = () => {
+          if (done) return;
+          done = true;
+          video.onseeked = null;
+          res();
+        };
+        video.onseeked = finish;
+        video.currentTime = Math.min(Math.max(0, time), Math.max(0, video.duration - 1 / 1000));
+        // segurança: se o navegador não disparar seeked, segue em frente
+        setTimeout(finish, 400);
+      });
+
+    // Vídeos longos ou com reconstrução (limpeza) não acompanham a leitura em
+    // tempo real: o quadro fonte não avança na mesma velocidade do encoder e o
+    // resultado sai travado/repetido. Nesses casos percorremos quadro a quadro.
+    const heavy = (t.cleanup?.length ?? 0) > 0 || outDur > 40;
+
     video.currentTime = trimStart;
     await new Promise<void>((res) => {
       video.onseeked = () => res();
     });
-    video.playbackRate = Math.max(1, Math.min(opts.turbo ?? 4, 16));
 
-    const endAt = trimStart + effDur;
-    await video.play();
+    if (heavy) {
+      while (frameIndex < totalFrames) {
+        if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
+        await seekTo(trimStart + (frameIndex / fps) * v.speed);
+        await emit();
+        if (frameIndex % 5 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
+      }
+    } else {
+      video.playbackRate = Math.max(1, Math.min(opts.turbo ?? 4, 16));
+      const endAt = trimStart + effDur;
+      await video.play();
 
-    await new Promise<void>((resolve, reject) => {
-      let stopped = false;
-      const stop = () => {
-        if (stopped) return;
-        stopped = true;
-        video.pause();
-        resolve();
-      };
-      const step = async () => {
-        if (stopped) return;
-        if (opts.signal?.aborted) {
+      await new Promise<void>((resolve, reject) => {
+        let stopped = false;
+        const stop = () => {
+          if (stopped) return;
           stopped = true;
           video.pause();
-          reject(new DOMException("cancelado", "AbortError"));
-          return;
-        }
-        const outT = (video.currentTime - trimStart) / v.speed;
-        while (frameIndex < totalFrames && frameIndex / fps <= outT) {
-          await emit();
-        }
-        opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
-        if (video.currentTime >= endAt || video.ended || frameIndex >= totalFrames) return stop();
-        if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => void step());
-        else setTimeout(() => void step(), 1000 / 60);
-      };
-      video.onended = () => void step();
-      void step();
-    });
+          resolve();
+        };
+        const step = async () => {
+          if (stopped) return;
+          if (opts.signal?.aborted) {
+            stopped = true;
+            video.pause();
+            reject(new DOMException("cancelado", "AbortError"));
+            return;
+          }
+          const outT = (video.currentTime - trimStart) / v.speed;
+          // se o desenho não acompanha, reduz a leitura em vez de repetir quadros
+          const lag = outT - frameIndex / fps;
+          if (lag > 0.35) video.playbackRate = Math.max(1, video.playbackRate * 0.8);
+          if (frameIndex < totalFrames && frameIndex / fps <= outT) {
+            await emit();
+          }
+          opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
+          if (video.currentTime >= endAt || video.ended || frameIndex >= totalFrames) return stop();
+          if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => void step());
+          else setTimeout(() => void step(), 0);
+        };
+        video.onended = () => void step();
+        void step();
+      });
 
-    // completa frames faltantes (garante duração exata)
-    while (frameIndex < totalFrames) await emit();
+      // completa quadros faltantes com busca precisa (evita congelar no fim)
+      while (frameIndex < totalFrames) {
+        await seekTo(trimStart + (frameIndex / fps) * v.speed);
+        await emit();
+      }
+    }
+
 
     await encoder.flush();
     encoder.close();
