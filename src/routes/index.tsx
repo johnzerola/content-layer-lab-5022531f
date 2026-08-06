@@ -1235,20 +1235,32 @@ function Home() {
                     </div>
                     <div className="mt-3 border-t border-border pt-3">
                       <CleanupStudio
-                        regions={active.cleanup ?? []}
-                        onChange={(cleanup) => setActive((t) => ({ ...t, cleanup }))}
+                        regions={cleanupRegions}
+                        onChange={setCleanupRegions}
                         poster={selected.poster ?? undefined}
-                        aspect={active.video.w / active.video.h}
+                        aspect={previewTemplate.video.w / previewTemplate.video.h}
                         onDetect={() => void runDetect()}
-                        detecting={detecting}
-                        detectMsg={detectMsg}
+                        detecting={detecting || selected.detectStatus === "analisando"}
+                        detectMsg={
+                          selected.detectStatus === "analisando"
+                            ? (selected.detectMsg ?? "analisando quadros…")
+                            : (detectMsg ?? selected.detectMsg)
+                        }
+                        perVideo={mode === "limpar"}
+                        onApplyAll={mode === "limpar" && items.length > 1 ? applyRegionsToAll : undefined}
+                        onUseSafeZones={() =>
+                          setCleanupRegions([
+                            ...cleanupRegions,
+                            ...safeZones().map((z) => makeCleanupRegion(z)),
+                          ])
+                        }
                         suggestions={suggestions}
                         onUseSuggestion={(r) => {
-                          setActive((t) => ({ ...t, cleanup: [...(t.cleanup ?? []), r] }));
+                          setCleanupRegions([...cleanupRegions, r]);
                           setSuggestions((s) => s.filter((x) => x.id !== r.id));
                         }}
                         onUseAllSuggestions={() => {
-                          setActive((t) => ({ ...t, cleanup: [...(t.cleanup ?? []), ...suggestions] }));
+                          setCleanupRegions([...cleanupRegions, ...suggestions]);
                           setSuggestions([]);
                           setDetectMsg(undefined);
                         }}
