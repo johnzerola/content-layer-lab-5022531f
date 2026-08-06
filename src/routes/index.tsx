@@ -981,7 +981,7 @@ function Home() {
     ? {
         ...baseTpl,
         headline: { ...baseTpl.headline, text: selected.headline || baseTpl.headline.text },
-        cleanup: mode === "limpar" ? cleanupRegions : baseTpl.cleanup,
+        cleanup: mode === "limpar" ? cleanupRegions : (baseTpl.cleanup ?? []),
         video: {
           ...baseTpl.video,
           offsetX: mode === "limpar" ? 0 : selected.offsetX,
