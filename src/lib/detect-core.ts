@@ -10,6 +10,8 @@ export const ROWS = 72;
 const EDGE_THR = 0.13;
 /** |g - mediana| abaixo disso = pixel "parado" naquele quadro */
 const STABLE_EPS = 0.035;
+/** energia mínima absoluta para considerar que existe overlay na cena */
+const ABS_MIN = 0.06;
 
 export type FrameSet = {
   /** quadros em cinza [0..1], todos com w*h pixels */
@@ -200,10 +202,11 @@ export function detectFromFrames(set: FrameSet): Partial<CleanupRegion>[] {
   const median = sorted[Math.floor(sorted.length / 2)] ?? 0;
   const norm = arr.map((s) => s / maxS);
   const thr = Math.min(0.75, Math.max(0.34, (median / maxS) * 1.8 + 0.16));
-  const hot = norm.map((s) => s >= thr);
+  // piso absoluto: sem overlay real o sinal máximo da cena fica muito baixo,
+  // e sem esse corte o limiar relativo transforma ruído de fundo em "achado".
+  const hot = norm.map((s, i) => s >= thr && arr[i]! >= ABS_MIN);
 
   const rects = groupCells(hot, norm, COLS, ROWS);
-  if (process.env.DBG) console.log("maxS", maxS, "median", median, "thr", thr, "rawTop", rects.map((r)=>Number((r.s*maxS).toFixed(4))));
 
   const pixelScore = (p: number, ci: number) => {
     const freq = edgeHits[p]! / used;
@@ -254,6 +257,7 @@ export function detectFromFrames(set: FrameSet): Partial<CleanupRegion>[] {
         Math.min(COLS - 1, Math.floor((x + rw / 2) * COLS));
       return { x, y, w: rw, h: rh, s: r.s, area: rw * rh, ci };
     })
+    .filter((r) => r.s * maxS >= ABS_MIN)
     .filter((r) => r.area > 0.0015 && r.area < 0.5 && r.h < 0.55)
     .sort((a, b) => b.s * Math.sqrt(b.area) - a.s * Math.sqrt(a.area))
     .slice(0, 8);
@@ -314,7 +318,7 @@ export function detectFromFrames(set: FrameSet): Partial<CleanupRegion>[] {
     const small = r.area < 0.07;
     const corner = (r.x < 0.14 || r.x + r.w > 0.86) && (r.y < 0.2 || r.y + r.h > 0.8);
     const isCaption = wide && middle > 0.55 && !alwaysOn;
-    const isWatermark = alwaysOn && (small || corner);
+    const isWatermark = (alwaysOn || persistence > 0.6) && (small || corner);
     const label = isCaption
       ? "Legenda queimada"
       : isWatermark
