@@ -148,10 +148,11 @@ function stripBranding(t: Template): Template {
   };
 }
 
-/** Modo "limpar": vídeo cheio, sem marca e sem legenda nova — só as áreas de limpeza. */
-function cleanOnly(t: Template): Template {
+/** Modo "limpar": vídeo cheio, sem marca e sem legenda nova — só as áreas de limpeza.
+ *  Com as dimensões da fonte, o quadro assume a orientação real (sem zoom nem barras). */
+function cleanOnly(t: Template, src?: { w: number; h: number }): Template {
   const b = stripBranding(t);
-  return {
+  const base: Template = {
     ...b,
     background: "#000000",
     video: {
@@ -164,11 +165,12 @@ function cleanOnly(t: Template): Template {
       radius: 0,
       offsetX: 0,
       offsetY: 0,
-      fit: "contain",
+      fit: "auto",
       visible: true,
     },
     captions: { ...(b.captions ?? defaultCaptions()), visible: false },
   };
+  return src?.w && src?.h ? fitCanvasToSource(base, src.w, src.h) : base;
 }
 
 function Home() {
