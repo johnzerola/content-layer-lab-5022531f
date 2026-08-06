@@ -107,6 +107,10 @@ interface Item {
   score?: number | undefined;
   status: Status;
   progress: number;
+  /** etapa atual legível (transcrição, render de cada variação, etc.) */
+  stage?: string | undefined;
+  stepIndex?: number | undefined;
+  stepTotal?: number | undefined;
   blob?: Blob | undefined;
   ext?: string | undefined;
   /** todas as variações geradas deste vídeo */
