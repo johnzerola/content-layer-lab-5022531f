@@ -1,12 +1,78 @@
-import { useState, type ReactNode } from "react";
-import { Layers, Scissors, Eraser, Library, Cloud, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import {
+  Layers,
+  Scissors,
+  Eraser,
+  Library,
+  Cloud,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Sparkle,
+  Wand2,
+  Droplets,
+} from "lucide-react";
 
 export type AppMode = "lote" | "clip" | "limpar";
 
-const MODES: { id: AppMode; label: string; hint: string; icon: typeof Layers }[] = [
-  { id: "lote", label: "Lote com template", hint: "branding em massa", icon: Layers },
-  { id: "clip", label: "Só cortes", hint: "clipagem sem template", icon: Scissors },
-  { id: "limpar", label: "Limpar vídeo", hint: "remover legenda e marca", icon: Eraser },
+type ModeDef = {
+  id: AppMode;
+  /** nome curto no menu */
+  label: string;
+  hint: string;
+  /** marca própria da ferramenta */
+  brand: string;
+  mark: string;
+  tagline: string;
+  headline: string;
+  description: string;
+  chips: string[];
+  icon: typeof Layers;
+  badge: typeof Sparkle;
+};
+
+const MODES: ModeDef[] = [
+  {
+    id: "lote",
+    label: "Lote com template",
+    hint: "branding em massa",
+    brand: "ViralBatch",
+    mark: "VB",
+    tagline: "branding em massa",
+    headline: "Um template, centenas de vídeos",
+    description:
+      "Monte o layout uma vez — avatar, nome, headline, CTA e marca d'água — e aplique em todo o lote com variações antiduplicidade e legendas queimadas.",
+    chips: ["editor de template", "variações 3–5x", "legendas karaokê", "ZIP por plataforma"],
+    icon: Layers,
+    badge: Sparkle,
+  },
+  {
+    id: "clip",
+    label: "Só cortes",
+    hint: "clipagem sem template",
+    brand: "CorteIA",
+    mark: "CI",
+    tagline: "clipagem inteligente",
+    headline: "Ache os melhores momentos sozinho",
+    description:
+      "A IA lê energia de fala e movimento, pontua cada trecho e devolve os cortes prontos — sem template, sem branding, só o vídeo limpo no formato vertical.",
+    chips: ["score viral", "duração min/máx", "reordenar cortes", "export direto"],
+    icon: Scissors,
+    badge: Wand2,
+  },
+  {
+    id: "limpar",
+    label: "Limpar vídeo",
+    hint: "remover legenda e marca",
+    brand: "LimpaVídeo",
+    mark: "LV",
+    tagline: "restauração de quadro",
+    headline: "Apague legendas e marcas d'água",
+    description:
+      "Detecção automática das áreas fixas + reconstrução por inpainting (Telea) para tirar texto e logo sem borrão, mantendo o enquadramento original.",
+    chips: ["detecção automática", "inpainting HQ", "antes / depois", "sem zoom"],
+    icon: Eraser,
+    badge: Droplets,
+  },
 ];
 
 interface Props {
@@ -21,9 +87,17 @@ interface Props {
 export function AppShell({ mode, onMode, count, onLibrary, onCloud, children }: Props) {
   const [open, setOpen] = useState(true);
   const current = MODES.find((m) => m.id === mode)!;
+  const Badge = current.badge;
+
+  // mantém portais (modais, toasts) na mesma identidade de cor
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove("theme-lote", "theme-clip", "theme-limpar");
+    root.classList.add(`theme-${mode}`);
+  }, [mode]);
 
   return (
-    <div className="flex min-h-dvh w-full bg-background">
+    <div className={`theme-${mode} flex min-h-dvh w-full bg-background`}>
       <aside
         className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border/70 bg-surface/60 backdrop-blur transition-[width] duration-300 md:flex ${
           open ? "w-[16.5rem]" : "w-[4.5rem]"
@@ -31,27 +105,27 @@ export function AppShell({ mode, onMode, count, onLibrary, onCloud, children }: 
       >
         <div className="flex items-center gap-3 px-4 py-5">
           <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary font-display text-sm font-bold text-primary-foreground shadow-[var(--shadow-glow)]">
-            vv
+            {current.mark}
           </div>
           {open && (
             <div className="min-w-0">
               <p className="truncate font-display text-base font-bold tracking-tight text-foreground">
-                VaiViral
+                {current.brand}
               </p>
-              <p className="truncate font-mono text-[10px] text-muted-foreground">roda no navegador</p>
+              <p className="truncate font-mono text-[10px] text-muted-foreground">{current.tagline}</p>
             </div>
           )}
         </div>
 
         <nav className="flex flex-col gap-1 px-3">
-          {open && <p className="mono-label px-2 pb-2 pt-3">Modo</p>}
+          {open && <p className="mono-label px-2 pb-2 pt-3">Ferramentas</p>}
           {MODES.map((m) => {
             const active = m.id === mode;
             return (
               <button
                 key={m.id}
                 onClick={() => onMode(m.id)}
-                title={m.label}
+                title={m.brand}
                 aria-current={active ? "page" : undefined}
                 className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
                   active
@@ -59,10 +133,18 @@ export function AppShell({ mode, onMode, count, onLibrary, onCloud, children }: 
                     : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
                 }`}
               >
-                <m.icon className={`size-[18px] shrink-0 ${active ? "text-primary" : ""}`} />
+                <span
+                  className={`grid size-7 shrink-0 place-items-center rounded-lg border transition ${
+                    active
+                      ? "border-primary/40 bg-primary/15 text-primary"
+                      : "border-border bg-surface-2 text-muted-foreground group-hover:text-foreground"
+                  }`}
+                >
+                  <m.icon className="size-[15px]" />
+                </span>
                 {open && (
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">{m.label}</span>
+                    <span className="block truncate text-sm font-medium">{m.brand}</span>
                     <span className="block truncate font-mono text-[10px] opacity-70">{m.hint}</span>
                   </span>
                 )}
@@ -106,9 +188,14 @@ export function AppShell({ mode, onMode, count, onLibrary, onCloud, children }: 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur">
           <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-4 py-3 sm:px-6">
-            <div className="min-w-0">
-              <h1 className="truncate font-display text-lg font-bold tracking-tight">{current.label}</h1>
-              <p className="truncate font-mono text-[11px] text-muted-foreground">{current.hint}</p>
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-primary/35 bg-primary/12 text-primary md:hidden">
+                <current.icon className="size-4" />
+              </span>
+              <div className="min-w-0">
+                <h1 className="truncate font-display text-lg font-bold tracking-tight">{current.brand}</h1>
+                <p className="truncate font-mono text-[11px] text-muted-foreground">{current.hint}</p>
+              </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <div className="flex rounded-xl border border-border bg-surface-2 p-0.5 md:hidden">
@@ -116,7 +203,7 @@ export function AppShell({ mode, onMode, count, onLibrary, onCloud, children }: 
                   <button
                     key={m.id}
                     onClick={() => onMode(m.id)}
-                    aria-label={m.label}
+                    aria-label={m.brand}
                     className={`grid size-9 place-items-center rounded-lg transition ${
                       m.id === mode ? "bg-primary text-primary-foreground" : "text-muted-foreground"
                     }`}
@@ -132,7 +219,42 @@ export function AppShell({ mode, onMode, count, onLibrary, onCloud, children }: 
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">{children}</div>
+        <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
+          <section
+            key={current.id}
+            className="mb-6 overflow-hidden rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5 shadow-[var(--shadow-panel)] sm:p-6"
+          >
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <p className="mono-label flex items-center gap-2 text-primary">
+                  <Badge className="size-3.5" />
+                  ferramenta independente
+                </p>
+                <h2 className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">
+                  {current.headline}
+                </h2>
+                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                  {current.description}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {current.chips.map((c) => (
+                    <span
+                      key={c}
+                      className="rounded-full border border-border bg-surface-2 px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground"
+                    >
+                      {c}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="grid size-16 shrink-0 place-items-center rounded-2xl border border-primary/30 bg-primary/12 text-primary shadow-[var(--shadow-glow)]">
+                <current.icon className="size-7" />
+              </div>
+            </div>
+          </section>
+
+          {children}
+        </div>
       </div>
     </div>
   );

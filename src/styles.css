@@ -69,6 +69,34 @@
   --shadow-panel: 0 1px 0 0 color-mix(in oklab, white 5%, transparent) inset, 0 18px 40px -28px oklch(0 0 0 / 0.9);
 }
 
+/* cada ferramenta tem a própria identidade de cor */
+.theme-lote {
+  --primary: oklch(0.82 0.19 163);
+  --primary-glow: oklch(0.9 0.15 168);
+  --primary-foreground: oklch(0.17 0.03 150);
+  --accent: oklch(0.29 0.02 150);
+  --accent-foreground: oklch(0.9 0.12 148);
+  --ring: oklch(0.82 0.19 163);
+}
+
+.theme-clip {
+  --primary: oklch(0.72 0.19 295);
+  --primary-glow: oklch(0.8 0.16 330);
+  --primary-foreground: oklch(0.16 0.03 300);
+  --accent: oklch(0.29 0.04 300);
+  --accent-foreground: oklch(0.88 0.12 300);
+  --ring: oklch(0.72 0.19 295);
+}
+
+.theme-limpar {
+  --primary: oklch(0.78 0.16 62);
+  --primary-glow: oklch(0.86 0.14 88);
+  --primary-foreground: oklch(0.18 0.03 60);
+  --accent: oklch(0.29 0.03 62);
+  --accent-foreground: oklch(0.89 0.11 70);
+  --ring: oklch(0.78 0.16 62);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
