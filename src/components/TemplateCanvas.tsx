@@ -187,6 +187,11 @@ export function TemplateCanvas({
     if (videoEl.current) videoEl.current.playbackRate = Math.max(0.25, Math.min(4, speed || 1));
   }, [speed, previewFile]);
 
+  // trocou o vídeo ou as áreas de limpeza: a reconstrução em cache não vale mais
+  useEffect(() => {
+    resetPatchCache();
+  }, [previewFile, template.cleanup]);
+
 
   useEffect(() => {
     for (const src of [template.avatar.src, template.watermark.src]) {
