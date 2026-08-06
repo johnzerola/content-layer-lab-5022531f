@@ -1416,11 +1416,12 @@ function Home() {
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="mono-label">{flow.export.title}</p>
                     <span className="font-mono text-[10px] text-muted-foreground">
-                      {platforms.length} formato{platforms.length > 1 ? "s" : ""} × {Math.max(1, variants)} variação
-                      {variants > 1 ? "ões" : ""} = {platforms.length * Math.max(1, variants)} arquivos por vídeo
+                      {flow.export.platforms
+                        ? `${platforms.length} formato${platforms.length > 1 ? "s" : ""} × ${Math.max(1, flow.export.variants ? variants : 1)} variação${flow.export.variants && variants > 1 ? "ões" : ""} = ${platforms.length * Math.max(1, flow.export.variants ? variants : 1)} arquivos por vídeo`
+                        : "1 arquivo por vídeo · resolução e proporção originais"}
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className={`flex-wrap gap-2 ${flow.export.platforms ? "flex" : "hidden"}`}>
                     {PLATFORM_PRESETS.map((p) => {
                       const on = platforms.includes(p.id);
                       return (
@@ -1483,7 +1484,7 @@ function Home() {
                     {autoBitrate ? "auto (preset)" : `${bitrate} Mbps`}
 
                   </label>
-                  <label className="flex items-center gap-2">
+                  <label className={`items-center gap-2 ${flow.export.variants ? "flex" : "hidden"}`}>
                     variações
                     <input
                       type="range"
