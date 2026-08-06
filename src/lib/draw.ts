@@ -11,7 +11,11 @@ import {
 import type { CaptionCue } from "./captions";
 import { exemplarDetail, inpaintTelea, resetInpaintCache } from "./inpaint";
 
-/** Reconstrói a área (sem borrão) usando FMM de Telea + refino exemplar. */
+/**
+ * Reconstrói a área (sem borrão) usando FMM de Telea multi-escala + refino exemplar.
+ * `hq` (exportação / pausa) roda em resolução total, com inicialização coarse-to-fine
+ * e mistura suave nas bordas — sem borrão e sem emenda visível.
+ */
 function inpaintArea(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -19,19 +23,21 @@ function inpaintArea(
   w: number,
   h: number,
   detail: number,
+  hq = false,
 ) {
   const canvas = ctx.canvas;
   // margem de contexto: pixels válidos de onde a estrutura é propagada
-  const pad = Math.max(8, Math.round(Math.min(w, h) * 0.6));
+  const pad = Math.max(hq ? 16 : 8, Math.round(Math.min(w, h) * (hq ? 0.9 : 0.6)));
   const sx = Math.max(0, x - pad);
   const sy = Math.max(0, y - pad);
   const sw = Math.min(canvas.width - sx, w + pad * 2);
   const sh = Math.min(canvas.height - sy, h + pad * 2);
   if (sw < 4 || sh < 4) return;
 
-  // buracos grandes: resolve numa escala menor e devolve só o miolo reconstruído
+  // preview: buracos grandes resolvem em escala menor (fluidez).
+  // alta qualidade: sempre resolução total.
   const area = w * h;
-  const scale = area > 90000 ? 0.5 : area > 260000 ? 0.35 : 1;
+  const scale = hq ? 1 : area > 90000 ? 0.5 : area > 260000 ? 0.35 : 1;
   const W = Math.max(4, Math.round(sw * scale));
   const H = Math.max(4, Math.round(sh * scale));
 
@@ -42,28 +48,92 @@ function inpaintArea(
   if (!wc) return;
   wc.drawImage(canvas, sx, sy, sw, sh, 0, 0, W, H);
 
-  const img = wc.getImageData(0, 0, W, H);
-  const mask = new Uint8Array(W * H);
-  const mx0 = Math.round((x - sx) * scale);
-  const my0 = Math.round((y - sy) * scale);
+  const mx0 = Math.max(0, Math.round((x - sx) * scale));
+  const my0 = Math.max(0, Math.round((y - sy) * scale));
   const mx1 = Math.min(W, Math.round((x - sx + w) * scale));
   const my1 = Math.min(H, Math.round((y - sy + h) * scale));
-  for (let yy = Math.max(0, my0); yy < my1; yy++)
-    for (let xx = Math.max(0, mx0); xx < mx1; xx++) mask[yy * W + xx] = 1;
+
+  const buildMask = (mw: number, mh: number, s: number) => {
+    const m = new Uint8Array(mw * mh);
+    const a0 = Math.max(0, Math.round((x - sx) * s));
+    const b0 = Math.max(0, Math.round((y - sy) * s));
+    const a1 = Math.min(mw, Math.round((x - sx + w) * s));
+    const b1 = Math.min(mh, Math.round((y - sy + h) * s));
+    for (let yy = b0; yy < b1; yy++) for (let xx = a0; xx < a1; xx++) m[yy * mw + xx] = 1;
+    return m;
+  };
+
+  // coarse-to-fine: resolve primeiro numa escala menor e usa como palpite inicial,
+  // o que dá estrutura muito melhor em buracos largos (barras de legenda inteiras).
+  if (hq && Math.min(w, h) > 24) {
+    const cs = 0.4;
+    const CW = Math.max(4, Math.round(W * cs));
+    const CH = Math.max(4, Math.round(H * cs));
+    const cc = document.createElement("canvas");
+    cc.width = CW;
+    cc.height = CH;
+    const cctx = cc.getContext("2d", { willReadFrequently: true });
+    if (cctx) {
+      cctx.drawImage(work, 0, 0, CW, CH);
+      const cimg = cctx.getImageData(0, 0, CW, CH);
+      resetInpaintCache();
+      inpaintTelea(cimg.data, buildMask(CW, CH, scale * cs), CW, CH, {
+        radius: Math.max(3, Math.round(Math.min(CW, CH) * 0.12)),
+      });
+      cctx.putImageData(cimg, 0, 0);
+      // injeta o palpite só dentro do buraco
+      wc.save();
+      wc.beginPath();
+      wc.rect(mx0, my0, Math.max(1, mx1 - mx0), Math.max(1, my1 - my0));
+      wc.clip();
+      wc.imageSmoothingEnabled = true;
+      wc.imageSmoothingQuality = "high";
+      wc.drawImage(cc, 0, 0, CW, CH, 0, 0, W, H);
+      wc.restore();
+    }
+  }
+
+  const img = wc.getImageData(0, 0, W, H);
+  const mask = buildMask(W, H, scale);
 
   resetInpaintCache();
   inpaintTelea(img.data, mask, W, H, {
-    radius: Math.max(3, Math.round(Math.min(W, H) * 0.06)),
+    radius: Math.max(3, Math.round(Math.min(W, H) * (hq ? 0.09 : 0.06))),
   });
   exemplarDetail(img.data, mask, W, H, detail);
+  if (hq) exemplarDetail(img.data, mask, W, H, detail * 0.5);
   wc.putImageData(img, 0, 0);
+
+  const rw = Math.max(1, mx1 - mx0);
+  const rh = Math.max(1, my1 - my0);
+
+  // mistura suave nas bordas para não deixar emenda entre reconstruído e original
+  const feather = hq ? Math.max(1.5, Math.min(6, Math.min(w, h) * 0.06)) : 0;
+  if (feather > 0.5) {
+    const fc = document.createElement("canvas");
+    fc.width = rw;
+    fc.height = rh;
+    const fx = fc.getContext("2d");
+    if (fx) {
+      fx.drawImage(work, mx0, my0, rw, rh, 0, 0, rw, rh);
+      fx.globalCompositeOperation = "destination-in";
+      fx.filter = `blur(${feather}px)`;
+      fx.fillStyle = "#fff";
+      fx.fillRect(feather, feather, Math.max(1, rw - feather * 2), Math.max(1, rh - feather * 2));
+      fx.filter = "none";
+      fx.globalCompositeOperation = "source-over";
+      ctx.drawImage(fc, 0, 0, rw, rh, x, y, w, h);
+      return;
+    }
+  }
 
   // devolve apenas a área reconstruída (bordas originais ficam intactas)
   const smooth = ctx.imageSmoothingEnabled;
   ctx.imageSmoothingEnabled = scale < 1;
-  ctx.drawImage(work, mx0, my0, Math.max(1, mx1 - mx0), Math.max(1, my1 - my0), x, y, w, h);
+  ctx.drawImage(work, mx0, my0, rw, rh, x, y, w, h);
   ctx.imageSmoothingEnabled = smooth;
 }
+
 
 
 const imgCache = new Map<string, HTMLImageElement>();
