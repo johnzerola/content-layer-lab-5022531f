@@ -1972,6 +1972,25 @@ function Home() {
                         {it.status === "processando" ? ` ${Math.round(it.progress * 100)}%` : ""}
                         {it.stage && it.status !== "pendente" ? ` · ${it.stage}` : ""}
                       </p>
+                      {mode === "limpar" && it.detectStatus && (
+                        <p
+                          className={`font-mono text-[10px] ${
+                            it.detectStatus === "ok"
+                              ? "text-primary"
+                              : it.detectStatus === "erro"
+                                ? "text-destructive"
+                                : "text-muted-foreground"
+                          }`}
+                        >
+                          {it.detectStatus === "analisando"
+                            ? (it.detectMsg ?? "analisando…")
+                            : it.detectStatus === "ok"
+                              ? `${(it.regions ?? []).length} área(s) detectada(s)`
+                              : it.detectStatus === "vazio"
+                                ? "nada encontrado — marque manual"
+                                : `falha na análise`}
+                        </p>
+                      )}
                       {(it.status === "processando" || it.status === "na fila") && (
                         <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
                           <div
