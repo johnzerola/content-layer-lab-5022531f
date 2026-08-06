@@ -576,12 +576,15 @@ export interface DrawOpts {
   /** moldura anti-duplicidade em px */
   border?: number;
   borderColor?: string;
-  /** tempo atual do vídeo fonte (segundos) — usado pelas legendas */
+  /** tempo atual do vídeo fonte (segundos) — usado pelas legendas e janelas de limpeza */
   time?: number;
   captions?: CaptionCue[];
+  /** placa de fundo (mediana temporal) para reconstruir áreas com pixels reais */
+  plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null;
   /** "hq" = reconstrução em resolução total (exportação). Padrão: preview rápido. */
   quality?: "preview" | "hq";
 }
+
 
 function drawVideoLayer(
   ctx: CanvasRenderingContext2D,
