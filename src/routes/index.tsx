@@ -1362,6 +1362,36 @@ function Home() {
                   )}
                 </div>
 
+                {/* relatório do lote */}
+                {report && !running && (
+                  <div className="space-y-1 rounded-xl border border-border bg-surface-2 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="mono-label">Relatório do lote</p>
+                      <button
+                        type="button"
+                        onClick={() => setReport(null)}
+                        className="font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                      >
+                        fechar
+                      </button>
+                    </div>
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      {report.ok} vídeo(s) exportado(s) · {report.fail} com erro · {report.seconds}s
+                    </p>
+                    {report.fails.length > 0 && (
+                      <ul className="max-h-24 space-y-0.5 overflow-auto">
+                        {report.fails.map((f, i) => (
+                          <li key={`${f.name}-${i}`} className="font-mono text-[10px] text-destructive">
+                            {f.name}: {f.error}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+
+
+
                 {/* presets de entrega por plataforma (MP4 H.264) */}
                 <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
