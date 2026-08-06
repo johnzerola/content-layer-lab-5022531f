@@ -119,6 +119,11 @@ interface Item {
   captions?: CaptionCue[] | undefined;
   capStatus?: string | undefined;
   capError?: boolean | undefined;
+  /** áreas de limpeza detectadas/ajustadas para ESTE vídeo (modo LimpaVídeo) */
+  regions?: CleanupRegion[] | undefined;
+  /** estado da análise automática de legenda/marca d'água */
+  detectStatus?: "analisando" | "ok" | "vazio" | "erro" | undefined;
+  detectMsg?: string | undefined;
 
   error?: string | undefined;
 }
