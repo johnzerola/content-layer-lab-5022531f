@@ -711,6 +711,24 @@ function Home() {
             }
           }
 
+
+          // LimpaVídeo: recupera o fundo real por mediana temporal antes de renderizar
+          const itemRegions = item.regions?.length ? item.regions : (active.cleanup ?? []);
+          let plate: Awaited<ReturnType<typeof buildBackgroundPlate>> = null;
+          if (runMode === "limpar" && itemRegions.length) {
+            setItems((p) =>
+              p.map((x) => (x.id === id ? { ...x, stage: "recuperando fundo original" } : x)),
+            );
+            try {
+              plate = await buildBackgroundPlate(item.file, itemRegions, {
+                ...(item.clip ? { clip: item.clip } : {}),
+                signal: ac.signal,
+              });
+            } catch {
+              plate = null;
+            }
+          }
+
           for (const plat of outs) {
             // cada plataforma recebe a resolução/fps/bitrate recomendados
             // no modo "limpar" o quadro segue a orientação real do vídeo (sem recorte)
@@ -719,9 +737,10 @@ function Home() {
                 ? {
                     ...cleanOnly(active, { w: item.w, h: item.h }),
                     // cada vídeo usa as áreas detectadas para ele; sem detecção, usa as do template
-                    cleanup: item.regions?.length ? item.regions : (active.cleanup ?? []),
+                    cleanup: itemRegions,
                   }
                 : applyRatio(baseTpl, plat.w, plat.h);
+
             for (let k = 0; k < n; k++) {
               const at = step;
               const stageLabel = `render ${at + 1}/${total}${outs.length > 1 ? ` · ${plat.short}` : ""}${n > 1 ? ` · v${k + 1}` : ""}`;
