@@ -162,7 +162,7 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
     });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-background/90 p-2 backdrop-blur sm:items-center sm:p-3">
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-background/95 p-2 sm:items-center sm:p-3">
       <div className="flex h-full max-h-[96vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
@@ -197,10 +197,12 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
                 ref={videoRef}
                 src={url}
                 playsInline
+                muted
+                preload="auto"
                 className="absolute inset-0 size-full object-contain"
                 style={{
                   filter,
-                  transform: `rotate(${pre.rotate}deg) scaleX(${pre.flipH ? -1 : 1}) scaleY(${pre.flipV ? -1 : 1})`,
+                  transform: `translateZ(0) rotate(${pre.rotate}deg) scaleX(${pre.flipH ? -1 : 1}) scaleY(${pre.flipV ? -1 : 1})`,
                 }}
                 onLoadedMetadata={() => seek(start)}
                 onPause={() => setPlaying(false)}
