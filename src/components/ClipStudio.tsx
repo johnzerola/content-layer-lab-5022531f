@@ -23,6 +23,9 @@ export interface ClipItem {
   duration: number;
   clip?: { start: number; end: number } | undefined;
   score?: number | undefined;
+  clipTitle?: string | undefined;
+  clipReason?: string | undefined;
+  clipTags?: string[] | undefined;
   status: "pendente" | "na fila" | "processando" | "pronto" | "erro";
   progress: number;
   blob?: Blob | undefined;
@@ -75,12 +78,12 @@ function scoreTone(score: number) {
   return { label: "baixo", cls: "text-muted-foreground border-border bg-surface-2" };
 }
 
-function ScoreRing({ score }: { score: number }) {
+function ScoreBadge({ score }: { score: number }) {
   const tone = scoreTone(score);
   return (
     <div className={`flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[11px] ${tone.cls}`}>
       <Flame className="size-3" />
-      {score}
+      {score} · {tone.label}
     </div>
   );
 }
@@ -125,10 +128,13 @@ function ClipCard({
     setPlaying(true);
   };
 
+  const [pos, setPos] = useState(0);
+  const len = Math.max(0.1, end - start);
+
   return (
     <div
       onClick={onSelect}
-      className={`group relative overflow-hidden rounded-xl border bg-surface-2 transition ${
+      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-surface-2 transition ${
         active ? "border-primary" : "border-border hover:border-primary/40"
       }`}
     >
@@ -142,13 +148,25 @@ function ClipCard({
           className="size-full object-cover"
           onTimeUpdate={(e) => {
             const v = e.currentTarget;
+            setPos(Math.max(0, Math.min(len, v.currentTime - start)));
             if (v.currentTime >= end) {
               v.pause();
               v.currentTime = start;
               setPlaying(false);
+              setPos(0);
             }
           }}
         />
+
+        {/* faixa de título estilo capa de corte */}
+        {item.clipTitle && (
+          <div className="absolute inset-x-0 top-0 flex justify-center p-2">
+            <span className="max-w-full truncate rounded-full bg-destructive px-3 py-1 text-center text-[10px] font-bold uppercase tracking-wide text-white shadow-lg">
+              {item.clipTitle.replace(/ · #\d+$/, "")}
+            </span>
+          </div>
+        )}
+
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -156,84 +174,138 @@ function ClipCard({
           }}
           className="absolute inset-0 grid place-items-center opacity-0 transition group-hover:opacity-100"
         >
-          <span className="grid size-11 place-items-center rounded-full bg-background/80 backdrop-blur">
-            {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
+          <span className="grid size-12 place-items-center rounded-full bg-background/80 backdrop-blur">
+            {playing ? <Pause className="size-5" /> : <Play className="size-5" />}
           </span>
         </button>
-
-        <div className="absolute left-2 top-2 flex items-center gap-1.5">
-          <span className="rounded-md bg-background/80 px-1.5 py-0.5 font-mono text-[10px] backdrop-blur">
-            #{index + 1}
-          </span>
-          {typeof item.score === "number" && <ScoreRing score={item.score} />}
-        </div>
 
         <button
           onClick={(e) => {
             e.stopPropagation();
             onToggle();
           }}
-          className={`absolute right-2 top-2 grid size-6 place-items-center rounded-md border backdrop-blur ${
+          className={`absolute left-2 top-2 grid size-6 place-items-center rounded-md border backdrop-blur ${
             checked ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background/70"
           }`}
         >
           {checked && <Check className="size-3.5" />}
         </button>
 
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-2">
-          <p className="font-mono text-[11px] text-white/90">
-            {formatTime(start)} – {formatTime(end)} · {Math.round(end - start)}s
-          </p>
-          <p
-            className={`font-mono text-[10px] ${
-              item.status === "pronto"
-                ? "text-primary"
-                : item.status === "erro"
-                  ? "text-destructive"
-                  : item.status === "processando"
-                    ? "text-warn"
-                    : "text-white/60"
-            }`}
-          >
-            ● {item.status}
-            {item.status === "processando" ? ` ${Math.round(item.progress * 100)}%` : ""}
-          </p>
-          {item.status === "processando" && (
-            <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/20">
-              <div className="h-full bg-primary" style={{ width: `${item.progress * 100}%` }} />
-            </div>
-          )}
+        {/* score grande no canto, como no OpusClip */}
+        {typeof item.score === "number" && (
+          <div className="absolute bottom-12 right-2 rounded-lg bg-primary px-2.5 py-1 text-lg font-extrabold leading-none text-primary-foreground shadow-lg">
+            {(item.score / 10).toFixed(1)}
+          </div>
+        )}
+
+        <div className="absolute inset-x-0 bottom-0 space-y-1.5 bg-gradient-to-t from-black/90 to-transparent px-2 pb-2 pt-6">
+          <div className="h-1 overflow-hidden rounded-full bg-white/25">
+            <div
+              className="h-full bg-white"
+              style={{ width: `${(item.status === "processando" ? item.progress : pos / len) * 100}%` }}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-mono text-[10px] text-white/85">
+              {formatTime(pos)} / {formatTime(len)}
+            </p>
+            <p
+              className={`font-mono text-[10px] ${
+                item.status === "pronto"
+                  ? "text-primary"
+                  : item.status === "erro"
+                    ? "text-destructive"
+                    : item.status === "processando"
+                      ? "text-warn"
+                      : "text-white/60"
+              }`}
+            >
+              ● {item.status}
+              {item.status === "processando" ? ` ${Math.round(item.progress * 100)}%` : ""}
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-1 p-2">
-        <span className="truncate font-mono text-[10px] text-muted-foreground">{item.file.name}</span>
+      {/* barra de ações */}
+      <div className="flex items-center justify-between gap-1 border-b border-border px-2 py-1.5 text-muted-foreground">
+        <span className="font-mono text-[10px]">#{index + 1}</span>
         <div className="flex items-center gap-1">
-          {item.blob && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDownload();
-              }}
-              className="rounded-md border border-border p-1.5 hover:border-primary"
-            >
-              <Download className="size-3.5" />
-            </button>
-          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              play();
+            }}
+            className="rounded-md p-1.5 hover:text-foreground"
+            title="pré-visualizar"
+          >
+            {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect();
+            }}
+            className="rounded-md p-1.5 hover:text-foreground"
+            title="abrir no editor"
+          >
+            <Scissors className="size-3.5" />
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
               onRemove();
             }}
-            className="rounded-md p-1.5 text-muted-foreground hover:text-destructive"
+            className="rounded-md p-1.5 hover:text-destructive"
+            title="remover corte"
           >
             <X className="size-3.5" />
           </button>
         </div>
       </div>
+
+      {/* título + descrição + baixar, no modelo da referência */}
+      <div className="flex flex-1 flex-col gap-2 p-3">
+        <div className="flex items-start justify-between gap-2">
+          <p className="line-clamp-2 text-sm font-semibold leading-snug">
+            {item.clipTitle?.replace(/ · #\d+$/, "") ?? item.file.name}
+          </p>
+          {typeof item.score === "number" && <ScoreBadge score={item.score} />}
+        </div>
+        {item.clipReason && (
+          <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground" title={item.clipReason}>
+            {item.clipReason}
+          </p>
+        )}
+        {item.clipTags && item.clipTags.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {item.clipTags.map((t) => (
+              <span key={t} className="rounded-full border border-border px-2 py-0.5 font-mono text-[9px] text-muted-foreground">
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
+        <div className="mt-auto space-y-1 pt-1">
+          <Button
+            className="w-full"
+            disabled={!item.blob}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDownload();
+            }}
+          >
+            <Download className="size-4" /> Baixar clipe
+          </Button>
+          <p className="text-center text-[10px] text-muted-foreground">
+            {item.blob ? "salve no seu celular ou computador" : "exporte o corte para liberar o download"}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
+
 
 function SelectedClip({
   item,
