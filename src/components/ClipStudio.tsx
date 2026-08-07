@@ -266,9 +266,12 @@ function ClipCard({
 
       {/* título + descrição + baixar, no modelo da referência */}
       <div className="flex flex-1 flex-col gap-2 p-3">
-        <p className="line-clamp-2 text-sm font-semibold leading-snug">
-          {item.clipTitle?.replace(/ · #\d+$/, "") ?? item.file.name}
-        </p>
+        <div className="flex items-start justify-between gap-2">
+          <p className="line-clamp-2 text-sm font-semibold leading-snug">
+            {item.clipTitle?.replace(/ · #\d+$/, "") ?? item.file.name}
+          </p>
+          {typeof item.score === "number" && <ScoreBadge score={item.score} />}
+        </div>
         {item.clipReason && (
           <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground" title={item.clipReason}>
             {item.clipReason}
