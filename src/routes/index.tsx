@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Copy,
   Columns2,
+  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
@@ -30,7 +31,7 @@ import { CloudPanel } from "@/components/CloudPanel";
 import { autoSyncTemplates, logBatch, logExports, type ProjectSnapshot } from "@/lib/cloud";
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
-import { hasPreEdit, type PreEdit } from "@/lib/preedit";
+import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
 
 import {
   applyRatio,
@@ -2115,6 +2116,7 @@ function Home() {
                         {it.w && it.h ? `${it.w}×${it.h}` : "…"} · {it.duration ? `${it.duration.toFixed(0)}s` : "…"}
                         {it.clip ? ` · corte ${formatTime(it.clip.start)}` : ""}
                         {it.score ? ` · ${it.score}` : ""}
+                        {hasPreEdit(it.preEdit) ? " · editado" : ""}
 
                       </p>
                       <p
@@ -2192,6 +2194,22 @@ function Home() {
                     <span
                       role="button"
                       tabIndex={0}
+                      title="Editar vídeo (cortar, enquadrar, cor)"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedId(it.id);
+                        setStudioId(it.id);
+                      }}
+                      className={`rounded-md border p-1.5 hover:border-primary ${
+                        hasPreEdit(it.preEdit) || it.clip ? "border-primary text-primary" : "border-border text-muted-foreground"
+                      }`}
+                    >
+                      <Wand2 className="size-3.5" />
+                    </span>
+
+                    <span
+                      role="button"
+                      tabIndex={0}
                       onClick={(e) => {
                         e.stopPropagation();
                         setItems((p) => p.filter((x) => x.id !== it.id));
@@ -2238,6 +2256,31 @@ function Home() {
             setLibraryOpen(false);
           }}
           onCommit={commit}
+        />
+      )}
+
+      {studioItem && (
+        <VideoStudio
+          file={studioItem.file}
+          width={studioItem.w}
+          height={studioItem.h}
+          duration={studioItem.duration}
+          value={{
+            pre: studioItem.preEdit ?? defaultPreEdit(),
+            clip: studioItem.clip ?? null,
+          }}
+          onClose={() => setStudioId(null)}
+          onSave={({ pre, clip }) => {
+            setItems((p) =>
+              p.map((x) =>
+                x.id === studioItem.id
+                  ? { ...x, preEdit: pre, clip: clip ?? undefined, status: "pendente", progress: 0 }
+                  : x,
+              ),
+            );
+            setStudioId(null);
+            toast.success("Edição aplicada — vale no preview e na exportação");
+          }}
         />
       )}
 
