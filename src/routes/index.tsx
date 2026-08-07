@@ -114,6 +114,12 @@ interface Item {
   /** pré-edição feita no Estúdio (recorte, giro, cor) */
   preEdit?: PreEdit | undefined;
   score?: number | undefined;
+  /** título sugerido pelo algoritmo de cortes */
+  clipTitle?: string | undefined;
+  /** motivo/descrição do corte */
+  clipReason?: string | undefined;
+  /** rótulos detectados no trecho */
+  clipTags?: string[] | undefined;
   status: Status;
   progress: number;
   /** etapa atual legível (transcrição, render de cada variação, etc.) */
