@@ -624,6 +624,8 @@ function Home() {
   );
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
+  const studioItem = studioId ? (items.find((i) => i.id === studioId) ?? null) : null;
+
 
   const antiDup = active.antiDup ?? defaultAntiDup();
   const setAntiDup = (patch: Partial<typeof antiDup>) =>
