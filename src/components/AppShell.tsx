@@ -1,10 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
 import {
   Layers,
   Scissors,
   Eraser,
   Library,
   Cloud,
+  CalendarClock,
   PanelLeftClose,
   PanelLeftOpen,
   Sparkle,
