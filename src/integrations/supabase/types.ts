@@ -122,6 +122,113 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduled_posts: {
+        Row: {
+          account_id: string | null
+          attempts: number
+          caption: string
+          created_at: string
+          error: string | null
+          file_name: string | null
+          id: string
+          kind: string
+          permalink: string | null
+          published_at: string | null
+          scheduled_at: string
+          status: string
+          updated_at: string
+          user_id: string
+          video_path: string | null
+          video_url: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          attempts?: number
+          caption?: string
+          created_at?: string
+          error?: string | null
+          file_name?: string | null
+          id?: string
+          kind?: string
+          permalink?: string | null
+          published_at?: string | null
+          scheduled_at?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          video_path?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          attempts?: number
+          caption?: string
+          created_at?: string
+          error?: string | null
+          file_name?: string | null
+          id?: string
+          kind?: string
+          permalink?: string | null
+          published_at?: string | null
+          scheduled_at?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          video_path?: string | null
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scheduled_posts_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "social_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      social_accounts: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          platform: string
+          provider: string
+          provider_account_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          platform?: string
+          provider?: string
+          provider_account_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          platform?: string
+          provider?: string
+          provider_account_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
       template_versions: {
         Row: {
           created_at: string
