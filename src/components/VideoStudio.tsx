@@ -207,7 +207,6 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
               />
               {tab === "crop" && (
                 <>
-                  <div className="pointer-events-none absolute inset-0 bg-black/55" />
                   <div
                     className="absolute cursor-move border-2 border-primary"
                     style={{
@@ -215,6 +214,7 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
                       top: `${crop.y * 100}%`,
                       width: `${crop.w * 100}%`,
                       height: `${crop.h * 100}%`,
+                      boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)",
                     }}
                     onPointerDown={(e) => onPointerDown(e, "move")}
                   >
