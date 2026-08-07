@@ -162,8 +162,8 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
     });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/90 p-3 backdrop-blur">
-      <div className="flex max-h-full w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-background/90 p-2 backdrop-blur sm:items-center sm:p-3">
+      <div className="flex h-full max-h-[96vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
         <header className="flex items-center justify-between border-b border-border px-4 py-3">
           <div>
             <h2 className="font-display text-base text-foreground">Estúdio de edição</h2>
