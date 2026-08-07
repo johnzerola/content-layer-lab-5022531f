@@ -129,7 +129,10 @@ function AgendaPage() {
   }
 
   async function onSchedule() {
-    if (!file) return toast.error("Escolha o vídeo que será publicado.");
+    if (!file) {
+      toast.error("Escolha o vídeo que será publicado.");
+      return;
+    }
     setSending(true);
     try {
       const up = await uploadPostVideo(file, file.name);
