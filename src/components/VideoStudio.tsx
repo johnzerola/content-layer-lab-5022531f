@@ -215,8 +215,6 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
                       top: `${crop.y * 100}%`,
                       width: `${crop.w * 100}%`,
                       height: `${crop.h * 100}%`,
-                      boxShadow: "0 0 0 9999px rgba(0,0,0,0.0)",
-                      backdropFilter: "none",
                     }}
                     onPointerDown={(e) => onPointerDown(e, "move")}
                   >
@@ -234,33 +232,6 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
                         }}
                       />
                     ))}
-                  </div>
-                  <div
-                    className="pointer-events-none absolute overflow-hidden"
-                    style={{
-                      left: `${crop.x * 100}%`,
-                      top: `${crop.y * 100}%`,
-                      width: `${crop.w * 100}%`,
-                      height: `${crop.h * 100}%`,
-                    }}
-                  >
-                    <div
-                      className="absolute"
-                      style={{
-                        left: `${(-crop.x / crop.w) * 100}%`,
-                        top: `${(-crop.y / crop.h) * 100}%`,
-                        width: `${(1 / crop.w) * 100}%`,
-                        height: `${(1 / crop.h) * 100}%`,
-                      }}
-                    >
-                      <video
-                        src={url}
-                        muted
-                        playsInline
-                        className="size-full object-contain"
-                        style={{ filter, opacity: 0 }}
-                      />
-                    </div>
                   </div>
                 </>
               )}
