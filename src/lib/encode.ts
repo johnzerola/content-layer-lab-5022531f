@@ -3,6 +3,7 @@ import { drawFrame } from "./draw";
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import type { Variation } from "./variation";
 import type { CaptionCue } from "./captions";
+import type { PreEdit } from "./preedit";
 import { cleanMp4Metadata } from "./mp4meta";
 
 export interface EncodeOptions {
@@ -18,6 +19,8 @@ export interface EncodeOptions {
   turbo?: number | undefined;
   /** recorte do vídeo fonte (clipagem automática) */
   clip?: { start: number; end: number } | undefined;
+  /** pré-edição do vídeo fonte (recorte, giro, cor) */
+  pre?: PreEdit | null | undefined;
   /** legendas em tempo do vídeo fonte */
   captions?: CaptionCue[] | undefined;
   /** placa de fundo (mediana temporal) para remover overlays com pixels reais */
@@ -205,6 +208,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       rotate: v.rotate,
       border: v.border,
       borderColor: v.borderColor,
+      ...(opts.pre ? { pre: opts.pre } : {}),
       ...(opts.captions?.length ? { captions: opts.captions } : {}),
       ...(opts.plate ? { plate: opts.plate } : {}),
     };
