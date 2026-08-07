@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Crop,
   FlipHorizontal,
@@ -56,8 +56,15 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(value.clip?.start ?? 0);
 
-  const url = useMemo(() => URL.createObjectURL(file), [file]);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    const u = URL.createObjectURL(file);
+    setUrl(u);
+    return () => {
+      setUrl("");
+      URL.revokeObjectURL(u);
+    };
+  }, [file]);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
