@@ -29,6 +29,8 @@ import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
 import { autoSyncTemplates, logBatch, logExports, type ProjectSnapshot } from "@/lib/cloud";
 import { ClipStudio } from "@/components/ClipStudio";
+import { VideoStudio } from "@/components/VideoStudio";
+import { hasPreEdit, type PreEdit } from "@/lib/preedit";
 
 import {
   applyRatio,
@@ -108,6 +110,8 @@ interface Item {
   offsetY: number;
   autoFrameSource?: string | undefined;
   clip?: { start: number; end: number } | undefined;
+  /** pré-edição feita no Estúdio (recorte, giro, cor) */
+  preEdit?: PreEdit | undefined;
   score?: number | undefined;
   status: Status;
   progress: number;
@@ -194,6 +198,7 @@ function Home() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
   const [editing, setEditing] = useState(false);
+  const [studioId, setStudioId] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [cloudOpen, setCloudOpen] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
@@ -713,6 +718,7 @@ function Home() {
             borderColor: previewVariation.borderColor,
             ...(previewCues?.length ? { captions: previewCues } : {}),
             ...(previewPlate ? { plate: previewPlate } : {}),
+            ...(selected?.preEdit ? { pre: selected.preEdit } : {}),
           }
         : undefined,
     [
@@ -726,6 +732,7 @@ function Home() {
       previewVariation?.borderColor,
       previewCues,
       previewPlate,
+      selected?.preEdit,
     ],
   );
 
@@ -872,6 +879,7 @@ function Home() {
                 fps: plat.fps,
                 bitrate: (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
                 clip: item.clip,
+                pre: item.preEdit,
                 captions: cues,
                 plate,
                 signal: ac.signal,
