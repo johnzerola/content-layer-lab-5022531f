@@ -78,12 +78,12 @@ function scoreTone(score: number) {
   return { label: "baixo", cls: "text-muted-foreground border-border bg-surface-2" };
 }
 
-function ScoreRing({ score }: { score: number }) {
+function ScoreBadge({ score }: { score: number }) {
   const tone = scoreTone(score);
   return (
     <div className={`flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[11px] ${tone.cls}`}>
       <Flame className="size-3" />
-      {score}
+      {score} · {tone.label}
     </div>
   );
 }
