@@ -10,6 +10,7 @@ import {
 } from "./template";
 import type { CaptionCue } from "./captions";
 import { exemplarDetail, inpaintTelea, resetInpaintCache } from "./inpaint";
+import { cropRect, preEditFilter, type PreEdit } from "./preedit";
 
 /**
  * Reconstrói a área (sem borrão) usando FMM de Telea multi-escala + refino exemplar.
@@ -581,6 +582,8 @@ export interface DrawOpts {
   captions?: CaptionCue[];
   /** placa de fundo (mediana temporal) para reconstruir áreas com pixels reais */
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null;
+  /** pré-edição do vídeo fonte (recorte, giro, cor) aplicada antes do template */
+  pre?: PreEdit | null;
   /** "hq" = reconstrução em resolução total (exportação). Padrão: preview rápido. */
   quality?: "preview" | "hq";
 }
@@ -615,20 +618,23 @@ function drawVideoLayer(
   ctx.clip();
   let dest: { dx: number; dy: number; dw: number; dh: number; mirror: boolean } | null = null;
   if (source && source.width) {
+    // pré-edição do vídeo fonte (recorte, giro, espelho e cor)
+    const pre = opts?.pre;
+    const cr = cropRect(pre, source.width, source.height);
     // a rotação exige um leve zoom extra pra não aparecer canto vazio
     const rotPad = rot ? 1 + Math.abs(rot) / 40 : 1;
     const zoom = (opts?.zoom ?? 1) * rotPad;
-    const srcAR = source.width / source.height;
+    const srcAR = cr.ew / cr.eh;
     const boxAR = v.w / v.h;
     // "auto": só recorta quando a orientação bate com a do quadro; senão mostra inteiro
     const useContain =
       v.fit === "contain" || (v.fit === "auto" && Math.abs(srcAR - boxAR) / boxAR > 0.02);
     const fitScale = useContain
-      ? Math.min(v.w / source.width, v.h / source.height)
-      : Math.max(v.w / source.width, v.h / source.height);
+      ? Math.min(v.w / cr.ew, v.h / cr.eh)
+      : Math.max(v.w / cr.ew, v.h / cr.eh);
     const scale = fitScale * zoom;
-    const dw = source.width * scale;
-    const dh = source.height * scale;
+    const dw = cr.ew * scale;
+    const dh = cr.eh * scale;
     const ox = (opts?.offsetX ?? v.offsetX) * (dw - v.w) * 0.5;
     const oy = (opts?.offsetY ?? v.offsetY) * (dh - v.h) * 0.5;
     const dx = v.x + (v.w - dw) / 2 + ox;
@@ -639,11 +645,21 @@ function drawVideoLayer(
       ctx.translate(v.x * 2 + v.w, 0);
       ctx.scale(-1, 1);
     }
-    const b = opts?.brightness ?? 1;
-    const s = opts?.saturation ?? 1;
-    if (b !== 1 || s !== 1) ctx.filter = `brightness(${b}) saturate(${s})`;
-    ctx.drawImage(source.el, dx, dy, dw, dh);
+    ctx.filter = preEditFilter(pre, {
+      brightness: opts?.brightness ?? 1,
+      saturation: opts?.saturation ?? 1,
+    });
+    ctx.save();
+    ctx.translate(dx + dw / 2, dy + dh / 2);
+    if (cr.quarter) ctx.rotate((cr.quarter * Math.PI) / 2);
+    if (pre?.flipH) ctx.scale(-1, 1);
+    if (pre?.flipV) ctx.scale(1, -1);
+    const rw = cr.quarter % 2 ? dh : dw;
+    const rh = cr.quarter % 2 ? dw : dh;
+    ctx.drawImage(source.el, cr.sx, cr.sy, cr.sw, cr.sh, -rw / 2, -rh / 2, rw, rh);
+    ctx.restore();
     ctx.filter = "none";
+
     if (opts?.noise) {
       ctx.globalAlpha = Math.min(0.12, opts.noise);
       ctx.globalCompositeOperation = "overlay";

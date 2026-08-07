@@ -3,6 +3,7 @@ import { drawFrame, resetPatchCache } from "./draw";
 import { encodeMp4, webCodecsSupported } from "./encode";
 import type { Variation } from "./variation";
 import type { CaptionCue } from "./captions";
+import type { PreEdit } from "./preedit";
 
 export interface RenderOptions {
   variation: Variation;
@@ -13,6 +14,8 @@ export interface RenderOptions {
   bitrate?: number | undefined;
   turbo?: number | undefined;
   clip?: { start: number; end: number } | undefined;
+  /** pré-edição do vídeo fonte (recorte, giro, cor) */
+  pre?: PreEdit | null | undefined;
   captions?: CaptionCue[] | undefined;
   /** placa de fundo (mediana temporal) para reconstruir áreas limpas */
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null | undefined;
@@ -105,6 +108,7 @@ async function recordVideo(
       borderColor: v.borderColor,
       time: video.currentTime,
       quality: "hq" as const,
+      ...(opts.pre ? { pre: opts.pre } : {}),
       ...(opts.captions?.length ? { captions: opts.captions } : {}),
       ...(opts.plate ? { plate: opts.plate } : {}),
     });
@@ -156,6 +160,7 @@ export async function renderVideo(
         bitrate: opts.bitrate ?? 10_000_000,
         turbo: opts.turbo ?? 4,
         clip: opts.clip,
+        pre: opts.pre,
         captions: opts.captions,
         plate: opts.plate,
         onProgress: opts.onProgress,
