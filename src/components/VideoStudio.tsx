@@ -182,12 +182,12 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
           </div>
         </header>
 
-        <div className="grid flex-1 gap-4 overflow-y-auto p-4 md:grid-cols-[1.1fr_1fr]">
+        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 md:grid-cols-[1.1fr_1fr] md:overflow-hidden">
           {/* palco */}
-          <div className="space-y-3">
+          <div className="flex min-h-0 flex-col gap-3 md:overflow-y-auto">
             <div
               ref={boxRef}
-              className="relative mx-auto w-full max-w-md overflow-hidden rounded-xl border border-border bg-black"
+              className="relative mx-auto w-full max-w-[min(100%,22rem)] max-h-[46vh] overflow-hidden rounded-xl border border-border bg-black"
               style={{ aspectRatio: String(srcAR) }}
               onPointerMove={onPointerMove}
               onPointerUp={() => (dragRef.current = null)}
