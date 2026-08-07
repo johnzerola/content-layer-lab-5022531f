@@ -257,7 +257,7 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
           </div>
 
           {/* controles */}
-          <div className="space-y-4">
+          <div className="min-h-0 space-y-4 md:overflow-y-auto md:pr-1">
             <div className="flex gap-1 rounded-lg border border-border p-1">
               {([
                 { id: "trim", label: "Cortar", icon: Scissors },
