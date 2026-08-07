@@ -23,6 +23,9 @@ export interface ClipItem {
   duration: number;
   clip?: { start: number; end: number } | undefined;
   score?: number | undefined;
+  clipTitle?: string | undefined;
+  clipReason?: string | undefined;
+  clipTags?: string[] | undefined;
   status: "pendente" | "na fila" | "processando" | "pronto" | "erro";
   progress: number;
   blob?: Blob | undefined;
