@@ -10,6 +10,7 @@ import {
 } from "./template";
 import type { CaptionCue } from "./captions";
 import { exemplarDetail, inpaintTelea, resetInpaintCache } from "./inpaint";
+import { cropRect, preEditFilter, type PreEdit } from "./preedit";
 
 /**
  * Reconstrói a área (sem borrão) usando FMM de Telea multi-escala + refino exemplar.
@@ -581,6 +582,8 @@ export interface DrawOpts {
   captions?: CaptionCue[];
   /** placa de fundo (mediana temporal) para reconstruir áreas com pixels reais */
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null;
+  /** pré-edição do vídeo fonte (recorte, giro, cor) aplicada antes do template */
+  pre?: PreEdit | null;
   /** "hq" = reconstrução em resolução total (exportação). Padrão: preview rápido. */
   quality?: "preview" | "hq";
 }
