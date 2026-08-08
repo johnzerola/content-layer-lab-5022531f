@@ -626,7 +626,7 @@ export const LAYER_LABELS: Record<LayerId, string> = {
 
 const KEY = "vv.templates";
 const VKEY = "vv.template-versions";
-const MAX_VERSIONS = 20;
+const MAX_VERSIONS = 8;
 
 export interface TemplateVersion {
   version: number;
@@ -660,8 +660,29 @@ export function loadTemplates(): Template[] {
   return read<Template[]>(KEY, []).map(migrate);
 }
 
+/** Escrita tolerante a quota: nunca lança, apenas avisa no console. */
+function safeWrite(key: string, value: string): boolean {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function saveTemplates(list: Template[]) {
-  localStorage.setItem(KEY, JSON.stringify(list));
+  if (typeof window === "undefined") return;
+  if (!safeWrite(KEY, JSON.stringify(list))) {
+    // libera espaço descartando o histórico de versões e tenta de novo
+    try {
+      localStorage.removeItem(VKEY);
+    } catch {
+      /* ignora */
+    }
+    if (!safeWrite(KEY, JSON.stringify(list))) {
+      console.warn("Armazenamento local cheio: não foi possível salvar os templates.");
+    }
+  }
 }
 
 type VersionMap = Record<string, TemplateVersion[]>;
@@ -670,8 +691,29 @@ export function loadVersions(templateId: string): TemplateVersion[] {
   return read<VersionMap>(VKEY, {})[templateId] ?? [];
 }
 
+/** Grava o histórico podando versões antigas até caber na quota. */
 function writeVersions(map: VersionMap) {
-  localStorage.setItem(VKEY, JSON.stringify(map));
+  if (typeof window === "undefined") return;
+  let current = map;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    if (safeWrite(VKEY, JSON.stringify(current))) return;
+    // descarta a versão mais antiga da lista mais longa
+    let longestId = "";
+    let longest = 0;
+    for (const [id, versions] of Object.entries(current)) {
+      if (versions.length > longest) {
+        longest = versions.length;
+        longestId = id;
+      }
+    }
+    if (!longestId || longest <= 1) break;
+    current = { ...current, [longestId]: (current[longestId] ?? []).slice(0, longest - 1) };
+  }
+  try {
+    localStorage.removeItem(VKEY);
+  } catch {
+    /* ignora */
+  }
 }
 
 /** Salva o template criando uma nova versão no histórico. */
