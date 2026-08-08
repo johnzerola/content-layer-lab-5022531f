@@ -18,8 +18,9 @@ interface Props {
   onClose: () => void;
   onChangeList: (list: Template[]) => void;
   onUse: (t: Template) => void;
-  /** Salva um template (nova versão) na biblioteca. */
-  onCommit: (t: Template, note?: string) => void;
+  /** Salva um template (nova versão) na biblioteca e devolve a versão salva. */
+  onCommit: (t: Template, note?: string) => Template | void;
+
 }
 
 const fmt = (ts?: number) =>
@@ -102,12 +103,12 @@ export function TemplateLibrary({ templates, activeId, onClose, onChangeList, on
                     variant="outline"
                     onClick={() => {
                       const t = p.build();
-                      onCommit(t, "modelo pronto");
-                      onUse(t);
+                      onUse(onCommit(t, "modelo pronto") || t);
                     }}
                   >
                     Usar
                   </Button>
+
                 </div>
                 <p className="mt-2 text-xs leading-snug text-muted-foreground">{p.description}</p>
               </div>
