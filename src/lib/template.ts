@@ -565,6 +565,11 @@ export function fitCanvasToSource(t: Template, srcW: number, srcH: number, maxDi
   const w = even(srcW * scale);
   const h = even(srcH * scale);
   const scaled = applyRatio(t, w, h);
+  // mantém o arredondamento escolhido pelo usuário (proporcional ao novo quadro)
+  const radius = Math.max(
+    0,
+    Math.round((t.video.radius ?? 0) * (w / (t.video.w || t.canvasW || w))),
+  );
   return {
     ...scaled,
     canvasW: w,
@@ -576,7 +581,7 @@ export function fitCanvasToSource(t: Template, srcW: number, srcH: number, maxDi
       w,
       h,
       rotation: 0,
-      radius: 0,
+      radius: Math.min(radius, Math.floor(Math.min(w, h) / 2)),
       offsetX: 0,
       offsetY: 0,
       fit: "contain",
@@ -584,6 +589,7 @@ export function fitCanvasToSource(t: Template, srcW: number, srcH: number, maxDi
     },
   };
 }
+
 
 /** Troca a proporção reescalando todas as camadas proporcionalmente. */
 export function applyRatio(t: Template, w: number, h: number): Template {
