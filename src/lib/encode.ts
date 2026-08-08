@@ -314,6 +314,17 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       await video.play();
       const targetRate = Math.max(1, Math.min(opts.turbo ?? 4, maxRate));
 
+      // reaproveita o último quadro desenhado quando o desenho não acompanha a
+      // leitura (evita a exportação ficar parada em 9% por vários minutos)
+      const emitRepeat = () => {
+        const frame = new VideoFrame(canvas, {
+          timestamp: frameIndex * frameDur,
+          duration: frameDur,
+        });
+        encoder.encode(frame, { keyFrame: frameIndex % (fps * 2) === 0 });
+        frame.close();
+        frameIndex++;
+      };
 
       await new Promise<void>((resolve, reject) => {
         let stopped = false;
@@ -332,15 +343,21 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
             return;
           }
           const outT = (video.currentTime - trimStart) / v.speed;
-          // se o desenho não acompanha, reduz a leitura (podendo ir abaixo do
-          // tempo real) em vez de deixar quadros para trás
+          // nunca abaixo do tempo real: se o desenho não acompanha, completamos
+          // com repetição de quadro em vez de arrastar a leitura para 0,25x
           const lag = outT - frameIndex / fps;
-          if (lag > 0.3) video.playbackRate = Math.max(0.25, video.playbackRate * 0.7);
+          if (lag > 0.3) video.playbackRate = Math.max(1, video.playbackRate * 0.8);
           else if (lag < 0.05 && video.playbackRate < targetRate)
             video.playbackRate = Math.min(targetRate, video.playbackRate * 1.08);
 
           if (frameIndex < totalFrames && outT >= 0 && frameIndex / fps <= outT) {
             await emit();
+            // preenche a lacuna acumulada repetindo o quadro recém-desenhado
+            const behind = Math.floor((outT - frameIndex / fps) * fps);
+            if (behind > 0) {
+              const fill = Math.min(behind, totalFrames - frameIndex);
+              for (let i = 0; i < fill; i++) emitRepeat();
+            }
           }
           opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
           if (video.currentTime >= endAt || video.ended || frameIndex >= totalFrames) return stop();
@@ -351,14 +368,21 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
         void step();
       });
 
-      // completa quadros faltantes com busca precisa (evita congelar no fim)
+      // completa quadros faltantes: busca precisa só no trecho curto final;
+      // se faltar muita coisa, repete o último quadro (rápido) em vez de travar
+      const tailSeekLimit = Math.round(fps * 2);
       while (frameIndex < totalFrames) {
         if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
-        await seekTo(trimStart + (frameIndex / fps) * v.speed);
-        await emit();
+        if (totalFrames - frameIndex <= tailSeekLimit) {
+          await seekTo(trimStart + (frameIndex / fps) * v.speed);
+          await emit();
+        } else {
+          emitRepeat();
+        }
         if (frameIndex % 5 === 0) opts.onProgress?.(Math.min(0.99, frameIndex / totalFrames));
       }
     }
+
 
 
     await encoder.flush();
