@@ -704,6 +704,42 @@ export function loadVersions(templateId: string): TemplateVersion[] {
   return read<VersionMap>(VKEY, {})[templateId] ?? [];
 }
 
+/** Todo o histórico salvo, por template. */
+export function loadAllVersions(): Record<string, TemplateVersion[]> {
+  return read<VersionMap>(VKEY, {});
+}
+
+/** Remove versões específicas (por número) de um template. */
+export function deleteVersions(templateId: string, versions: number[]): TemplateVersion[] {
+  const map = read<VersionMap>(VKEY, {});
+  const drop = new Set(versions);
+  const next = (map[templateId] ?? []).filter((v) => !drop.has(v.version));
+  if (next.length) map[templateId] = next;
+  else delete map[templateId];
+  writeVersions(map);
+  return next;
+}
+
+/** Apaga todo o histórico de versões (mantém os templates). */
+export function clearAllVersions() {
+  writeVersions({});
+}
+
+/** Uso aproximado do armazenamento local (bytes). */
+export function storageUsage() {
+  if (typeof window === "undefined") return { templates: 0, versions: 0, total: 0, other: 0 };
+  const size = (k: string) => (localStorage.getItem(k)?.length ?? 0) * 2;
+  let all = 0;
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i)!;
+    all += (k.length + (localStorage.getItem(k)?.length ?? 0)) * 2;
+  }
+  const templates = size(KEY);
+  const versions = size(VKEY);
+  return { templates, versions, total: all, other: Math.max(0, all - templates - versions) };
+}
+
+
 /** Grava o histórico podando versões antigas até caber na quota. */
 function writeVersions(map: VersionMap) {
   if (typeof window === "undefined") return;
