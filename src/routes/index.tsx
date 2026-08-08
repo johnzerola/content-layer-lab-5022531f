@@ -28,7 +28,7 @@ import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { TemplateEditor } from "@/components/TemplateEditor";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
-import { autoSyncTemplates, logBatch, logExports, type ProjectSnapshot } from "@/lib/cloud";
+import { autoSyncTemplates, enableCloudQuotaFallback, logBatch, logExports, type ProjectSnapshot } from "@/lib/cloud";
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
@@ -211,6 +211,15 @@ function Home() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [webmWarn, setWebmWarn] = useState(false);
   useEffect(() => setWebmWarn(outputIsWebm()), []);
+  // fallback: se o localStorage encher, os templates vão para a nuvem
+  useEffect(() => {
+    enableCloudQuotaFallback((ok, msg) => {
+      if (ok) toast.success(msg);
+      else toast.error(msg, { action: { label: "Nuvem", onClick: () => setCloudOpen(true) } });
+    });
+    return () => { enableCloudQuotaFallback(); };
+  }, []);
+
 
   // filas totalmente separadas por ferramenta
   const [queues, setQueues] = useState<Record<Mode, Item[]>>({ lote: [], clip: [], limpar: [] });

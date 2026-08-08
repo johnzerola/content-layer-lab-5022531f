@@ -1,7 +1,7 @@
 /** Sincronização opcional da biblioteca com a nuvem (login por e-mail ou Google). */
 import { supabase } from "@/integrations/supabase/client";
 import type { Json } from "@/integrations/supabase/types";
-import { migrate, type Template } from "@/lib/template";
+import { migrate, registerQuotaFallback, type Template } from "@/lib/template";
 
 export type CloudUser = { id: string; email: string | null };
 
@@ -256,4 +256,72 @@ export function autoSyncTemplates(list: Template[], delay = 4000) {
       if (u && list.length) void pushTemplates(list).catch(() => undefined);
     });
   }, delay);
+}
+
+/* -------------------------------------------------------------------- */
+/* Fallback de quota: quando o localStorage estoura, salva na nuvem      */
+/* -------------------------------------------------------------------- */
+
+const PENDING_KEY = "vv.cloud-pending";
+
+/** Envia os templates + histórico direto para a nuvem (usado no estouro de quota). */
+export async function saveTemplatesOverflow(
+  list: Template[],
+  versions?: Record<string, { version: number; savedAt: number; note: string; snapshot: Template }[]>,
+) {
+  const user = await currentUser();
+  if (!user) throw new Error("Sem login: não foi possível salvar na nuvem.");
+  if (list.length) await pushTemplates(list);
+  if (versions) {
+    const { data } = await supabase.from("templates").select("id,local_id");
+    const idByLocal = new Map((data ?? []).map((r) => [r.local_id, r.id]));
+    const rows = Object.entries(versions).flatMap(([localId, vs]) => {
+      const templateId = idByLocal.get(localId);
+      if (!templateId) return [];
+      return vs.slice(0, 5).map((v) => ({
+        user_id: user.id,
+        template_id: templateId,
+        label: `v${v.version} · ${new Date(v.savedAt).toLocaleString("pt-BR")}${v.note ? ` · ${v.note}` : ""}`,
+        data: v.snapshot as unknown as Json,
+      }));
+    });
+    if (rows.length) await supabase.from("template_versions").insert(rows);
+  }
+}
+
+/** Registra o fallback no módulo de templates (idempotente). */
+export function enableCloudQuotaFallback(onResult?: (ok: boolean, msg: string) => void) {
+  registerQuotaFallback((list, versions) => {
+    void saveTemplatesOverflow(list, versions)
+      .then(() => {
+        try {
+          sessionStorage.removeItem(PENDING_KEY);
+        } catch {
+          /* ignora */
+        }
+        onResult?.(true, "Armazenamento local cheio — templates salvos na nuvem.");
+      })
+      .catch((e: unknown) => {
+        try {
+          sessionStorage.setItem(PENDING_KEY, "1");
+        } catch {
+          /* ignora */
+        }
+        onResult?.(
+          false,
+          e instanceof Error && e.message.includes("login")
+            ? "Armazenamento local cheio. Entre na sua conta para salvar os templates na nuvem."
+            : "Armazenamento local cheio e a nuvem não respondeu. Tente sincronizar manualmente.",
+        );
+      });
+  });
+}
+
+/** Existe algo aguardando envio para a nuvem nesta sessão? */
+export function hasPendingCloudSave(): boolean {
+  try {
+    return sessionStorage.getItem(PENDING_KEY) === "1";
+  } catch {
+    return false;
+  }
 }

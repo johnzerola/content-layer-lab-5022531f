@@ -670,6 +670,16 @@ function safeWrite(key: string, value: string): boolean {
   }
 }
 
+/** Fallback registrado pela nuvem: chamado quando o localStorage estoura a quota. */
+type QuotaFallback = (list: Template[], versions?: VersionMap) => void;
+let quotaFallback: QuotaFallback | null = null;
+export function registerQuotaFallback(fn: QuotaFallback | null) {
+  quotaFallback = fn;
+}
+
+/** Últimos templates que não couberam localmente (para a UI avisar). */
+export let lastQuotaOverflow = 0;
+
 export function saveTemplates(list: Template[]) {
   if (typeof window === "undefined") return;
   if (!safeWrite(KEY, JSON.stringify(list))) {
@@ -680,10 +690,13 @@ export function saveTemplates(list: Template[]) {
       /* ignora */
     }
     if (!safeWrite(KEY, JSON.stringify(list))) {
-      console.warn("Armazenamento local cheio: não foi possível salvar os templates.");
+      console.warn("Armazenamento local cheio: salvando templates na nuvem.");
+      lastQuotaOverflow = Date.now();
+      quotaFallback?.(list);
     }
   }
 }
+
 
 type VersionMap = Record<string, TemplateVersion[]>;
 
@@ -709,12 +722,16 @@ function writeVersions(map: VersionMap) {
     if (!longestId || longest <= 1) break;
     current = { ...current, [longestId]: (current[longestId] ?? []).slice(0, longest - 1) };
   }
+  // não coube nem podando: manda o histórico para a nuvem e limpa o local
   try {
     localStorage.removeItem(VKEY);
   } catch {
     /* ignora */
   }
+  lastQuotaOverflow = Date.now();
+  quotaFallback?.(loadTemplates(), map);
 }
+
 
 /** Salva o template criando uma nova versão no histórico. */
 export function commitTemplate(
