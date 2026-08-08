@@ -45,7 +45,10 @@ const fmt = (s: number) => {
   return `${m}:${r.toFixed(1).padStart(4, "0")}`;
 };
 
-type Drag = { mode: "move" | "nw" | "ne" | "sw" | "se"; x: number; y: number; crop: NonNullable<PreEdit["crop"]> };
+type Handle = "nw" | "ne" | "sw" | "se" | "n" | "s" | "w" | "e";
+type Drag = { mode: "move" | Handle; x: number; y: number; crop: NonNullable<PreEdit["crop"]> };
+
+const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
 /** Estúdio de pré-edição: corte de tempo, recorte de quadro, giro e cor. */
 export function VideoStudio({ file, width, height, duration, value, onClose, onSave }: Props) {
@@ -55,6 +58,8 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
   const [tab, setTab] = useState<"trim" | "crop" | "color">("trim");
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(value.clip?.start ?? 0);
+  /** proporção travada do recorte (largura/altura em pixels da fonte) */
+  const [lock, setLock] = useState<number | null>(null);
 
   const [url, setUrl] = useState("");
   useEffect(() => {
