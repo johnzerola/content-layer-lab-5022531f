@@ -5,16 +5,55 @@ export interface OutFile {
   blob: Blob;
 }
 
-export async function downloadAsZip(files: OutFile[], zipName = "vaiviral.zip") {
-  const blob = await downloadZip(
-    files.map((f) => ({ name: f.name, input: f.blob, lastModified: new Date() })),
-  ).blob();
+type SavePicker = (opts?: {
+  suggestedName?: string;
+  types?: { description: string; accept: Record<string, string[]> }[];
+}) => Promise<FileSystemFileHandle>;
+
+function triggerDownload(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = zipName;
+  a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 8000);
+}
+
+export async function downloadAsZip(files: OutFile[], zipName = "vaiviral.zip") {
+  if (!files.length) return;
+  // um único arquivo não precisa de ZIP (evita cópia de centenas de MB na memória)
+  if (files.length === 1) {
+    triggerDownload(files[0]!.blob, files[0]!.name);
+    return;
+  }
+
+  const entries = files.map((f) => ({ name: f.name, input: f.blob, lastModified: new Date() }));
+  // client-zip só empacota (sem compressão): o gargalo é montar tudo na memória.
+  // Quando o navegador permite, escrevemos direto no disco em streaming.
+  const picker = (window as unknown as { showSaveFilePicker?: SavePicker }).showSaveFilePicker;
+  if (picker) {
+    try {
+      const handle = await picker({
+        suggestedName: zipName,
+        types: [{ description: "ZIP", accept: { "application/zip": [".zip"] } }],
+      });
+      const writable = await handle.createWritable();
+      const stream = downloadZip(entries).body;
+      if (stream) {
+        await stream.pipeTo(writable);
+        return;
+      }
+      await writable.write(await downloadZip(entries).blob());
+      await writable.close();
+      return;
+    } catch (err) {
+      if ((err as Error)?.name === "AbortError") return;
+      /* sem permissão: cai no download normal */
+    }
+  }
+
+  const blob = await downloadZip(entries).blob();
+  triggerDownload(blob, zipName);
 }
 
 type DirPicker = () => Promise<FileSystemDirectoryHandle>;

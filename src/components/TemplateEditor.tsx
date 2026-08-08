@@ -392,7 +392,7 @@ export function TemplateEditor({
                           <Slider label="Y" value={t.video.y} min={-200} max={1920} onChange={(v) => patch(id, { y: v })} />
                           <Slider label="Largura" value={t.video.w} min={200} max={1080} onChange={(v) => patch(id, { w: v })} />
                           <Slider label="Altura" value={t.video.h} min={200} max={1920} onChange={(v) => patch(id, { h: v })} />
-                          <Slider label="Cantos arredondados" value={t.video.radius} min={0} max={80} onChange={(v) => patch(id, { radius: v })} />
+                          <Slider label="Cantos arredondados" value={t.video.radius} min={0} max={240} onChange={(v) => patch(id, { radius: v })} />
                           <div className="flex gap-2">
                             {[
                               ["9:16", 9 / 16],
