@@ -88,7 +88,9 @@ function StoragePage() {
     if (!sel.size) return;
     const byTemplate = new Map<string, number[]>();
     for (const k of sel) {
-      const [id, v] = k.split(":");
+      const idx = k.lastIndexOf(":");
+      const id = k.slice(0, idx);
+      const v = k.slice(idx + 1);
       byTemplate.set(id, [...(byTemplate.get(id) ?? []), Number(v)]);
     }
     for (const [id, versions] of byTemplate) deleteVersions(id, versions);
