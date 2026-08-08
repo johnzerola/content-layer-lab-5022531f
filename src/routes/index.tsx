@@ -45,6 +45,8 @@ import {
   fitCanvasToSource,
   orientationOf,
   loadTemplates,
+  migrate,
+
   PLATFORM_PRESETS,
   RATIO_PRESETS,
   makeCleanupRegion,
