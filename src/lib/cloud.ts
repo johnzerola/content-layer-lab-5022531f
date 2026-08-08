@@ -290,8 +290,11 @@ export async function saveTemplatesOverflow(
 }
 
 /** Registra o fallback no módulo de templates (idempotente). */
-export function enableCloudQuotaFallback(onResult?: (ok: boolean, msg: string) => void) {
-  registerQuotaFallback((list, versions) => {
+export function enableCloudQuotaFallback(
+  onResult?: (ok: boolean, msg: string, historyOnly?: boolean) => void,
+) {
+  registerQuotaFallback((list, versions, opts) => {
+    const historyOnly = opts?.historyOnly === true;
     void saveTemplatesOverflow(list, versions)
       .then(() => {
         try {
@@ -299,7 +302,13 @@ export function enableCloudQuotaFallback(onResult?: (ok: boolean, msg: string) =
         } catch {
           /* ignora */
         }
-        onResult?.(true, "Armazenamento local cheio — templates salvos na nuvem.");
+        onResult?.(
+          true,
+          historyOnly
+            ? "Histórico de versões antigo enviado para a nuvem e limpo do navegador."
+            : "Armazenamento local cheio — templates salvos na nuvem.",
+          historyOnly,
+        );
       })
       .catch((e: unknown) => {
         try {
@@ -309,9 +318,12 @@ export function enableCloudQuotaFallback(onResult?: (ok: boolean, msg: string) =
         }
         onResult?.(
           false,
-          e instanceof Error && e.message.includes("login")
-            ? "Armazenamento local cheio. Entre na sua conta para salvar os templates na nuvem."
-            : "Armazenamento local cheio e a nuvem não respondeu. Tente sincronizar manualmente.",
+          historyOnly
+            ? "Histórico de versões antigo foi limpo para liberar espaço. Seus templates continuam salvos."
+            : e instanceof Error && e.message.includes("login")
+              ? "Armazenamento local cheio. Entre na sua conta para salvar os templates na nuvem."
+              : "Armazenamento local cheio e a nuvem não respondeu. Tente sincronizar manualmente.",
+          historyOnly,
         );
       });
   });

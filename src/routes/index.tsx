@@ -213,8 +213,9 @@ function Home() {
   useEffect(() => setWebmWarn(outputIsWebm()), []);
   // fallback: se o localStorage encher, os templates vão para a nuvem
   useEffect(() => {
-    enableCloudQuotaFallback((ok, msg) => {
-      if (ok) toast.success(msg);
+    enableCloudQuotaFallback((ok, msg, historyOnly) => {
+      if (historyOnly) toast.info(msg);
+      else if (ok) toast.success(msg);
       else toast.error(msg, { action: { label: "Nuvem", onClick: () => setCloudOpen(true) } });
     });
     return () => { enableCloudQuotaFallback(); };

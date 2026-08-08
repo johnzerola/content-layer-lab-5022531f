@@ -677,7 +677,11 @@ function safeWrite(key: string, value: string): boolean {
 }
 
 /** Fallback registrado pela nuvem: chamado quando o localStorage estoura a quota. */
-type QuotaFallback = (list: Template[], versions?: VersionMap) => void;
+type QuotaFallback = (
+  list: Template[],
+  versions?: VersionMap,
+  opts?: { historyOnly?: boolean },
+) => void;
 let quotaFallback: QuotaFallback | null = null;
 export function registerQuotaFallback(fn: QuotaFallback | null) {
   quotaFallback = fn;
@@ -770,8 +774,14 @@ function writeVersions(map: VersionMap) {
   } catch {
     /* ignora */
   }
+  // guarda ao menos a versão mais recente de cada template, se couber
+  const latest: VersionMap = {};
+  for (const [id, versions] of Object.entries(map)) {
+    if (versions[0]) latest[id] = [versions[0]];
+  }
+  safeWrite(VKEY, JSON.stringify(latest));
   lastQuotaOverflow = Date.now();
-  quotaFallback?.(loadTemplates(), map);
+  quotaFallback?.(loadTemplates(), map, { historyOnly: true });
 }
 
 
