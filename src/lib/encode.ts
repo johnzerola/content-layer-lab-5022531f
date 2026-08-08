@@ -329,7 +329,10 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
             return;
           }
           const outT = (video.currentTime - trimStart) / v.speed;
-          if (frameIndex < totalFrames && outT >= 0 && frameIndex / fps <= outT) {
+          // Converte a cadência da fonte para FPS constante. Fontes de 24 fps,
+          // por exemplo, precisam ocasionalmente alimentar dois frames em uma
+          // saída de 30 fps; fontes de 60 fps naturalmente descartam o excedente.
+          while (frameIndex < totalFrames && outT >= 0 && frameIndex / fps <= outT) {
             await emit();
           }
           opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
