@@ -295,9 +295,12 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
             return;
           }
           const outT = (video.currentTime - trimStart) / v.speed;
-          // se o desenho não acompanha, reduz a leitura em vez de repetir quadros
+          // se o desenho não acompanha, reduz a leitura (podendo ir abaixo do
+          // tempo real) em vez de deixar quadros para trás
           const lag = outT - frameIndex / fps;
-          if (lag > 0.35) video.playbackRate = Math.max(1, video.playbackRate * 0.8);
+          if (lag > 0.3) video.playbackRate = Math.max(0.25, video.playbackRate * 0.7);
+          else if (lag < 0.05 && video.playbackRate < maxRate)
+            video.playbackRate = Math.min(maxRate, video.playbackRate * 1.05);
           if (frameIndex < totalFrames && frameIndex / fps <= outT) {
             await emit();
           }
@@ -312,8 +315,10 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
 
       // completa quadros faltantes com busca precisa (evita congelar no fim)
       while (frameIndex < totalFrames) {
+        if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
         await seekTo(trimStart + (frameIndex / fps) * v.speed);
         await emit();
+        if (frameIndex % 5 === 0) opts.onProgress?.(Math.min(0.99, frameIndex / totalFrames));
       }
     }
 
