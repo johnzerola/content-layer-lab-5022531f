@@ -2304,9 +2304,10 @@ function Home() {
           onClose={() => setLibraryOpen(false)}
           onChangeList={setTemplates}
           onUse={(t) => {
-            setActive(t);
+            useTemplate(t);
             setLibraryOpen(false);
           }}
+
           onCommit={commit}
         />
       )}
