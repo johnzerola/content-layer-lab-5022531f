@@ -325,7 +325,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
           if (lag > 0.3) video.playbackRate = Math.max(0.25, video.playbackRate * 0.7);
           else if (lag < 0.05 && video.playbackRate < maxRate)
             video.playbackRate = Math.min(maxRate, video.playbackRate * 1.05);
-          if (frameIndex < totalFrames && frameIndex / fps <= outT) {
+          if (frameIndex < totalFrames && outT >= 0 && frameIndex / fps <= outT) {
             await emit();
           }
           opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
