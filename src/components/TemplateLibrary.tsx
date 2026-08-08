@@ -103,12 +103,12 @@ export function TemplateLibrary({ templates, activeId, onClose, onChangeList, on
                     variant="outline"
                     onClick={() => {
                       const t = p.build();
-                      onCommit(t, "modelo pronto");
-                      onUse(t);
+                      onUse(onCommit(t, "modelo pronto") || t);
                     }}
                   >
                     Usar
                   </Button>
+
                 </div>
                 <p className="mt-2 text-xs leading-snug text-muted-foreground">{p.description}</p>
               </div>
