@@ -1247,7 +1247,8 @@ function Home() {
                 value={templates.some((t) => t.id === active.id) ? active.id : ""}
                 onChange={(e) => {
                   const t = templates.find((x) => x.id === e.target.value);
-                  if (t) setActive(t);
+                  if (t) useTemplate(t);
+
                 }}
               >
                 <option value="" disabled>
