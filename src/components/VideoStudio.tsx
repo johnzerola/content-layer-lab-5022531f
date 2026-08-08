@@ -397,23 +397,38 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
             {tab === "crop" && (
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-1.5">
-                  {CROP_PRESETS.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() =>
-                        set({ crop: p.ratio ? cropForRatio(p.ratio, width || 1080, height || 1920) : null })
-                      }
-                      className={`rounded-md border px-2.5 py-1 font-mono text-[11px] transition ${
-                        (p.ratio === null && isFullCrop(pre.crop)) ? "border-primary text-primary" : "border-border text-muted-foreground hover:border-primary/50"
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
+                  {CROP_PRESETS.map((p) => {
+                    const active = p.ratio === null ? lock === null && isFullCrop(pre.crop) : lock === p.ratio;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => applyRatio(p.ratio ?? null)}
+                        className={`rounded-md border px-2.5 py-1 font-mono text-[11px] transition ${
+                          active
+                            ? "border-primary text-primary"
+                            : "border-border text-muted-foreground hover:border-primary/50"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
                 </div>
                 <p className="font-mono text-[11px] text-muted-foreground">
-                  Arraste o retângulo no palco para escolher a área que fica no vídeo.
+                  Arraste o retângulo (ou as alças das bordas) para escolher a área que fica no vídeo.
+                  {lock ? " Proporção travada — o recorte mantém o formato." : ""}
                 </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="secondary" size="sm" onClick={centerCrop}>
+                    Centralizar
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => applyRatio(null)}>
+                    Quadro inteiro
+                  </Button>
+                  <span className="self-center font-mono text-[11px] text-muted-foreground">
+                    saída {cropPx.w}×{cropPx.h}px
+                  </span>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <Num label="X %" value={crop.x} onChange={(n) => set({ crop: { ...crop, x: Math.min(n, 1 - crop.w) } })} />
                   <Num label="Y %" value={crop.y} onChange={(n) => set({ crop: { ...crop, y: Math.min(n, 1 - crop.h) } })} />
