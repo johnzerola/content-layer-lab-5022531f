@@ -336,8 +336,9 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
           // tempo real) em vez de deixar quadros para trás
           const lag = outT - frameIndex / fps;
           if (lag > 0.3) video.playbackRate = Math.max(0.25, video.playbackRate * 0.7);
-          else if (lag < 0.05 && video.playbackRate < maxRate)
-            video.playbackRate = Math.min(maxRate, video.playbackRate * 1.05);
+          else if (lag < 0.05 && video.playbackRate < targetRate)
+            video.playbackRate = Math.min(targetRate, video.playbackRate * 1.08);
+
           if (frameIndex < totalFrames && outT >= 0 && frameIndex / fps <= outT) {
             await emit();
           }
