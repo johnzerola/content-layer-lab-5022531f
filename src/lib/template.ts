@@ -722,12 +722,16 @@ function writeVersions(map: VersionMap) {
     if (!longestId || longest <= 1) break;
     current = { ...current, [longestId]: (current[longestId] ?? []).slice(0, longest - 1) };
   }
+  // não coube nem podando: manda o histórico para a nuvem e limpa o local
   try {
     localStorage.removeItem(VKEY);
   } catch {
     /* ignora */
   }
+  lastQuotaOverflow = Date.now();
+  quotaFallback?.(loadTemplates(), map);
 }
+
 
 /** Salva o template criando uma nova versão no histórico. */
 export function commitTemplate(
