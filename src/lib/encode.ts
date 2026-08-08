@@ -250,13 +250,15 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
         video.onseeked = finish;
         video.currentTime = Math.min(Math.max(0, time), Math.max(0, video.duration - 1 / 1000));
         // segurança: se o navegador não disparar seeked, segue em frente
-        setTimeout(finish, 400);
+        setTimeout(finish, 150);
       });
 
-    // Vídeos longos ou com reconstrução (limpeza) não acompanham a leitura em
-    // tempo real: o quadro fonte não avança na mesma velocidade do encoder e o
-    // resultado sai travado/repetido. Nesses casos percorremos quadro a quadro.
-    const heavy = (t.cleanup?.length ?? 0) > 0 || outDur > 40;
+    // Buscar quadro a quadro é preciso, mas cada seek custa 50–300 ms: em um
+    // vídeo de 2 minutos isso vira mais de meia hora. Só usamos esse caminho em
+    // trechos curtos; o resto roda em leitura contínua (com taxa adaptativa),
+    // que entrega o mesmo resultado em uma fração do tempo.
+    const hasCleanup = (t.cleanup?.length ?? 0) > 0;
+    const heavy = outDur <= 20 && (hasCleanup || outDur <= 8);
 
     video.currentTime = trimStart;
     await new Promise<void>((res) => {
@@ -271,7 +273,8 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
         if (frameIndex % 5 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
       }
     } else {
-      video.playbackRate = Math.max(1, Math.min(opts.turbo ?? 4, 16));
+      const maxRate = hasCleanup ? 2 : 16;
+      video.playbackRate = Math.max(1, Math.min(opts.turbo ?? 4, maxRate));
       const endAt = trimStart + effDur;
       await video.play();
 
@@ -292,9 +295,12 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
             return;
           }
           const outT = (video.currentTime - trimStart) / v.speed;
-          // se o desenho não acompanha, reduz a leitura em vez de repetir quadros
+          // se o desenho não acompanha, reduz a leitura (podendo ir abaixo do
+          // tempo real) em vez de deixar quadros para trás
           const lag = outT - frameIndex / fps;
-          if (lag > 0.35) video.playbackRate = Math.max(1, video.playbackRate * 0.8);
+          if (lag > 0.3) video.playbackRate = Math.max(0.25, video.playbackRate * 0.7);
+          else if (lag < 0.05 && video.playbackRate < maxRate)
+            video.playbackRate = Math.min(maxRate, video.playbackRate * 1.05);
           if (frameIndex < totalFrames && frameIndex / fps <= outT) {
             await emit();
           }
@@ -309,8 +315,10 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
 
       // completa quadros faltantes com busca precisa (evita congelar no fim)
       while (frameIndex < totalFrames) {
+        if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
         await seekTo(trimStart + (frameIndex / fps) * v.speed);
         await emit();
+        if (frameIndex % 5 === 0) opts.onProgress?.(Math.min(0.99, frameIndex / totalFrames));
       }
     }
 

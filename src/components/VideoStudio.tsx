@@ -45,7 +45,10 @@ const fmt = (s: number) => {
   return `${m}:${r.toFixed(1).padStart(4, "0")}`;
 };
 
-type Drag = { mode: "move" | "nw" | "ne" | "sw" | "se"; x: number; y: number; crop: NonNullable<PreEdit["crop"]> };
+type Handle = "nw" | "ne" | "sw" | "se" | "n" | "s" | "w" | "e";
+type Drag = { mode: "move" | Handle; x: number; y: number; crop: NonNullable<PreEdit["crop"]> };
+
+const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
 /** Estúdio de pré-edição: corte de tempo, recorte de quadro, giro e cor. */
 export function VideoStudio({ file, width, height, duration, value, onClose, onSave }: Props) {
@@ -55,6 +58,8 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
   const [tab, setTab] = useState<"trim" | "crop" | "color">("trim");
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(value.clip?.start ?? 0);
+  /** proporção travada do recorte (largura/altura em pixels da fonte) */
+  const [lock, setLock] = useState<number | null>(null);
 
   const [url, setUrl] = useState("");
   useEffect(() => {
@@ -123,40 +128,81 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
     [crop],
   );
 
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    const d = dragRef.current;
-    const b = boxRef.current?.getBoundingClientRect();
-    if (!d || !b) return;
-    const nx = (e.clientX - b.left) / b.width;
-    const ny = (e.clientY - b.top) / b.height;
-    const dx = nx - d.x;
-    const dy = ny - d.y;
-    const c = d.crop;
-    const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
-    let next = { ...c };
-    if (d.mode === "move") {
-      next.x = clamp(c.x + dx, 0, 1 - c.w);
-      next.y = clamp(c.y + dy, 0, 1 - c.h);
-    } else {
-      const right = c.x + c.w;
-      const bottom = c.y + c.h;
-      if (d.mode === "nw" || d.mode === "sw") {
-        const x = clamp(c.x + dx, 0, right - 0.06);
-        next.x = x;
-        next.w = right - x;
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      const d = dragRef.current;
+      const b = boxRef.current?.getBoundingClientRect();
+      if (!d || !b) return;
+      const nx = (e.clientX - b.left) / b.width;
+      const ny = (e.clientY - b.top) / b.height;
+      const dx = nx - d.x;
+      const dy = ny - d.y;
+      const c = d.crop;
+      const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+      const MIN = 0.06;
+      const next = { ...c };
+      if (d.mode === "move") {
+        next.x = clamp(c.x + dx, 0, 1 - c.w);
+        next.y = clamp(c.y + dy, 0, 1 - c.h);
       } else {
-        next.w = clamp(c.w + dx, 0.06, 1 - c.x);
+        const m = d.mode;
+        const right = c.x + c.w;
+        const bottom = c.y + c.h;
+        if (m.includes("w")) {
+          const x = clamp(c.x + dx, 0, right - MIN);
+          next.x = x;
+          next.w = right - x;
+        } else if (m.includes("e")) {
+          next.w = clamp(c.w + dx, MIN, 1 - c.x);
+        }
+        if (m.startsWith("n")) {
+          const y = clamp(c.y + dy, 0, bottom - MIN);
+          next.y = y;
+          next.h = bottom - y;
+        } else if (m.startsWith("s")) {
+          next.h = clamp(c.h + dy, MIN, 1 - c.y);
+        }
+        // mantém a proporção escolhida (9:16, 1:1, …) enquanto redimensiona
+        if (lock && width && height) {
+          const boxAR = width / height;
+          // altura normalizada equivalente à proporção travada
+          const hFromW = (next.w * boxAR) / lock;
+          const wFromH = (next.h * lock) / boxAR;
+          const drivenByWidth = m.includes("w") || m.includes("e");
+          if (drivenByWidth) {
+            next.h = Math.min(hFromW, 1);
+            next.w = (next.h * lock) / boxAR;
+          } else {
+            next.w = Math.min(wFromH, 1);
+            next.h = (next.w * boxAR) / lock;
+          }
+          if (m.startsWith("n")) next.y = clamp(bottom - next.h, 0, 1 - next.h);
+          if (m.includes("w")) next.x = clamp(right - next.w, 0, 1 - next.w);
+          next.x = clamp(next.x, 0, 1 - next.w);
+          next.y = clamp(next.y, 0, 1 - next.h);
+        }
       }
-      if (d.mode === "nw" || d.mode === "ne") {
-        const y = clamp(c.y + dy, 0, bottom - 0.06);
-        next.y = y;
-        next.h = bottom - y;
-      } else {
-        next.h = clamp(c.h + dy, 0.06, 1 - c.y);
-      }
-    }
-    setPre((v) => ({ ...v, crop: next }));
-  }, []);
+      setPre((v) => ({ ...v, crop: next }));
+    },
+    [lock, width, height],
+  );
+
+  /** aplica uma proporção (ou libera) centralizando o recorte */
+  const applyRatio = (ratio: number | null) => {
+    setLock(ratio);
+    setPre((v) => ({ ...v, crop: ratio ? cropForRatio(ratio, width || 1080, height || 1920) : null }));
+  };
+
+  const centerCrop = () =>
+    setPre((v) => {
+      const c = v.crop ?? { x: 0, y: 0, w: 1, h: 1 };
+      return { ...v, crop: { ...c, x: (1 - c.w) / 2, y: (1 - c.h) / 2 } };
+    });
+
+  const cropPx = {
+    w: Math.round((crop.w || 1) * (width || 0)),
+    h: Math.round((crop.h || 1) * (height || 0)),
+  };
 
   const filter = preEditFilter(pre);
   const srcAR = width && height ? width / height : 9 / 16;
@@ -215,34 +261,52 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
                 onPause={() => setPlaying(false)}
               />
               {tab === "crop" && (
-                <>
-                  <div
-                    className="absolute cursor-move border-2 border-primary"
-                    style={{
-                      left: `${crop.x * 100}%`,
-                      top: `${crop.y * 100}%`,
-                      width: `${crop.w * 100}%`,
-                      height: `${crop.h * 100}%`,
-                      boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)",
-                    }}
-                    onPointerDown={(e) => onPointerDown(e, "move")}
-                  >
-                    <div className="absolute inset-0 -z-10" />
-                    {(["nw", "ne", "sw", "se"] as const).map((h) => (
+                <div
+                  className="absolute cursor-move border-2 border-primary"
+                  style={{
+                    left: `${crop.x * 100}%`,
+                    top: `${crop.y * 100}%`,
+                    width: `${crop.w * 100}%`,
+                    height: `${crop.h * 100}%`,
+                    boxShadow: "0 0 0 9999px rgba(0,0,0,0.6)",
+                  }}
+                  onPointerDown={(e) => onPointerDown(e, "move")}
+                >
+                  {/* guias de terços */}
+                  <div className="pointer-events-none absolute inset-0 opacity-60">
+                    <div className="absolute inset-y-0 left-1/3 w-px bg-primary/40" />
+                    <div className="absolute inset-y-0 left-2/3 w-px bg-primary/40" />
+                    <div className="absolute inset-x-0 top-1/3 h-px bg-primary/40" />
+                    <div className="absolute inset-x-0 top-2/3 h-px bg-primary/40" />
+                  </div>
+                  <span className="pointer-events-none absolute -top-6 left-0 rounded bg-background/90 px-1.5 py-0.5 font-mono text-[10px] text-foreground">
+                    {cropPx.w}×{cropPx.h}
+                  </span>
+                  {HANDLES.map((h) => {
+                    const cursor =
+                      h === "n" || h === "s"
+                        ? "cursor-ns-resize"
+                        : h === "e" || h === "w"
+                          ? "cursor-ew-resize"
+                          : h === "nw" || h === "se"
+                            ? "cursor-nwse-resize"
+                            : "cursor-nesw-resize";
+                    const mid = h.length === 1;
+                    return (
                       <span
                         key={h}
                         onPointerDown={(e) => onPointerDown(e, h)}
-                        className="absolute size-3.5 cursor-nwse-resize rounded-sm border border-primary bg-background"
+                        className={`absolute size-3.5 rounded-sm border border-primary bg-background ${cursor}`}
                         style={{
-                          left: h.includes("w") ? -7 : undefined,
+                          left: h.includes("w") ? -7 : mid && (h === "n" || h === "s") ? "calc(50% - 7px)" : undefined,
                           right: h.includes("e") ? -7 : undefined,
-                          top: h.startsWith("n") ? -7 : undefined,
+                          top: h.startsWith("n") ? -7 : mid && (h === "e" || h === "w") ? "calc(50% - 7px)" : undefined,
                           bottom: h.startsWith("s") ? -7 : undefined,
                         }}
                       />
-                    ))}
-                  </div>
-                </>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
@@ -333,23 +397,38 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
             {tab === "crop" && (
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-1.5">
-                  {CROP_PRESETS.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() =>
-                        set({ crop: p.ratio ? cropForRatio(p.ratio, width || 1080, height || 1920) : null })
-                      }
-                      className={`rounded-md border px-2.5 py-1 font-mono text-[11px] transition ${
-                        (p.ratio === null && isFullCrop(pre.crop)) ? "border-primary text-primary" : "border-border text-muted-foreground hover:border-primary/50"
-                      }`}
-                    >
-                      {p.label}
-                    </button>
-                  ))}
+                  {CROP_PRESETS.map((p) => {
+                    const active = p.ratio === null ? lock === null && isFullCrop(pre.crop) : lock === p.ratio;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => applyRatio(p.ratio ?? null)}
+                        className={`rounded-md border px-2.5 py-1 font-mono text-[11px] transition ${
+                          active
+                            ? "border-primary text-primary"
+                            : "border-border text-muted-foreground hover:border-primary/50"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
                 </div>
                 <p className="font-mono text-[11px] text-muted-foreground">
-                  Arraste o retângulo no palco para escolher a área que fica no vídeo.
+                  Arraste o retângulo (ou as alças das bordas) para escolher a área que fica no vídeo.
+                  {lock ? " Proporção travada — o recorte mantém o formato." : ""}
                 </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="secondary" size="sm" onClick={centerCrop}>
+                    Centralizar
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => applyRatio(null)}>
+                    Quadro inteiro
+                  </Button>
+                  <span className="self-center font-mono text-[11px] text-muted-foreground">
+                    saída {cropPx.w}×{cropPx.h}px
+                  </span>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
                   <Num label="X %" value={crop.x} onChange={(n) => set({ crop: { ...crop, x: Math.min(n, 1 - crop.w) } })} />
                   <Num label="Y %" value={crop.y} onChange={(n) => set({ crop: { ...crop, y: Math.min(n, 1 - crop.h) } })} />
