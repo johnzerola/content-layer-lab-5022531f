@@ -12,6 +12,7 @@ import {
   Sparkle,
   Wand2,
   Droplets,
+  HardDrive,
 } from "lucide-react";
 
 export type AppMode = "lote" | "clip" | "limpar";
@@ -179,6 +180,14 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           >
             <CalendarClock className="size-[18px] shrink-0" />
             {open && "Agenda"}
+          </Link>
+          <Link
+            to="/armazenamento"
+            title="Armazenamento e versões"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+          >
+            <HardDrive className="size-[18px] shrink-0" />
+            {open && "Armazenamento"}
           </Link>
           <button
             onClick={onCloud}
