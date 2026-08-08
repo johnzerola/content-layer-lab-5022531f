@@ -18,8 +18,9 @@ interface Props {
   onClose: () => void;
   onChangeList: (list: Template[]) => void;
   onUse: (t: Template) => void;
-  /** Salva um template (nova versão) na biblioteca. */
-  onCommit: (t: Template, note?: string) => void;
+  /** Salva um template (nova versão) na biblioteca e devolve a versão salva. */
+  onCommit: (t: Template, note?: string) => Template | void;
+
 }
 
 const fmt = (ts?: number) =>
