@@ -218,13 +218,22 @@ function Home() {
   useEffect(() => setWebmWarn(outputIsWebm()), []);
   // fallback: se o localStorage encher, os templates vão para a nuvem
   useEffect(() => {
+    let lastAt = 0;
     enableCloudQuotaFallback((ok, msg, historyOnly) => {
-      if (historyOnly) toast.info(msg);
-      else if (ok) toast.success(msg);
-      else toast.error(msg, { action: { label: "Nuvem", onClick: () => setCloudOpen(true) } });
+      const now = Date.now();
+      if (now - lastAt < 60_000) return; // evita spam de avisos repetidos
+      lastAt = now;
+      if (historyOnly) toast.info(msg, { id: "vv-quota" });
+      else if (ok) toast.success(msg, { id: "vv-quota" });
+      else
+        toast.error(msg, {
+          id: "vv-quota",
+          action: { label: "Nuvem", onClick: () => setCloudOpen(true) },
+        });
     });
     return () => { enableCloudQuotaFallback(); };
   }, []);
+
 
 
   // filas totalmente separadas por ferramenta
