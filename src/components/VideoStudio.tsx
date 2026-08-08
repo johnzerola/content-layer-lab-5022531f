@@ -261,34 +261,52 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
                 onPause={() => setPlaying(false)}
               />
               {tab === "crop" && (
-                <>
-                  <div
-                    className="absolute cursor-move border-2 border-primary"
-                    style={{
-                      left: `${crop.x * 100}%`,
-                      top: `${crop.y * 100}%`,
-                      width: `${crop.w * 100}%`,
-                      height: `${crop.h * 100}%`,
-                      boxShadow: "0 0 0 9999px rgba(0,0,0,0.55)",
-                    }}
-                    onPointerDown={(e) => onPointerDown(e, "move")}
-                  >
-                    <div className="absolute inset-0 -z-10" />
-                    {(["nw", "ne", "sw", "se"] as const).map((h) => (
+                <div
+                  className="absolute cursor-move border-2 border-primary"
+                  style={{
+                    left: `${crop.x * 100}%`,
+                    top: `${crop.y * 100}%`,
+                    width: `${crop.w * 100}%`,
+                    height: `${crop.h * 100}%`,
+                    boxShadow: "0 0 0 9999px rgba(0,0,0,0.6)",
+                  }}
+                  onPointerDown={(e) => onPointerDown(e, "move")}
+                >
+                  {/* guias de terços */}
+                  <div className="pointer-events-none absolute inset-0 opacity-60">
+                    <div className="absolute inset-y-0 left-1/3 w-px bg-primary/40" />
+                    <div className="absolute inset-y-0 left-2/3 w-px bg-primary/40" />
+                    <div className="absolute inset-x-0 top-1/3 h-px bg-primary/40" />
+                    <div className="absolute inset-x-0 top-2/3 h-px bg-primary/40" />
+                  </div>
+                  <span className="pointer-events-none absolute -top-6 left-0 rounded bg-background/90 px-1.5 py-0.5 font-mono text-[10px] text-foreground">
+                    {cropPx.w}×{cropPx.h}
+                  </span>
+                  {HANDLES.map((h) => {
+                    const cursor =
+                      h === "n" || h === "s"
+                        ? "cursor-ns-resize"
+                        : h === "e" || h === "w"
+                          ? "cursor-ew-resize"
+                          : h === "nw" || h === "se"
+                            ? "cursor-nwse-resize"
+                            : "cursor-nesw-resize";
+                    const mid = h.length === 1;
+                    return (
                       <span
                         key={h}
                         onPointerDown={(e) => onPointerDown(e, h)}
-                        className="absolute size-3.5 cursor-nwse-resize rounded-sm border border-primary bg-background"
+                        className={`absolute size-3.5 rounded-sm border border-primary bg-background ${cursor}`}
                         style={{
-                          left: h.includes("w") ? -7 : undefined,
+                          left: h.includes("w") ? -7 : mid && (h === "n" || h === "s") ? "calc(50% - 7px)" : undefined,
                           right: h.includes("e") ? -7 : undefined,
-                          top: h.startsWith("n") ? -7 : undefined,
+                          top: h.startsWith("n") ? -7 : mid && (h === "e" || h === "w") ? "calc(50% - 7px)" : undefined,
                           bottom: h.startsWith("s") ? -7 : undefined,
                         }}
                       />
-                    ))}
-                  </div>
-                </>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
