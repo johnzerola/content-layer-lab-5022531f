@@ -307,16 +307,34 @@ function Home() {
   itemsRef.current = items;
   smartRef.current = smartFrame;
 
-  const commit = useCallback((t: Template, note?: string) => {
-    setTemplates((list) => {
-      const res = commitTemplate(list, t, note);
-      setActive(res.template);
-      return res.list;
-    });
+  const templatesRef = useRef<Template[]>([]);
+  templatesRef.current = templates;
+
+  /** Salva/atualiza o template na biblioteca e devolve a versão salva. */
+  const commit = useCallback((t: Template, note?: string): Template => {
+    const res = commitTemplate(templatesRef.current, t, note);
+    templatesRef.current = res.list;
+    setTemplates(res.list);
+    setActive(res.template);
+    try {
+      localStorage.setItem(ACTIVE_KEY, res.template.id);
+    } catch {
+      /* ignora */
+    }
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 1800);
+    return res.template;
   }, []);
 
+  /** Carrega um template salvo como ativo (e lembra a escolha). */
+  const useTemplate = useCallback((t: Template) => {
+    setActive(migrate(structuredClone(t)));
+    try {
+      localStorage.setItem(ACTIVE_KEY, t.id);
+    } catch {
+      /* ignora */
+    }
+  }, []);
 
   useEffect(() => {
     if (templates.length) autoSyncTemplates(templates);
@@ -325,9 +343,17 @@ function Home() {
   useEffect(() => {
     const list = loadTemplates();
     setTemplates(list);
-    if (list[0]) setActive(list[0]);
+    let lastId: string | null = null;
+    try {
+      lastId = localStorage.getItem(ACTIVE_KEY);
+    } catch {
+      /* ignora */
+    }
+    const pick = list.find((t) => t.id === lastId) ?? list[0];
+    if (pick) setActive(migrate(structuredClone(pick)));
     void registerFonts(list.flatMap((t) => t.fonts ?? []));
   }, []);
+
 
 
   const addVideos = useCallback(async (list: File[], meta?: { sourceUrl?: string }) => {
