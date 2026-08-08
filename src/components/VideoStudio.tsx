@@ -128,40 +128,81 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
     [crop],
   );
 
-  const onPointerMove = useCallback((e: React.PointerEvent) => {
-    const d = dragRef.current;
-    const b = boxRef.current?.getBoundingClientRect();
-    if (!d || !b) return;
-    const nx = (e.clientX - b.left) / b.width;
-    const ny = (e.clientY - b.top) / b.height;
-    const dx = nx - d.x;
-    const dy = ny - d.y;
-    const c = d.crop;
-    const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
-    let next = { ...c };
-    if (d.mode === "move") {
-      next.x = clamp(c.x + dx, 0, 1 - c.w);
-      next.y = clamp(c.y + dy, 0, 1 - c.h);
-    } else {
-      const right = c.x + c.w;
-      const bottom = c.y + c.h;
-      if (d.mode === "nw" || d.mode === "sw") {
-        const x = clamp(c.x + dx, 0, right - 0.06);
-        next.x = x;
-        next.w = right - x;
+  const onPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      const d = dragRef.current;
+      const b = boxRef.current?.getBoundingClientRect();
+      if (!d || !b) return;
+      const nx = (e.clientX - b.left) / b.width;
+      const ny = (e.clientY - b.top) / b.height;
+      const dx = nx - d.x;
+      const dy = ny - d.y;
+      const c = d.crop;
+      const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+      const MIN = 0.06;
+      const next = { ...c };
+      if (d.mode === "move") {
+        next.x = clamp(c.x + dx, 0, 1 - c.w);
+        next.y = clamp(c.y + dy, 0, 1 - c.h);
       } else {
-        next.w = clamp(c.w + dx, 0.06, 1 - c.x);
+        const m = d.mode;
+        const right = c.x + c.w;
+        const bottom = c.y + c.h;
+        if (m.includes("w")) {
+          const x = clamp(c.x + dx, 0, right - MIN);
+          next.x = x;
+          next.w = right - x;
+        } else if (m.includes("e")) {
+          next.w = clamp(c.w + dx, MIN, 1 - c.x);
+        }
+        if (m.startsWith("n")) {
+          const y = clamp(c.y + dy, 0, bottom - MIN);
+          next.y = y;
+          next.h = bottom - y;
+        } else if (m.startsWith("s")) {
+          next.h = clamp(c.h + dy, MIN, 1 - c.y);
+        }
+        // mantém a proporção escolhida (9:16, 1:1, …) enquanto redimensiona
+        if (lock && width && height) {
+          const boxAR = width / height;
+          // altura normalizada equivalente à proporção travada
+          const hFromW = (next.w * boxAR) / lock;
+          const wFromH = (next.h * lock) / boxAR;
+          const drivenByWidth = m.includes("w") || m.includes("e");
+          if (drivenByWidth) {
+            next.h = Math.min(hFromW, 1);
+            next.w = (next.h * lock) / boxAR;
+          } else {
+            next.w = Math.min(wFromH, 1);
+            next.h = (next.w * boxAR) / lock;
+          }
+          if (m.startsWith("n")) next.y = clamp(bottom - next.h, 0, 1 - next.h);
+          if (m.includes("w")) next.x = clamp(right - next.w, 0, 1 - next.w);
+          next.x = clamp(next.x, 0, 1 - next.w);
+          next.y = clamp(next.y, 0, 1 - next.h);
+        }
       }
-      if (d.mode === "nw" || d.mode === "ne") {
-        const y = clamp(c.y + dy, 0, bottom - 0.06);
-        next.y = y;
-        next.h = bottom - y;
-      } else {
-        next.h = clamp(c.h + dy, 0.06, 1 - c.y);
-      }
-    }
-    setPre((v) => ({ ...v, crop: next }));
-  }, []);
+      setPre((v) => ({ ...v, crop: next }));
+    },
+    [lock, width, height],
+  );
+
+  /** aplica uma proporção (ou libera) centralizando o recorte */
+  const applyRatio = (ratio: number | null) => {
+    setLock(ratio);
+    setPre((v) => ({ ...v, crop: ratio ? cropForRatio(ratio, width || 1080, height || 1920) : null }));
+  };
+
+  const centerCrop = () =>
+    setPre((v) => {
+      const c = v.crop ?? { x: 0, y: 0, w: 1, h: 1 };
+      return { ...v, crop: { ...c, x: (1 - c.w) / 2, y: (1 - c.h) / 2 } };
+    });
+
+  const cropPx = {
+    w: Math.round((crop.w || 1) * (width || 0)),
+    h: Math.round((crop.h || 1) * (height || 0)),
+  };
 
   const filter = preEditFilter(pre);
   const srcAR = width && height ? width / height : 9 / 16;
