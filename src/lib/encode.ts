@@ -30,7 +30,9 @@ export interface EncodeOptions {
 }
 
 type VideoWithRvfc = HTMLVideoElement & {
-  requestVideoFrameCallback?: (cb: () => void) => number;
+  requestVideoFrameCallback?: (
+    cb: (now: number, metadata: { mediaTime: number; presentedFrames: number }) => void,
+  ) => number;
 };
 
 
@@ -217,7 +219,9 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     let frameIndex = 0;
     const frameDur = Math.round(1_000_000 / fps);
 
+    let averageFrameMs = 1000 / fps;
     const emit = async () => {
+      const startedAt = performance.now();
       // tempo do vídeo fonte correspondente a este frame (legendas sincronizadas)
       const srcTime = trimStart + (frameIndex / fps) * v.speed;
       drawFrame(
@@ -233,9 +237,17 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       encoder.encode(frame, { keyFrame: frameIndex % (fps * 2) === 0 });
       frame.close();
       frameIndex++;
-      if (encoder.encodeQueueSize > 8) {
-        await new Promise((r) => setTimeout(r, 0));
+      // Não deixe o encoder acumular uma fila grande. Uma fila sem limite faz
+      // o desenho continuar enquanto o vídeo fonte avança, provocando saltos
+      // que aparecem como congelamentos no MP4 final.
+      while (encoder.encodeQueueSize > 6) {
+        await new Promise((r) => setTimeout(r, 2));
       }
+      // Libera a thread principal regularmente para a barra de progresso e o
+      // botão de cancelar continuarem respondendo durante renders pesados.
+      if (frameIndex % 4 === 0) await new Promise((r) => setTimeout(r, 0));
+      const elapsed = Math.max(0.1, performance.now() - startedAt);
+      averageFrameMs = averageFrameMs * 0.85 + elapsed * 0.15;
     };
 
     const seekTo = (time: number) =>
@@ -309,39 +321,73 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
 
       const endAt = trimStart + effDur;
       await seekTo(trimStart + (frameIndex / fps) * v.speed);
-      video.playbackRate = Math.max(0.25, Math.min(4, v.speed));
+      // O elemento fonte deve avançar apenas na velocidade que canvas +
+      // encoder conseguem consumir. Os timestamps de saída continuam em FPS
+      // constante, portanto isto muda somente o tempo de processamento, não a
+      // duração nem a velocidade do arquivo final.
+      const safePlaybackRate = () => {
+        const capacity = (1000 / fps) / Math.max(1, averageFrameMs);
+        return Math.max(0.1, Math.min(4, v.speed * capacity * 0.8));
+      };
+      video.playbackRate = safePlaybackRate();
       await video.play();
 
       await new Promise<void>((resolve, reject) => {
         let stopped = false;
+        let stepping = false;
         const stop = () => {
           if (stopped) return;
           stopped = true;
           video.pause();
           resolve();
         };
-        const step = async () => {
-          if (stopped) return;
+        const step = async (_now?: number, metadata?: { mediaTime: number; presentedFrames: number }) => {
+          if (stopped || stepping) return;
+          stepping = true;
           if (opts.signal?.aborted) {
             stopped = true;
             video.pause();
             reject(new DOMException("cancelado", "AbortError"));
             return;
           }
-          const outT = (video.currentTime - trimStart) / v.speed;
-          // Converte a cadência da fonte para FPS constante. Fontes de 24 fps,
-          // por exemplo, precisam ocasionalmente alimentar dois frames em uma
-          // saída de 30 fps; fontes de 60 fps naturalmente descartam o excedente.
-          while (frameIndex < totalFrames && outT >= 0 && frameIndex / fps <= outT) {
-            await emit();
+          try {
+            const mediaTime = metadata?.mediaTime ?? video.currentTime;
+            const outT = (mediaTime - trimStart) / v.speed;
+            const dueFrame = Math.min(totalFrames - 1, Math.floor(Math.max(0, outT) * fps + 0.001));
+
+            // Normalmente há um quadro devido por callback. Se o navegador
+            // ainda assim saltar dois ou mais, recuperamos os instantes
+            // ausentes com seeks precisos em vez de duplicar o quadro atual.
+            if (dueFrame - frameIndex > 1) {
+              video.pause();
+              while (frameIndex <= dueFrame && frameIndex < totalFrames) {
+                await seekTo(trimStart + (frameIndex / fps) * v.speed);
+                await emit();
+              }
+              if (frameIndex < totalFrames && !stopped) await video.play();
+            } else {
+              // A repetição ocasional aqui é apenas a conversão normal de uma
+              // fonte 24 fps para uma saída 30 fps (pulldown), não um catch-up.
+              while (frameIndex <= dueFrame && frameIndex < totalFrames) await emit();
+            }
+
+            video.playbackRate = safePlaybackRate();
+            opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
+            if (mediaTime >= endAt || video.ended || frameIndex >= totalFrames) return stop();
+          } catch (error) {
+            stopped = true;
+            video.pause();
+            reject(error);
+            return;
+          } finally {
+            stepping = false;
           }
-          opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
-          if (video.currentTime >= endAt || video.ended || frameIndex >= totalFrames) return stop();
-          if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(() => void step());
+          if (video.requestVideoFrameCallback) video.requestVideoFrameCallback((now, next) => void step(now, next));
           else setTimeout(() => void step(), 0);
         };
         video.onended = () => void step();
-        void step();
+        if (video.requestVideoFrameCallback) video.requestVideoFrameCallback((now, metadata) => void step(now, metadata));
+        else void step();
       });
 
       // Completa cada quadro faltante buscando o instante correto. Repetir o
