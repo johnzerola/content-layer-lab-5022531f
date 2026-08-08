@@ -202,6 +202,9 @@ function cleanOnly(t: Template, src?: { w: number; h: number }): Template {
   return src?.w && src?.h ? fitCanvasToSource(base, src.w, src.h) : base;
 }
 
+/** Lembra qual template estava ativo entre sessões. */
+const ACTIVE_KEY = "vv.active-template";
+
 function Home() {
   const [mode, setMode] = useState<Mode>("lote");
   const [templates, setTemplates] = useState<Template[]>([]);
