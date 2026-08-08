@@ -707,7 +707,7 @@ function writeVersions(map: VersionMap) {
       }
     }
     if (!longestId || longest <= 1) break;
-    current = { ...current, [longestId]: current[longestId].slice(0, longest - 1) };
+    current = { ...current, [longestId]: (current[longestId] ?? []).slice(0, longest - 1) };
   }
   try {
     localStorage.removeItem(VKEY);
