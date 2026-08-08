@@ -290,8 +290,11 @@ export async function saveTemplatesOverflow(
 }
 
 /** Registra o fallback no módulo de templates (idempotente). */
-export function enableCloudQuotaFallback(onResult?: (ok: boolean, msg: string) => void) {
-  registerQuotaFallback((list, versions) => {
+export function enableCloudQuotaFallback(
+  onResult?: (ok: boolean, msg: string, historyOnly?: boolean) => void,
+) {
+  registerQuotaFallback((list, versions, opts) => {
+    const historyOnly = opts?.historyOnly === true;
     void saveTemplatesOverflow(list, versions)
       .then(() => {
         try {
