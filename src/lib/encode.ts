@@ -260,10 +260,34 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     const hasCleanup = (t.cleanup?.length ?? 0) > 0;
     const heavy = outDur <= 20 && (hasCleanup || outDur <= 8);
 
-    video.currentTime = trimStart;
+    // garante que há um quadro decodificado antes de desenhar (evita
+    // primeiros frames pretos/embaralhados no início da exportação)
+    if (video.readyState < 2) {
+      await new Promise<void>((res) => {
+        const done = () => res();
+        video.onloadeddata = done;
+        setTimeout(done, 3000);
+      });
+    }
+    await seekTo(trimStart);
     await new Promise<void>((res) => {
-      video.onseeked = () => res();
+      if (video.requestVideoFrameCallback) {
+        let settled = false;
+        video.requestVideoFrameCallback(() => {
+          if (!settled) {
+            settled = true;
+            res();
+          }
+        });
+        setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            res();
+          }
+        }, 300);
+      } else setTimeout(res, 120);
     });
+
 
     if (heavy) {
       while (frameIndex < totalFrames) {
@@ -301,7 +325,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
           if (lag > 0.3) video.playbackRate = Math.max(0.25, video.playbackRate * 0.7);
           else if (lag < 0.05 && video.playbackRate < maxRate)
             video.playbackRate = Math.min(maxRate, video.playbackRate * 1.05);
-          if (frameIndex < totalFrames && frameIndex / fps <= outT) {
+          if (frameIndex < totalFrames && outT >= 0 && frameIndex / fps <= outT) {
             await emit();
           }
           opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
