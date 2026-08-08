@@ -298,9 +298,22 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       }
     } else {
       const maxRate = hasCleanup ? 2 : 16;
-      video.playbackRate = Math.max(1, Math.min(opts.turbo ?? 4, maxRate));
+      // Os primeiros quadros são os que mais travam: o navegador ainda está
+      // acelerando a decodificação. Renderizamos ~0,8 s por busca precisa e só
+      // então entramos na leitura contínua (começando em 1x e acelerando).
+      const warmupFrames = Math.min(totalFrames, Math.round(fps * 0.8));
+      while (frameIndex < warmupFrames) {
+        if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
+        await seekTo(trimStart + (frameIndex / fps) * v.speed);
+        await emit();
+      }
+
       const endAt = trimStart + effDur;
+      await seekTo(trimStart + (frameIndex / fps) * v.speed);
+      video.playbackRate = 1;
       await video.play();
+      const targetRate = Math.max(1, Math.min(opts.turbo ?? 4, maxRate));
+
 
       await new Promise<void>((resolve, reject) => {
         let stopped = false;
