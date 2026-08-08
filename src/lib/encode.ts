@@ -260,10 +260,34 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     const hasCleanup = (t.cleanup?.length ?? 0) > 0;
     const heavy = outDur <= 20 && (hasCleanup || outDur <= 8);
 
-    video.currentTime = trimStart;
+    // garante que há um quadro decodificado antes de desenhar (evita
+    // primeiros frames pretos/embaralhados no início da exportação)
+    if (video.readyState < 2) {
+      await new Promise<void>((res) => {
+        const done = () => res();
+        video.onloadeddata = done;
+        setTimeout(done, 3000);
+      });
+    }
+    await seekTo(trimStart);
     await new Promise<void>((res) => {
-      video.onseeked = () => res();
+      if (video.requestVideoFrameCallback) {
+        let settled = false;
+        video.requestVideoFrameCallback(() => {
+          if (!settled) {
+            settled = true;
+            res();
+          }
+        });
+        setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            res();
+          }
+        }, 300);
+      } else setTimeout(res, 120);
     });
+
 
     if (heavy) {
       while (frameIndex < totalFrames) {
