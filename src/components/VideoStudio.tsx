@@ -65,7 +65,7 @@ type Drag = { mode: "move" | Handle; x: number; y: number; crop: NonNullable<Pre
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-type Tab = "trim" | "crop" | "keys" | "trans" | "caps" | "text";
+type Tab = "trim" | "crop" | "keys" | "trans" | "color" | "caps" | "text";
 
 /** Estúdio de pré-edição: corte de tempo, recorte de quadro, keyframes, transições, legendas e textos. */
 export function VideoStudio({
