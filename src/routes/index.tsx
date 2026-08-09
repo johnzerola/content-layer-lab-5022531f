@@ -802,6 +802,8 @@ function Home() {
       previewCues,
       previewPlate,
       selected?.preEdit,
+      selected?.clip,
+      selected?.duration,
     ],
   );
 
