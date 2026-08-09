@@ -52,6 +52,9 @@ export interface PreEdit {
 export function defaultPreEdit(): PreEdit {
   return {
     crop: null,
+    keys: [],
+    transIn: { kind: "none", dur: 0.5 },
+    transOut: { kind: "none", dur: 0.5 },
     rotate: 0,
     flipH: false,
     flipV: false,
