@@ -1531,6 +1531,17 @@ function Home() {
                         >
                           <Columns2 className="mr-1 inline size-3" /> comparar
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setCropTune((c) => !c)}
+                          className={`rounded-md border px-2 py-1 font-mono text-[10px] ${
+                            cropTune
+                              ? "border-primary/60 bg-primary/15 text-primary"
+                              : "border-border text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <Crop className="mr-1 inline size-3" /> ajustar corte
+                        </button>
                         {variants > 1 && (
                           <select
                             value={variantIdx}
