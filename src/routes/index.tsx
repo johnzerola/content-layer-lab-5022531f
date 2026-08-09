@@ -21,7 +21,9 @@ import {
   Copy,
   Columns2,
   Wand2,
+  Crop,
 } from "lucide-react";
+import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
 import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
@@ -299,6 +301,8 @@ function Home() {
   const [detectMsg, setDetectMsg] = useState<string | undefined>(undefined);
   const [suggestions, setSuggestions] = useState<CleanupRegion[]>([]);
   const [compare, setCompare] = useState(false);
+  /** mini editor de enquadramento direto na prévia */
+  const [cropTune, setCropTune] = useState(false);
   // as transcrições rodam em fila (uma por vez) mesmo com render paralelo
   const capChain = useRef<Promise<unknown>>(Promise.resolve());
 
@@ -789,7 +793,14 @@ function Home() {
                 }
               : {}),
           }
-        : undefined,
+        : selected?.preEdit
+          ? {
+              pre: selected.preEdit,
+              clip: selected.clip ?? { start: 0, end: selected.duration || 0 },
+              ...(previewCues?.length ? { captions: previewCues } : {}),
+              ...(previewPlate ? { plate: previewPlate } : {}),
+            }
+          : undefined,
     [
       previewVariation?.mirror,
       previewVariation?.brightness,
@@ -1531,6 +1542,17 @@ function Home() {
                         >
                           <Columns2 className="mr-1 inline size-3" /> comparar
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => setCropTune((c) => !c)}
+                          className={`rounded-md border px-2 py-1 font-mono text-[10px] ${
+                            cropTune
+                              ? "border-primary/60 bg-primary/15 text-primary"
+                              : "border-border text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          <Crop className="mr-1 inline size-3" /> ajustar corte
+                        </button>
                         {variants > 1 && (
                           <select
                             value={variantIdx}
@@ -1576,17 +1598,37 @@ function Home() {
                         }
                       />
                     ) : (
-
-                      <TemplateCanvas
-                        template={previewTemplate}
-                        interactive={false}
-                        poster={selected.poster}
-                        previewFile={selected.file}
-                        drawOpts={previewDrawOpts}
-                        speed={previewVariation?.speed ?? 1}
-                        loopStart={previewLoop.start}
-                        loopEnd={previewLoop.end}
-                      />
+                      <div className="relative mx-auto w-full max-w-[320px]">
+                        <TemplateCanvas
+                          template={previewTemplate}
+                          interactive={false}
+                          poster={selected.poster}
+                          previewFile={selected.file}
+                          drawOpts={previewDrawOpts}
+                          speed={previewVariation?.speed ?? 1}
+                          loopStart={previewLoop.start}
+                          loopEnd={previewLoop.end}
+                        />
+                        {cropTune && (
+                          <PreviewCropOverlay
+                            pre={selected.preEdit ?? defaultPreEdit()}
+                            onChange={(next) =>
+                              setItems((p) =>
+                                p.map((x) => (x.id === selected.id ? { ...x, preEdit: next } : x)),
+                              )
+                            }
+                            onReset={() =>
+                              setItems((p) =>
+                                p.map((x) =>
+                                  x.id === selected.id
+                                    ? { ...x, preEdit: { ...(x.preEdit ?? defaultPreEdit()), crop: null, keys: [] } }
+                                    : x,
+                                ),
+                              )
+                            }
+                          />
+                        )}
+                      </div>
                     )}
                     {/* estilo rápido de legenda direto na prévia */}
                     <div className="flex flex-wrap items-center gap-1">
