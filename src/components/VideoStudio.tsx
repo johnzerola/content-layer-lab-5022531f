@@ -362,11 +362,14 @@ export function VideoStudio({
 
           {/* controles */}
           <div className="min-h-0 space-y-4 md:overflow-y-auto md:pr-1">
-            <div className="flex gap-1 rounded-lg border border-border p-1">
+            <div className="flex flex-wrap gap-1 rounded-lg border border-border p-1">
               {([
                 { id: "trim", label: "Cortar", icon: Scissors },
                 { id: "crop", label: "Enquadrar", icon: Crop },
-                { id: "color", label: "Cor", icon: SlidersHorizontal },
+                { id: "keys", label: "Keyframes", icon: Sparkles },
+                { id: "trans", label: "Transições", icon: SlidersHorizontal },
+                { id: "caps", label: "Legenda", icon: Subtitles },
+                { id: "text", label: "Textos", icon: Type },
               ] as const).map((t) => (
                 <button
                   key={t.id}
@@ -379,6 +382,7 @@ export function VideoStudio({
                 </button>
               ))}
             </div>
+
 
             {tab === "trim" && (
               <div className="space-y-4">
