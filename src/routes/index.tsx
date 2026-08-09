@@ -782,7 +782,12 @@ function Home() {
             borderColor: previewVariation.borderColor,
             ...(previewCues?.length ? { captions: previewCues } : {}),
             ...(previewPlate ? { plate: previewPlate } : {}),
-            ...(selected?.preEdit ? { pre: selected.preEdit } : {}),
+            ...(selected?.preEdit
+              ? {
+                  pre: selected.preEdit,
+                  clip: selected.clip ?? { start: 0, end: selected.duration || 0 },
+                }
+              : {}),
           }
         : undefined,
     [
