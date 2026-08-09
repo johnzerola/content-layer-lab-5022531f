@@ -21,7 +21,9 @@ import {
   Copy,
   Columns2,
   Wand2,
+  Crop,
 } from "lucide-react";
+import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
 import { Button } from "@/components/ui/button";
 import { TemplateCanvas } from "@/components/TemplateCanvas";
 import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
