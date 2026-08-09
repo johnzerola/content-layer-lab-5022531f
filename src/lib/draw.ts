@@ -620,7 +620,7 @@ function drawVideoLayer(
   if (source && source.width) {
     // pré-edição do vídeo fonte (recorte, giro, espelho e cor)
     const pre = opts?.pre;
-    const cr = cropRect(pre, source.width, source.height);
+    const cr = cropRect(pre, source.width, source.height, opts?.time);
     // a rotação exige um leve zoom extra pra não aparecer canto vazio
     const rotPad = rot ? 1 + Math.abs(rot) / 40 : 1;
     const zoom = (opts?.zoom ?? 1) * rotPad;
