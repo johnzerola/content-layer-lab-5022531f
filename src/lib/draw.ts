@@ -584,6 +584,8 @@ export interface DrawOpts {
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null;
   /** pré-edição do vídeo fonte (recorte, giro, cor) aplicada antes do template */
   pre?: PreEdit | null;
+  /** janela exportada — usada pelas transições de abertura/saída */
+  clip?: { start: number; end: number } | null;
   /** "hq" = reconstrução em resolução total (exportação). Padrão: preview rápido. */
   quality?: "preview" | "hq";
 }
