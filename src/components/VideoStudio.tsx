@@ -8,6 +8,9 @@ import {
   RotateCw,
   Scissors,
   SlidersHorizontal,
+  Sparkles,
+  Subtitles,
+  Type,
   Undo2,
   X,
 } from "lucide-react";
@@ -16,12 +19,18 @@ import { Slider } from "@/components/ui/slider";
 import {
   COLOR_PRESETS,
   CROP_PRESETS,
+  cropAt,
   cropForRatio,
   defaultPreEdit,
   isFullCrop,
   preEditFilter,
+  TRANSITIONS,
+  type FrameKey,
   type PreEdit,
+  type TransitionKind,
 } from "@/lib/preedit";
+import { CaptionTimeline } from "@/components/CaptionTimeline";
+import type { CaptionCue } from "@/lib/captions";
 
 export interface PreEditResult {
   pre: PreEdit;
@@ -35,6 +44,12 @@ type Props = {
   height: number;
   duration: number;
   value: PreEditResult;
+  /** legendas deste vídeo (permite corrigir palavras aqui mesmo) */
+  captions?: CaptionCue[] | undefined;
+  onCaptionsChange?: ((cues: CaptionCue[]) => void) | undefined;
+  /** textos do template usados neste vídeo */
+  texts?: { headline: string; name: string; handle: string; cta: string } | undefined;
+  onTextsChange?: ((t: { headline: string; name: string; handle: string; cta: string }) => void) | undefined;
   onClose: () => void;
   onSave: (v: PreEditResult) => void;
 };
@@ -50,16 +65,32 @@ type Drag = { mode: "move" | Handle; x: number; y: number; crop: NonNullable<Pre
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-/** Estúdio de pré-edição: corte de tempo, recorte de quadro, giro e cor. */
-export function VideoStudio({ file, width, height, duration, value, onClose, onSave }: Props) {
+type Tab = "trim" | "crop" | "keys" | "trans" | "caps" | "text";
+
+/** Estúdio de pré-edição: corte de tempo, recorte de quadro, keyframes, transições, legendas e textos. */
+export function VideoStudio({
+  file,
+  width,
+  height,
+  duration,
+  value,
+  captions,
+  onCaptionsChange,
+  texts,
+  onTextsChange,
+  onClose,
+  onSave,
+}: Props) {
   const [pre, setPre] = useState<PreEdit>(value.pre ?? defaultPreEdit());
   const [start, setStart] = useState(value.clip?.start ?? 0);
   const [end, setEnd] = useState(value.clip?.end ?? duration);
-  const [tab, setTab] = useState<"trim" | "crop" | "color">("trim");
+  const [tab, setTab] = useState<Tab>("trim");
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(value.clip?.start ?? 0);
+  const [draft, setDraft] = useState(texts ?? { headline: "", name: "", handle: "", cta: "" });
   /** proporção travada do recorte (largura/altura em pixels da fonte) */
   const [lock, setLock] = useState<number | null>(null);
+
 
   const [url, setUrl] = useState("");
   useEffect(() => {
