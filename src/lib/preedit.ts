@@ -90,9 +90,79 @@ export function preEditFilter(p?: PreEdit | null, extra?: { brightness?: number;
   return parts.length ? parts.join(" ") : "none";
 }
 
+/** Recorte válido no instante `t` (interpolando os keyframes, quando houver). */
+export function cropAt(p: PreEdit | null | undefined, t?: number): PreCrop | null {
+  const keys = p?.keys;
+  if (!keys || keys.length === 0 || t === undefined) return p?.crop ?? null;
+  const sorted = [...keys].sort((a, b) => a.t - b.t);
+  if (t <= sorted[0]!.t) return sorted[0]!.crop;
+  const last = sorted[sorted.length - 1]!;
+  if (t >= last.t) return last.crop;
+  let i = 0;
+  while (i < sorted.length - 1 && sorted[i + 1]!.t < t) i++;
+  const a = sorted[i]!;
+  const b = sorted[i + 1]!;
+  const span = Math.max(1e-4, b.t - a.t);
+  const raw = (t - a.t) / span;
+  // suavização (ease-in-out) para um movimento de câmera natural
+  const k = raw * raw * (3 - 2 * raw);
+  const mix = (x: number, y: number) => x + (y - x) * k;
+  return {
+    x: mix(a.crop.x, b.crop.x),
+    y: mix(a.crop.y, b.crop.y),
+    w: mix(a.crop.w, b.crop.w),
+    h: mix(a.crop.h, b.crop.h),
+  };
+}
+
+/** Estado da transição de abertura/saída no instante `t` do trecho exportado. */
+export function transitionAt(
+  p: PreEdit | null | undefined,
+  t?: number,
+  clip?: { start: number; end: number } | null,
+): { alpha: number; scale: number; dx: number; dy: number } {
+  const none = { alpha: 1, scale: 1, dx: 0, dy: 0 };
+  if (!p || t === undefined) return none;
+  const start = clip?.start ?? 0;
+  const end = clip?.end;
+  const local = t - start;
+  const easeOut = (k: number) => 1 - Math.pow(1 - k, 3);
+
+  const apply = (kind: TransitionKind, k: number, outward: boolean) => {
+    const e = easeOut(Math.min(1, Math.max(0, k)));
+    const dir = outward ? -1 : 1;
+    switch (kind) {
+      case "fade":
+        return { alpha: e, scale: 1, dx: 0, dy: 0 };
+      case "zoom":
+        return { alpha: e, scale: 1 + (1 - e) * 0.18, dx: 0, dy: 0 };
+      case "slide-up":
+        return { alpha: e, scale: 1, dx: 0, dy: dir * (1 - e) * 0.25 };
+      case "slide-left":
+        return { alpha: e, scale: 1, dx: dir * (1 - e) * 0.25, dy: 0 };
+      case "whip":
+        return { alpha: e, scale: 1 + (1 - e) * 0.06, dx: dir * (1 - e) * 0.4, dy: 0 };
+      default:
+        return none;
+    }
+  };
+
+  const tin = p.transIn;
+  if (tin && tin.kind !== "none" && tin.dur > 0 && local < tin.dur) {
+    return apply(tin.kind, local / tin.dur, false);
+  }
+  const tout = p.transOut;
+  if (tout && tout.kind !== "none" && tout.dur > 0 && end !== undefined) {
+    const left = end - t;
+    if (left < tout.dur) return apply(tout.kind, Math.max(0, left) / tout.dur, true);
+  }
+  return none;
+}
+
 /** Retângulo em pixels da fonte + dimensões efetivas após o giro. */
-export function cropRect(p: PreEdit | null | undefined, w: number, h: number) {
-  const c = p?.crop && !isFullCrop(p.crop) ? p.crop : FULL;
+export function cropRect(p: PreEdit | null | undefined, w: number, h: number, time?: number) {
+  const anim = cropAt(p, time);
+  const c = anim && !isFullCrop(anim) ? anim : FULL;
   const sx = Math.max(0, Math.round(c.x * w));
   const sy = Math.max(0, Math.round(c.y * h));
   const sw = Math.max(2, Math.min(w - sx, Math.round(c.w * w)));
@@ -100,6 +170,15 @@ export function cropRect(p: PreEdit | null | undefined, w: number, h: number) {
   const quarter = (((p?.rotate ?? 0) / 90) | 0) % 4;
   return { sx, sy, sw, sh, quarter, ew: quarter % 2 ? sh : sw, eh: quarter % 2 ? sw : sh };
 }
+
+export const TRANSITIONS: { id: TransitionKind; label: string }[] = [
+  { id: "none", label: "Nenhuma" },
+  { id: "fade", label: "Fade" },
+  { id: "zoom", label: "Zoom" },
+  { id: "slide-up", label: "Subir" },
+  { id: "slide-left", label: "Deslizar" },
+  { id: "whip", label: "Whip" },
+];
 
 export const CROP_PRESETS: { id: string; label: string; ratio: number | null }[] = [
   { id: "free", label: "Livre", ratio: null },
