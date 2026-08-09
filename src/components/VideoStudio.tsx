@@ -230,6 +230,17 @@ export function VideoStudio({
       return { ...v, crop: { ...c, x: (1 - c.w) / 2, y: (1 - c.h) / 2 } };
     });
 
+  /** grava o recorte atual como keyframe no instante do playhead */
+  const addKey = () =>
+    setPre((v) => {
+      const c = v.crop ?? cropAt(v, time) ?? { x: 0, y: 0, w: 1, h: 1 };
+      const t = Number(time.toFixed(2));
+      const key: FrameKey = { t, crop: { ...c } };
+      const keys = [...v.keys.filter((k) => Math.abs(k.t - t) > 0.05), key].sort((a, b) => a.t - b.t);
+      return { ...v, keys };
+    });
+
+
   const cropPx = {
     w: Math.round((crop.w || 1) * (width || 0)),
     h: Math.round((crop.h || 1) * (height || 0)),
