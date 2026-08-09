@@ -385,10 +385,18 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
         let stepping = false;
         let lastAdvanceAt = performance.now();
         let lastFrameIndex = frameIndex;
+        let pulse = 0;
+        const stop = () => {
+          if (stopped) return;
+          stopped = true;
+          window.clearInterval(pulse);
+          video.pause();
+          resolve();
+        };
         // requestVideoFrameCallback pode ser suspenso em abas inativas. Este
         // pulso mantém a exportação viva e também encerra a leitura contínua se
         // o decoder parar; a etapa seguinte completa com buscas precisas.
-        const pulse = window.setInterval(() => {
+        pulse = window.setInterval(() => {
           if (stopped) return;
           if (frameIndex > lastFrameIndex) {
             lastFrameIndex = frameIndex;
@@ -399,13 +407,6 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
           }
           if (!stepping) void step();
         }, 250);
-        const stop = () => {
-          if (stopped) return;
-          stopped = true;
-          window.clearInterval(pulse);
-          video.pause();
-          resolve();
-        };
         const step = async (_now?: number, metadata?: { mediaTime: number; presentedFrames: number }) => {
           if (stopped || stepping) return;
           stepping = true;
