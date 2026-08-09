@@ -108,7 +108,7 @@ async function recordVideo(
       borderColor: v.borderColor,
       time: video.currentTime,
       quality: "hq" as const,
-      ...(opts.pre ? { pre: opts.pre } : {}),
+      ...(opts.pre ? { pre: opts.pre, clip: { start: clipStart, end: endAt } } : {}),
       ...(opts.captions?.length ? { captions: opts.captions } : {}),
       ...(opts.plate ? { plate: opts.plate } : {}),
     });
