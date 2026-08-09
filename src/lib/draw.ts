@@ -10,7 +10,7 @@ import {
 } from "./template";
 import type { CaptionCue } from "./captions";
 import { exemplarDetail, inpaintTelea, resetInpaintCache } from "./inpaint";
-import { cropRect, preEditFilter, type PreEdit } from "./preedit";
+import { cropRect, preEditFilter, transitionAt, type PreEdit } from "./preedit";
 
 /**
  * Reconstrói a área (sem borrão) usando FMM de Telea multi-escala + refino exemplar.
