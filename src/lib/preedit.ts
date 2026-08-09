@@ -85,6 +85,9 @@ export function hasPreEdit(p?: PreEdit | null) {
   if (!p) return false;
   return (
     !isFullCrop(p.crop) ||
+    (p.keys?.length ?? 0) > 0 ||
+    (p.transIn?.kind ?? "none") !== "none" ||
+    (p.transOut?.kind ?? "none") !== "none" ||
     p.rotate !== 0 ||
     p.flipH ||
     p.flipV ||
