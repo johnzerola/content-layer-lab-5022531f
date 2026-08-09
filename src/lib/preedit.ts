@@ -9,9 +9,29 @@ export interface PreCrop {
   h: number;
 }
 
+export type TransitionKind = "none" | "fade" | "zoom" | "slide-up" | "slide-left" | "whip";
+
+export interface Transition {
+  kind: TransitionKind;
+  /** duração em segundos */
+  dur: number;
+}
+
+/** Keyframe de enquadramento: em `t` segundos o recorte fica assim. */
+export interface FrameKey {
+  t: number;
+  crop: PreCrop;
+}
+
 export interface PreEdit {
   /** recorte de área do vídeo original (null = quadro inteiro) */
   crop: PreCrop | null;
+  /** keyframes de enquadramento (vazio = recorte fixo acima) */
+  keys: FrameKey[];
+  /** transição de abertura */
+  transIn: Transition;
+  /** transição de saída */
+  transOut: Transition;
   /** giro em passos de 90° */
   rotate: 0 | 90 | 180 | 270;
   flipH: boolean;
