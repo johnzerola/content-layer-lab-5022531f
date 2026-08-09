@@ -269,7 +269,9 @@ function Home() {
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [zipping, setZipping] = useState(false);
-  const [concurrency, setConcurrency] = useState(2);
+  // Canvas, decoder e encoder disputam a mesma thread/GPU. Dois vídeos em
+  // paralelo frequentemente deixam ambos presos em 0% em máquinas comuns.
+  const [concurrency, setConcurrency] = useState(1);
   const [bitrate, setBitrate] = useState(10);
   const [autoBitrate, setAutoBitrate] = useState(true);
   const [platforms, setPlatforms] = useState<string[]>(["reels"]);
