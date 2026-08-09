@@ -1591,17 +1591,37 @@ function Home() {
                         }
                       />
                     ) : (
-
-                      <TemplateCanvas
-                        template={previewTemplate}
-                        interactive={false}
-                        poster={selected.poster}
-                        previewFile={selected.file}
-                        drawOpts={previewDrawOpts}
-                        speed={previewVariation?.speed ?? 1}
-                        loopStart={previewLoop.start}
-                        loopEnd={previewLoop.end}
-                      />
+                      <div className="relative mx-auto w-full max-w-[320px]">
+                        <TemplateCanvas
+                          template={previewTemplate}
+                          interactive={false}
+                          poster={selected.poster}
+                          previewFile={selected.file}
+                          drawOpts={previewDrawOpts}
+                          speed={previewVariation?.speed ?? 1}
+                          loopStart={previewLoop.start}
+                          loopEnd={previewLoop.end}
+                        />
+                        {cropTune && (
+                          <PreviewCropOverlay
+                            pre={selected.preEdit ?? defaultPreEdit()}
+                            onChange={(next) =>
+                              setItems((p) =>
+                                p.map((x) => (x.id === selected.id ? { ...x, preEdit: next } : x)),
+                              )
+                            }
+                            onReset={() =>
+                              setItems((p) =>
+                                p.map((x) =>
+                                  x.id === selected.id
+                                    ? { ...x, preEdit: { ...(x.preEdit ?? defaultPreEdit()), crop: null, keys: [] } }
+                                    : x,
+                                ),
+                              )
+                            }
+                          />
+                        )}
+                      </div>
                     )}
                     {/* estilo rápido de legenda direto na prévia */}
                     <div className="flex flex-wrap items-center gap-1">
