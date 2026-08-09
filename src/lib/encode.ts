@@ -252,7 +252,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       rotate: v.rotate,
       border: v.border,
       borderColor: v.borderColor,
-      ...(opts.pre ? { pre: opts.pre } : {}),
+      ...(opts.pre ? { pre: opts.pre, clip: { start: trimStart, end: trimStart + effDur } } : {}),
       ...(opts.captions?.length ? { captions: opts.captions } : {}),
       ...(opts.plate ? { plate: opts.plate } : {}),
     };
