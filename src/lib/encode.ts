@@ -35,6 +35,29 @@ type VideoWithRvfc = HTMLVideoElement & {
   ) => number;
 };
 
+class RenderStalledError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RenderStalledError";
+  }
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = window.setTimeout(() => reject(new RenderStalledError(message)), ms);
+    promise.then(
+      (value) => {
+        window.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        window.clearTimeout(timer);
+        reject(error);
+      },
+    );
+  });
+}
+
 
 export function webCodecsSupported() {
   return (
@@ -159,10 +182,14 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
   video.preload = "auto";
 
   try {
-    await new Promise<void>((res, rej) => {
-      video.onloadedmetadata = () => res();
-      video.onerror = () => rej(new Error("Não foi possível ler o vídeo"));
-    });
+    await withTimeout(
+      new Promise<void>((res, rej) => {
+        video.onloadedmetadata = () => res();
+        video.onerror = () => rej(new Error("Não foi possível ler o vídeo"));
+      }),
+      15_000,
+      "O navegador não conseguiu preparar este vídeo em 15 segundos",
+    );
 
     const clipStart = Math.max(0, Math.min(opts.clip?.start ?? 0, Math.max(0, video.duration - 0.5)));
     const clipEnd = Math.min(video.duration, opts.clip?.end ?? video.duration);
@@ -172,7 +199,18 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     const outDur = effDur / v.speed;
     const totalFrames = Math.max(1, Math.round(outDur * fps));
 
-    const audio = await decodeAudio(opts.file, trimStart, effDur, v.speed, v.pitch, v.eq);
+    // A leitura do áudio acontece antes do primeiro quadro. Alguns MP4s
+    // defeituosos deixam decodeAudioData pendurado indefinidamente; nesse caso
+    // continuamos com o vídeo, em vez de deixar o lote parado em 0% por horas.
+    opts.onProgress?.(0.005);
+    const audio = await withTimeout(
+      decodeAudio(opts.file, trimStart, effDur, v.speed, v.pitch, v.eq),
+      Math.min(60_000, Math.max(20_000, effDur * 250)),
+      "A faixa de áudio não pôde ser preparada",
+    ).catch((error) => {
+      console.warn("Áudio ignorado para evitar bloqueio da exportação:", error);
+      return null;
+    });
     const audioCodec = audio ? await pickAudioCodec(audio.channels, audio.sampleRate) : null;
 
     const muxer = new Muxer({
@@ -184,9 +222,13 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       fastStart: "in-memory",
     });
 
+    let encoderError: DOMException | null = null;
     const encoder = new VideoEncoder({
       output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
-      error: (e) => console.error(e),
+      error: (e) => {
+        encoderError = e;
+        console.error(e);
+      },
     });
     encoder.configure(videoConfig);
 
@@ -240,7 +282,13 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       // Não deixe o encoder acumular uma fila grande. Uma fila sem limite faz
       // o desenho continuar enquanto o vídeo fonte avança, provocando saltos
       // que aparecem como congelamentos no MP4 final.
+      const queueWaitStarted = performance.now();
       while (encoder.encodeQueueSize > 6) {
+        if (encoderError) throw encoderError;
+        if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
+        if (performance.now() - queueWaitStarted > 15_000) {
+          throw new RenderStalledError("O codificador de vídeo parou de responder");
+        }
         await new Promise((r) => setTimeout(r, 2));
       }
       // Libera a thread principal regularmente para a barra de progresso e o
@@ -335,9 +383,26 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       await new Promise<void>((resolve, reject) => {
         let stopped = false;
         let stepping = false;
+        let lastAdvanceAt = performance.now();
+        let lastFrameIndex = frameIndex;
+        // requestVideoFrameCallback pode ser suspenso em abas inativas. Este
+        // pulso mantém a exportação viva e também encerra a leitura contínua se
+        // o decoder parar; a etapa seguinte completa com buscas precisas.
+        const pulse = window.setInterval(() => {
+          if (stopped) return;
+          if (frameIndex > lastFrameIndex) {
+            lastFrameIndex = frameIndex;
+            lastAdvanceAt = performance.now();
+          } else if (performance.now() - lastAdvanceAt > 8_000) {
+            stop();
+            return;
+          }
+          if (!stepping) void step();
+        }, 250);
         const stop = () => {
           if (stopped) return;
           stopped = true;
+          window.clearInterval(pulse);
           video.pause();
           resolve();
         };
@@ -346,6 +411,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
           stepping = true;
           if (opts.signal?.aborted) {
             stopped = true;
+            window.clearInterval(pulse);
             video.pause();
             reject(new DOMException("cancelado", "AbortError"));
             return;
@@ -376,6 +442,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
             if (mediaTime >= endAt || video.ended || frameIndex >= totalFrames) return stop();
           } catch (error) {
             stopped = true;
+            window.clearInterval(pulse);
             video.pause();
             reject(error);
             return;
@@ -403,7 +470,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
 
 
 
-    await encoder.flush();
+    await withTimeout(encoder.flush(), 30_000, "O codificador não conseguiu finalizar o arquivo");
     encoder.close();
 
     if (audio && audioCodec) {

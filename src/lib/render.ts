@@ -168,7 +168,7 @@ export async function renderVideo(
       });
       return { blob, ext: "mp4" };
     } catch (err) {
-      if ((err as Error)?.name === "AbortError") throw err;
+      if ((err as Error)?.name === "AbortError" || (err as Error)?.name === "RenderStalledError") throw err;
       console.warn("WebCodecs falhou, usando fallback:", err);
     }
   }
