@@ -301,6 +301,8 @@ function Home() {
   const [detectMsg, setDetectMsg] = useState<string | undefined>(undefined);
   const [suggestions, setSuggestions] = useState<CleanupRegion[]>([]);
   const [compare, setCompare] = useState(false);
+  /** mini editor de enquadramento direto na prévia */
+  const [cropTune, setCropTune] = useState(false);
   // as transcrições rodam em fila (uma por vez) mesmo com render paralelo
   const capChain = useRef<Promise<unknown>>(Promise.resolve());
 
