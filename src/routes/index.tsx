@@ -793,7 +793,14 @@ function Home() {
                 }
               : {}),
           }
-        : undefined,
+        : selected?.preEdit
+          ? {
+              pre: selected.preEdit,
+              clip: selected.clip ?? { start: 0, end: selected.duration || 0 },
+              ...(previewCues?.length ? { captions: previewCues } : {}),
+              ...(previewPlate ? { plate: previewPlate } : {}),
+            }
+          : undefined,
     [
       previewVariation?.mirror,
       previewVariation?.brightness,
