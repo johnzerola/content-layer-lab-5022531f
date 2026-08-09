@@ -368,6 +368,7 @@ export function VideoStudio({
                 { id: "crop", label: "Enquadrar", icon: Crop },
                 { id: "keys", label: "Keyframes", icon: Sparkles },
                 { id: "trans", label: "Transições", icon: SlidersHorizontal },
+                { id: "color", label: "Cor", icon: SlidersHorizontal },
                 { id: "caps", label: "Legenda", icon: Subtitles },
                 { id: "text", label: "Textos", icon: Type },
               ] as const).map((t) => (
