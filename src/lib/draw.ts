@@ -847,6 +847,17 @@ export function drawFrame(
   ctx.fillStyle = t.background;
   ctx.fillRect(0, 0, W, H);
 
+  // transição de abertura/saída: afeta o quadro montado inteiro
+  const tr = transitionAt(opts?.pre, opts?.time, opts?.clip ?? null);
+  const animating = tr.alpha < 1 || tr.scale !== 1 || tr.dx !== 0 || tr.dy !== 0;
+  if (animating) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, tr.alpha));
+    ctx.translate(W / 2 + tr.dx * W, H / 2 + tr.dy * H);
+    ctx.scale(tr.scale, tr.scale);
+    ctx.translate(-W / 2, -H / 2);
+  }
+
   // ordem de empilhamento configurável (z-index por camada)
   const jobs: { z: number; i: number; run: () => void }[] = [];
   const push = (z: number | undefined, fallback: number, run: () => void) =>
@@ -869,5 +880,6 @@ export function drawFrame(
   }
 
   jobs.sort((a, b) => a.z - b.z || a.i - b.i).forEach((j) => j.run());
+  if (animating) ctx.restore();
   ctx.restore();
 }
