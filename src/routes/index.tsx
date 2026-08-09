@@ -782,7 +782,12 @@ function Home() {
             borderColor: previewVariation.borderColor,
             ...(previewCues?.length ? { captions: previewCues } : {}),
             ...(previewPlate ? { plate: previewPlate } : {}),
-            ...(selected?.preEdit ? { pre: selected.preEdit } : {}),
+            ...(selected?.preEdit
+              ? {
+                  pre: selected.preEdit,
+                  clip: selected.clip ?? { start: 0, end: selected.duration || 0 },
+                }
+              : {}),
           }
         : undefined,
     [
@@ -797,6 +802,8 @@ function Home() {
       previewCues,
       previewPlate,
       selected?.preEdit,
+      selected?.clip,
+      selected?.duration,
     ],
   );
 
@@ -2334,7 +2341,27 @@ function Home() {
             pre: studioItem.preEdit ?? defaultPreEdit(),
             clip: studioItem.clip ?? null,
           }}
+          captions={studioItem.captions}
+          onCaptionsChange={(cues) =>
+            setItems((p) => p.map((x) => (x.id === studioItem.id ? { ...x, captions: cues } : x)))
+          }
+          texts={{
+            headline: studioItem.headline || active.headline.text,
+            name: active.name_.text,
+            handle: active.handle.text,
+            cta: active.cta.text,
+          }}
+          onTextsChange={(t) => {
+            setItems((p) => p.map((x) => (x.id === studioItem.id ? { ...x, headline: t.headline } : x)));
+            setActive((tpl) => ({
+              ...tpl,
+              name_: { ...tpl.name_, text: t.name },
+              handle: { ...tpl.handle, text: t.handle },
+              cta: { ...tpl.cta, text: t.cta },
+            }));
+          }}
           onClose={() => setStudioId(null)}
+
           onSave={({ pre, clip }) => {
             setItems((p) =>
               p.map((x) =>

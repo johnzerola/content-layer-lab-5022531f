@@ -10,7 +10,7 @@ import {
 } from "./template";
 import type { CaptionCue } from "./captions";
 import { exemplarDetail, inpaintTelea, resetInpaintCache } from "./inpaint";
-import { cropRect, preEditFilter, type PreEdit } from "./preedit";
+import { cropRect, preEditFilter, transitionAt, type PreEdit } from "./preedit";
 
 /**
  * Reconstrói a área (sem borrão) usando FMM de Telea multi-escala + refino exemplar.
@@ -584,6 +584,8 @@ export interface DrawOpts {
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null;
   /** pré-edição do vídeo fonte (recorte, giro, cor) aplicada antes do template */
   pre?: PreEdit | null;
+  /** janela exportada — usada pelas transições de abertura/saída */
+  clip?: { start: number; end: number } | null;
   /** "hq" = reconstrução em resolução total (exportação). Padrão: preview rápido. */
   quality?: "preview" | "hq";
 }
@@ -620,7 +622,7 @@ function drawVideoLayer(
   if (source && source.width) {
     // pré-edição do vídeo fonte (recorte, giro, espelho e cor)
     const pre = opts?.pre;
-    const cr = cropRect(pre, source.width, source.height);
+    const cr = cropRect(pre, source.width, source.height, opts?.time);
     // a rotação exige um leve zoom extra pra não aparecer canto vazio
     const rotPad = rot ? 1 + Math.abs(rot) / 40 : 1;
     const zoom = (opts?.zoom ?? 1) * rotPad;
@@ -845,6 +847,17 @@ export function drawFrame(
   ctx.fillStyle = t.background;
   ctx.fillRect(0, 0, W, H);
 
+  // transição de abertura/saída: afeta o quadro montado inteiro
+  const tr = transitionAt(opts?.pre, opts?.time, opts?.clip ?? null);
+  const animating = tr.alpha < 1 || tr.scale !== 1 || tr.dx !== 0 || tr.dy !== 0;
+  if (animating) {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, tr.alpha));
+    ctx.translate(W / 2 + tr.dx * W, H / 2 + tr.dy * H);
+    ctx.scale(tr.scale, tr.scale);
+    ctx.translate(-W / 2, -H / 2);
+  }
+
   // ordem de empilhamento configurável (z-index por camada)
   const jobs: { z: number; i: number; run: () => void }[] = [];
   const push = (z: number | undefined, fallback: number, run: () => void) =>
@@ -867,5 +880,6 @@ export function drawFrame(
   }
 
   jobs.sort((a, b) => a.z - b.z || a.i - b.i).forEach((j) => j.run());
+  if (animating) ctx.restore();
   ctx.restore();
 }

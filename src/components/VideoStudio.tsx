@@ -8,6 +8,9 @@ import {
   RotateCw,
   Scissors,
   SlidersHorizontal,
+  Sparkles,
+  Subtitles,
+  Type,
   Undo2,
   X,
 } from "lucide-react";
@@ -16,12 +19,18 @@ import { Slider } from "@/components/ui/slider";
 import {
   COLOR_PRESETS,
   CROP_PRESETS,
+  cropAt,
   cropForRatio,
   defaultPreEdit,
   isFullCrop,
   preEditFilter,
+  TRANSITIONS,
+  type FrameKey,
   type PreEdit,
+  type TransitionKind,
 } from "@/lib/preedit";
+import { CaptionTimeline } from "@/components/CaptionTimeline";
+import type { CaptionCue } from "@/lib/captions";
 
 export interface PreEditResult {
   pre: PreEdit;
@@ -35,6 +44,12 @@ type Props = {
   height: number;
   duration: number;
   value: PreEditResult;
+  /** legendas deste vídeo (permite corrigir palavras aqui mesmo) */
+  captions?: CaptionCue[] | undefined;
+  onCaptionsChange?: ((cues: CaptionCue[]) => void) | undefined;
+  /** textos do template usados neste vídeo */
+  texts?: { headline: string; name: string; handle: string; cta: string } | undefined;
+  onTextsChange?: ((t: { headline: string; name: string; handle: string; cta: string }) => void) | undefined;
   onClose: () => void;
   onSave: (v: PreEditResult) => void;
 };
@@ -50,16 +65,32 @@ type Drag = { mode: "move" | Handle; x: number; y: number; crop: NonNullable<Pre
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-/** Estúdio de pré-edição: corte de tempo, recorte de quadro, giro e cor. */
-export function VideoStudio({ file, width, height, duration, value, onClose, onSave }: Props) {
+type Tab = "trim" | "crop" | "keys" | "trans" | "color" | "caps" | "text";
+
+/** Estúdio de pré-edição: corte de tempo, recorte de quadro, keyframes, transições, legendas e textos. */
+export function VideoStudio({
+  file,
+  width,
+  height,
+  duration,
+  value,
+  captions,
+  onCaptionsChange,
+  texts,
+  onTextsChange,
+  onClose,
+  onSave,
+}: Props) {
   const [pre, setPre] = useState<PreEdit>(value.pre ?? defaultPreEdit());
   const [start, setStart] = useState(value.clip?.start ?? 0);
   const [end, setEnd] = useState(value.clip?.end ?? duration);
-  const [tab, setTab] = useState<"trim" | "crop" | "color">("trim");
+  const [tab, setTab] = useState<Tab>("trim");
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(value.clip?.start ?? 0);
+  const [draft, setDraft] = useState(texts ?? { headline: "", name: "", handle: "", cta: "" });
   /** proporção travada do recorte (largura/altura em pixels da fonte) */
   const [lock, setLock] = useState<number | null>(null);
+
 
   const [url, setUrl] = useState("");
   useEffect(() => {
@@ -199,6 +230,17 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
       return { ...v, crop: { ...c, x: (1 - c.w) / 2, y: (1 - c.h) / 2 } };
     });
 
+  /** grava o recorte atual como keyframe no instante do playhead */
+  const addKey = () =>
+    setPre((v) => {
+      const c = v.crop ?? cropAt(v, time) ?? { x: 0, y: 0, w: 1, h: 1 };
+      const t = Number(time.toFixed(2));
+      const key: FrameKey = { t, crop: { ...c } };
+      const keys = [...v.keys.filter((k) => Math.abs(k.t - t) > 0.05), key].sort((a, b) => a.t - b.t);
+      return { ...v, keys };
+    });
+
+
   const cropPx = {
     w: Math.round((crop.w || 1) * (width || 0)),
     h: Math.round((crop.h || 1) * (height || 0)),
@@ -331,11 +373,15 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
 
           {/* controles */}
           <div className="min-h-0 space-y-4 md:overflow-y-auto md:pr-1">
-            <div className="flex gap-1 rounded-lg border border-border p-1">
+            <div className="flex flex-wrap gap-1 rounded-lg border border-border p-1">
               {([
                 { id: "trim", label: "Cortar", icon: Scissors },
                 { id: "crop", label: "Enquadrar", icon: Crop },
+                { id: "keys", label: "Keyframes", icon: Sparkles },
+                { id: "trans", label: "Transições", icon: SlidersHorizontal },
                 { id: "color", label: "Cor", icon: SlidersHorizontal },
+                { id: "caps", label: "Legenda", icon: Subtitles },
+                { id: "text", label: "Textos", icon: Type },
               ] as const).map((t) => (
                 <button
                   key={t.id}
@@ -348,6 +394,7 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
                 </button>
               ))}
             </div>
+
 
             {tab === "trim" && (
               <div className="space-y-4">
@@ -452,6 +499,140 @@ export function VideoStudio({ file, width, height, duration, value, onClose, onS
                 </div>
               </div>
             )}
+
+            {tab === "keys" && (
+              <div className="space-y-4">
+                <p className="font-mono text-[11px] text-muted-foreground">
+                  Keyframes movem o enquadramento ao longo do vídeo: leve o tempo até o ponto, ajuste o
+                  recorte na aba “Enquadrar” e grave o keyframe. O corte passa a acompanhar o rosto.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" onClick={addKey}>
+                    Gravar keyframe em {fmt(time)}
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => set({ keys: [] })}>
+                    Limpar todos
+                  </Button>
+                </div>
+                {pre.keys.length === 0 ? (
+                  <p className="font-mono text-[11px] text-muted-foreground">Nenhum keyframe — enquadramento fixo.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {[...pre.keys]
+                      .sort((a, b) => a.t - b.t)
+                      .map((k) => (
+                        <li
+                          key={k.t}
+                          className="flex items-center justify-between rounded-md border border-border px-2 py-1.5 font-mono text-[11px]"
+                        >
+                          <button className="text-primary" onClick={() => seek(k.t)}>
+                            {fmt(k.t)}
+                          </button>
+                          <span className="text-muted-foreground">
+                            {Math.round(k.crop.w * 100)}% × {Math.round(k.crop.h * 100)}%
+                          </span>
+                          <button
+                            className="text-destructive"
+                            onClick={() => set({ keys: pre.keys.filter((x) => x.t !== k.t) })}
+                          >
+                            remover
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {tab === "trans" && (
+              <div className="space-y-5">
+                {(["transIn", "transOut"] as const).map((key) => (
+                  <div key={key} className="space-y-2">
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      {key === "transIn" ? "Transição de abertura" : "Transição de saída"}
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {TRANSITIONS.map((tr) => (
+                        <button
+                          key={tr.id}
+                          onClick={() => set({ [key]: { ...pre[key], kind: tr.id as TransitionKind } } as Partial<PreEdit>)}
+                          className={`rounded-md border px-2.5 py-1 font-mono text-[11px] transition ${
+                            pre[key].kind === tr.id
+                              ? "border-primary text-primary"
+                              : "border-border text-muted-foreground hover:border-primary/50"
+                          }`}
+                        >
+                          {tr.label}
+                        </button>
+                      ))}
+                    </div>
+                    <Field label={`Duração · ${pre[key].dur.toFixed(2)}s`}>
+                      <Slider
+                        value={[pre[key].dur]}
+                        min={0.1}
+                        max={2}
+                        step={0.05}
+                        onValueChange={([v]) => set({ [key]: { ...pre[key], dur: v ?? 0.5 } } as Partial<PreEdit>)}
+                      />
+                    </Field>
+                  </div>
+                ))}
+                <p className="font-mono text-[11px] text-muted-foreground">
+                  As transições aparecem no preview do painel e na exportação.
+                </p>
+              </div>
+            )}
+
+            {tab === "caps" && (
+              <div className="space-y-3">
+                {captions?.length ? (
+                  <CaptionTimeline
+                    file={file}
+                    cues={captions}
+                    onChange={(cues) => onCaptionsChange?.(cues)}
+                  />
+                ) : (
+                  <p className="font-mono text-[11px] text-muted-foreground">
+                    Sem legenda ainda. Gere a transcrição no painel de legendas e volte aqui para corrigir
+                    palavras e tempos.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {tab === "text" && (
+              <div className="space-y-3">
+                {texts ? (
+                  <>
+                    {([
+                      ["headline", "Headline"],
+                      ["name", "Nome"],
+                      ["handle", "Arroba"],
+                      ["cta", "CTA"],
+                    ] as const).map(([k, label]) => (
+                      <label key={k} className="block space-y-1">
+                        <span className="font-mono text-[11px] text-muted-foreground">{label}</span>
+                        <input
+                          value={draft[k]}
+                          onChange={(e) => {
+                            const next = { ...draft, [k]: e.target.value };
+                            setDraft(next);
+                            onTextsChange?.(next);
+                          }}
+                          className="w-full rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground"
+                        />
+                      </label>
+                    ))}
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      Os textos valem para este vídeo no preview e na exportação.
+                    </p>
+                  </>
+                ) : (
+                  <p className="font-mono text-[11px] text-muted-foreground">Textos indisponíveis neste modo.</p>
+                )}
+              </div>
+            )}
+
 
             {tab === "color" && (
               <div className="space-y-4">
