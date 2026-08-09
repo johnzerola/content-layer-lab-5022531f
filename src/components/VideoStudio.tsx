@@ -489,6 +489,140 @@ export function VideoStudio({
               </div>
             )}
 
+            {tab === "keys" && (
+              <div className="space-y-4">
+                <p className="font-mono text-[11px] text-muted-foreground">
+                  Keyframes movem o enquadramento ao longo do vídeo: leve o tempo até o ponto, ajuste o
+                  recorte na aba “Enquadrar” e grave o keyframe. O corte passa a acompanhar o rosto.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button size="sm" onClick={addKey}>
+                    Gravar keyframe em {fmt(time)}
+                  </Button>
+                  <Button variant="secondary" size="sm" onClick={() => set({ keys: [] })}>
+                    Limpar todos
+                  </Button>
+                </div>
+                {pre.keys.length === 0 ? (
+                  <p className="font-mono text-[11px] text-muted-foreground">Nenhum keyframe — enquadramento fixo.</p>
+                ) : (
+                  <ul className="space-y-1.5">
+                    {[...pre.keys]
+                      .sort((a, b) => a.t - b.t)
+                      .map((k) => (
+                        <li
+                          key={k.t}
+                          className="flex items-center justify-between rounded-md border border-border px-2 py-1.5 font-mono text-[11px]"
+                        >
+                          <button className="text-primary" onClick={() => seek(k.t)}>
+                            {fmt(k.t)}
+                          </button>
+                          <span className="text-muted-foreground">
+                            {Math.round(k.crop.w * 100)}% × {Math.round(k.crop.h * 100)}%
+                          </span>
+                          <button
+                            className="text-destructive"
+                            onClick={() => set({ keys: pre.keys.filter((x) => x.t !== k.t) })}
+                          >
+                            remover
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {tab === "trans" && (
+              <div className="space-y-5">
+                {(["transIn", "transOut"] as const).map((key) => (
+                  <div key={key} className="space-y-2">
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      {key === "transIn" ? "Transição de abertura" : "Transição de saída"}
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {TRANSITIONS.map((tr) => (
+                        <button
+                          key={tr.id}
+                          onClick={() => set({ [key]: { ...pre[key], kind: tr.id as TransitionKind } } as Partial<PreEdit>)}
+                          className={`rounded-md border px-2.5 py-1 font-mono text-[11px] transition ${
+                            pre[key].kind === tr.id
+                              ? "border-primary text-primary"
+                              : "border-border text-muted-foreground hover:border-primary/50"
+                          }`}
+                        >
+                          {tr.label}
+                        </button>
+                      ))}
+                    </div>
+                    <Field label={`Duração · ${pre[key].dur.toFixed(2)}s`}>
+                      <Slider
+                        value={[pre[key].dur]}
+                        min={0.1}
+                        max={2}
+                        step={0.05}
+                        onValueChange={([v]) => set({ [key]: { ...pre[key], dur: v ?? 0.5 } } as Partial<PreEdit>)}
+                      />
+                    </Field>
+                  </div>
+                ))}
+                <p className="font-mono text-[11px] text-muted-foreground">
+                  As transições aparecem no preview do painel e na exportação.
+                </p>
+              </div>
+            )}
+
+            {tab === "caps" && (
+              <div className="space-y-3">
+                {captions?.length ? (
+                  <CaptionTimeline
+                    file={file}
+                    cues={captions}
+                    onChange={(cues) => onCaptionsChange?.(cues)}
+                  />
+                ) : (
+                  <p className="font-mono text-[11px] text-muted-foreground">
+                    Sem legenda ainda. Gere a transcrição no painel de legendas e volte aqui para corrigir
+                    palavras e tempos.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {tab === "text" && (
+              <div className="space-y-3">
+                {texts ? (
+                  <>
+                    {([
+                      ["headline", "Headline"],
+                      ["name", "Nome"],
+                      ["handle", "Arroba"],
+                      ["cta", "CTA"],
+                    ] as const).map(([k, label]) => (
+                      <label key={k} className="block space-y-1">
+                        <span className="font-mono text-[11px] text-muted-foreground">{label}</span>
+                        <input
+                          value={draft[k]}
+                          onChange={(e) => {
+                            const next = { ...draft, [k]: e.target.value };
+                            setDraft(next);
+                            onTextsChange?.(next);
+                          }}
+                          className="w-full rounded-md border border-border bg-background px-2 py-1.5 font-mono text-xs text-foreground"
+                        />
+                      </label>
+                    ))}
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      Os textos valem para este vídeo no preview e na exportação.
+                    </p>
+                  </>
+                ) : (
+                  <p className="font-mono text-[11px] text-muted-foreground">Textos indisponíveis neste modo.</p>
+                )}
+              </div>
+            )}
+
+
             {tab === "color" && (
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-1.5">
