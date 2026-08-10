@@ -34,6 +34,9 @@ import { autoSyncTemplates, enableCloudQuotaFallback, logBatch, logExports, type
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
+import { failJob, finishJob, setJobCancel, setJobRetry, startJob, updateJob } from "@/lib/jobs";
+import { undoable } from "@/lib/undo";
+import { takeHandoff, takePendingTool, type HandoffTool } from "@/lib/handoff";
 
 import {
   applyRatio,
@@ -475,6 +478,44 @@ function Home() {
     [addVideos],
   );
 
+  /** Remove um item da fila deixando um "desfazer" disponível por alguns segundos. */
+  const removeItemWithUndo = useCallback(
+    (id: string) => {
+      const mode = modeRef.current;
+      let backup: Item | undefined;
+      let index = -1;
+      setItemsIn(mode, (p) => {
+        index = p.findIndex((x) => x.id === id);
+        backup = p[index];
+        return p.filter((x) => x.id !== id);
+      });
+      undoable(`"${backup?.file.name ?? "vídeo"}" removido da fila`, () => {
+        if (!backup) return;
+        const restored = backup;
+        setItemsIn(mode, (p) => {
+          if (p.some((x) => x.id === restored.id)) return p;
+          const next = [...p];
+          next.splice(Math.max(0, index), 0, restored);
+          return next;
+        });
+      });
+    },
+    [setItemsIn],
+  );
+
+  /** Recebe vídeos enviados por outra ferramenta (ex.: Monitora Live) sem reimportar. */
+  useEffect(() => {
+    const pending = takePendingTool();
+    const tool: HandoffTool = pending ?? "lote";
+    const files = takeHandoff(tool);
+    if (files.length) {
+      void addVideos(files);
+      toast.success(`${files.length} vídeo(s) recebido(s) de outra ferramenta`);
+    }
+  }, [addVideos]);
+
+
+
   /** Importa um vídeo apenas colando o link (baixa pelo servidor, sem upload). */
   const importFromLink = useCallback(async () => {
     const url = linkUrl.trim();
@@ -824,7 +865,7 @@ function Home() {
 
 
 
-  const processAll = async (onlyIds?: string[]) => {
+  const processAll = async (onlyIds?: string[], safe = false) => {
     // a fila roda presa à ferramenta em que foi disparada
     const runMode = modeRef.current;
     const runFlow = FLOWS[runMode].export;
@@ -857,6 +898,17 @@ function Home() {
         if (!item) continue;
         const ac = new AbortController();
         ctrl.aborts.set(id, ac);
+        // central de atividade: um trabalho por vídeo, com etapas cronometradas
+        startJob({
+          id,
+          tool: runMode,
+          name: item.file.name,
+          stage: "preparando",
+          meta: { seguro: safe, plataformas: platforms.join(", ") },
+        });
+        updateJob(id, { status: "processando", safeMode: safe });
+        setJobCancel(id, () => ac.abort());
+        setJobRetry(id, (asSafe) => void processAll([id], asSafe));
         setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0, stage: "preparando", stepIndex: 0, stepTotal: 0 } : x)));
         const runItem = async () => {
 
@@ -884,6 +936,7 @@ function Home() {
               setItems((p) =>
                 p.map((x) => (x.id === id ? { ...x, capStatus: "transcrevendo…", capError: false, stage: "transcrevendo áudio" } : x)),
               );
+              updateJob(id, { stage: "transcrevendo áudio" });
               return generateCaptions(item.file, {
                 clip: item.clip,
                 language: capLang || undefined,
@@ -925,6 +978,7 @@ function Home() {
             setItems((p) =>
               p.map((x) => (x.id === id ? { ...x, stage: "recuperando fundo original" } : x)),
             );
+            updateJob(id, { stage: "recuperando fundo original" });
             try {
               plate = await buildBackgroundPlate(item.file, itemRegions, {
                 ...(item.clip ? { clip: item.clip } : {}),
@@ -955,22 +1009,27 @@ function Home() {
                   x.id === id ? { ...x, stage: stageLabel, stepIndex: at + 1, stepTotal: total } : x,
                 ),
               );
+              updateJob(id, { stage: stageLabel });
               const { blob, ext } = await renderVideo(item.file, tpl, {
                 variation: variationOf(item, k),
                 offsetX: item.offsetX,
                 offsetY: item.offsetY,
                 headline: item.headline || undefined,
-                fps: plat.fps,
-                bitrate: (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
+                // modo seguro: menos quadros e bitrate menor para destravar o render
+                fps: safe ? 24 : plat.fps,
+                bitrate: safe ? 4_000_000 : (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
                 clip: item.clip,
                 pre: item.preEdit,
                 captions: cues,
                 plate,
                 signal: ac.signal,
-                onProgress: (p) =>
+                onProgress: (p) => {
+                  const value = (at + p) / total;
                   setItems((prev) =>
-                    prev.map((x) => (x.id === id ? { ...x, progress: (at + p) / total } : x)),
-                  ),
+                    prev.map((x) => (x.id === id ? { ...x, progress: value } : x)),
+                  );
+                  updateJob(id, { progress: value });
+                },
               });
               const label = [outs.length > 1 ? plat.short : "", n > 1 ? `v${k + 1}` : ""]
                 .filter(Boolean)
@@ -981,6 +1040,7 @@ function Home() {
           }
 
           doneCount.current++;
+          finishJob(id, `${outputs.length} arquivo(s) prontos`);
           const first = outputs[0]!;
           setItems((p) =>
             p.map((x) =>
@@ -1029,6 +1089,8 @@ function Home() {
                 : x,
             ),
           );
+          if (aborted) updateJob(id, { status: "cancelado", stage: "cancelado" });
+          else failJob(id, msg);
         } finally {
           ctrl.aborts.delete(id);
         }
@@ -1410,7 +1472,7 @@ function Home() {
             onProcess={(ids) => void processAll(ids)}
             onTogglePause={togglePause}
             onCancel={cancelAll}
-            onRemove={(id) => setItems((p) => p.filter((x) => x.id !== id))}
+            onRemove={(id) => removeItemWithUndo(id)}
             onDownload={(it) => it.blob && downloadBlob(it.blob, `corte-${it.id.slice(0, 6)}.${it.ext}`)}
             onZip={() => void downloadZipAll()}
             onSaveFolder={() => void saveFolder()}
@@ -2330,7 +2392,7 @@ function Home() {
                       tabIndex={0}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setItems((p) => p.filter((x) => x.id !== it.id));
+                        removeItemWithUndo(it.id);
                       }}
                       className="rounded-md p-1.5 text-muted-foreground hover:text-destructive"
                     >
