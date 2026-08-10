@@ -898,6 +898,10 @@ function Home() {
               setItems((p) =>
                 p.map((x) => (x.id === id ? { ...x, capStatus: "transcrevendo…", capError: false, stage: "transcrevendo áudio" } : x)),
               );
+              updateJob(id, { stage: "transcrevendo áudio" });
+              void 0;
+              return generateCaptionsPlaceholder();
+              );
               return generateCaptions(item.file, {
                 clip: item.clip,
                 language: capLang || undefined,
