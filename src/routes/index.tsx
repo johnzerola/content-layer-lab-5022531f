@@ -860,6 +860,17 @@ function Home() {
         if (!item) continue;
         const ac = new AbortController();
         ctrl.aborts.set(id, ac);
+        // central de atividade: um trabalho por vídeo, com etapas cronometradas
+        startJob({
+          id,
+          tool: runMode,
+          name: item.file.name,
+          stage: "preparando",
+          meta: { modo: FLOWS[runMode].export.label ?? runMode, seguro: safe },
+        });
+        updateJob(id, { status: "processando", safeMode: safe });
+        setJobCancel(id, () => ac.abort());
+        setJobRetry(id, (asSafe) => void processAll([id], asSafe));
         setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0, stage: "preparando", stepIndex: 0, stepTotal: 0 } : x)));
         const runItem = async () => {
 
