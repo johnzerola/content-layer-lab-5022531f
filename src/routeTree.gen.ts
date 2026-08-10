@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as ArmazenamentoRouteImport } from './routes/armazenamento'
+import { Route as LiveRouteImport } from './routes/live'
 import { Route as VendasRouteImport } from './routes/vendas'
 import { Route as ApiPublicHlsProxyRouteImport } from './routes/api/public/hls-proxy'
 import { Route as ApiPublicMediaProxyRouteImport } from './routes/api/public/media-proxy'
@@ -30,6 +31,11 @@ const AgendaRoute = AgendaRouteImport.update({
 const ArmazenamentoRoute = ArmazenamentoRouteImport.update({
   id: '/armazenamento',
   path: '/armazenamento',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LiveRoute = LiveRouteImport.update({
+  id: '/live',
+  path: '/live',
   getParentRoute: () => rootRouteImport,
 } as any)
 const VendasRoute = VendasRouteImport.update({
@@ -58,6 +64,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
+  '/live': typeof LiveRoute
   '/vendas': typeof VendasRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
@@ -67,6 +74,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
+  '/live': typeof LiveRoute
   '/vendas': typeof VendasRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
@@ -77,6 +85,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
+  '/live': typeof LiveRoute
   '/vendas': typeof VendasRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
@@ -88,6 +97,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/armazenamento'
+    | '/live'
     | '/vendas'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
@@ -97,6 +107,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/armazenamento'
+    | '/live'
     | '/vendas'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
@@ -106,6 +117,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/armazenamento'
+    | '/live'
     | '/vendas'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
@@ -116,6 +128,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgendaRoute: typeof AgendaRoute
   ArmazenamentoRoute: typeof ArmazenamentoRoute
+  LiveRoute: typeof LiveRoute
   VendasRoute: typeof VendasRoute
   ApiPublicHlsProxyRoute: typeof ApiPublicHlsProxyRoute
   ApiPublicMediaProxyRoute: typeof ApiPublicMediaProxyRoute
@@ -143,6 +156,13 @@ declare module '@tanstack/react-router' {
       path: '/armazenamento'
       fullPath: '/armazenamento'
       preLoaderRoute: typeof ArmazenamentoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/live': {
+      id: '/live'
+      path: '/live'
+      fullPath: '/live'
+      preLoaderRoute: typeof LiveRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/vendas': {
@@ -180,6 +200,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgendaRoute: AgendaRoute,
   ArmazenamentoRoute: ArmazenamentoRoute,
+  LiveRoute: LiveRoute,
   VendasRoute: VendasRoute,
   ApiPublicHlsProxyRoute: ApiPublicHlsProxyRoute,
   ApiPublicMediaProxyRoute: ApiPublicMediaProxyRoute,

@@ -174,6 +174,14 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             {open && "Templates"}
           </button>
           <Link
+            to="/live"
+            title="Monitora Live"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+          >
+            <Radio className="size-[18px] shrink-0" />
+            {open && "Monitora Live"}
+          </Link>
+          <Link
             to="/agenda"
             title="Agenda de postagens"
             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
