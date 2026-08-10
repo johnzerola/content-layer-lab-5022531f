@@ -94,6 +94,108 @@ async function fileToDataUrl(file: File) {
   });
 }
 
+function DebugPanel({
+  t,
+  selected,
+  grid,
+  setGrid,
+  safe,
+  setSafe,
+  boxes,
+  setBoxes,
+}: {
+  t: Template;
+  selected: SelId | null;
+  grid: number;
+  setGrid: (n: number) => void;
+  safe: boolean;
+  setSafe: (b: boolean) => void;
+  boxes: boolean;
+  setBoxes: (b: boolean) => void;
+}) {
+  const l = selected
+    ? (layerOf(t, selected) as
+        | (Record<string, unknown> & {
+            x: number;
+            y: number;
+            w: number;
+            h?: number;
+            size?: number;
+            visible: boolean;
+            rotation?: number;
+            opacity?: number;
+            z?: number;
+          })
+        | null)
+    : null;
+  const h = l ? (l.h ?? Math.round((l.size ?? 0) * 1.2)) : 0;
+  const W = t.canvasW ?? 1080;
+  const H = t.canvasH ?? 1920;
+
+  const rows: [string, string][] = l
+    ? [
+        ["X", `${Math.round(l.x)} px (${((l.x / W) * 100).toFixed(1)}%)`],
+        ["Y", `${Math.round(l.y)} px (${((l.y / H) * 100).toFixed(1)}%)`],
+        ["Larg", `${Math.round(l.w)} px (${((l.w / W) * 100).toFixed(1)}%)`],
+        ["Alt", `${Math.round(h)} px (${((h / H) * 100).toFixed(1)}%)`],
+        ["Centro", `${Math.round(l.x + l.w / 2)} , ${Math.round(l.y + h / 2)}`],
+        ["Rotação", `${Math.round(l.rotation ?? 0)}°`],
+        ["Opacidade", (l.opacity ?? 1).toFixed(2)],
+        ["Z-index", String(l.z ?? 0)],
+        ["Visível", l.visible ? "sim" : "não"],
+      ]
+    : [];
+
+  return (
+    <div className="space-y-3 rounded-xl border border-border bg-surface-2 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="mono-label">Depuração</span>
+        <button
+          onClick={() => setBoxes(!boxes)}
+          className={`rounded-md border px-2 py-1 font-mono text-[11px] ${boxes ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
+        >
+          bounding boxes
+        </button>
+        <button
+          onClick={() => setSafe(!safe)}
+          className={`rounded-md border px-2 py-1 font-mono text-[11px] ${safe ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
+        >
+          safe areas
+        </button>
+        <div className="flex items-center gap-1">
+          {[2, 3, 4, 6].map((n) => (
+            <button
+              key={n}
+              onClick={() => setGrid(n)}
+              className={`rounded-md border px-2 py-1 font-mono text-[11px] ${grid === n ? "border-primary text-primary" : "border-border text-muted-foreground"}`}
+            >
+              {n}×{n}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="font-mono text-[11px] text-muted-foreground">
+        canvas {W}×{H} · camadas {selectableIds(t).length}
+      </div>
+
+      {l ? (
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-[11px]">
+          {rows.map(([k, v]) => (
+            <div key={k} className="flex justify-between gap-2 border-b border-border/50 py-0.5">
+              <span className="text-muted-foreground">{k}</span>
+              <span className="text-foreground">{v}</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="font-mono text-[11px] text-muted-foreground">Selecione uma camada para inspecionar.</p>
+      )}
+    </div>
+  );
+}
+
+
 export function TemplateEditor({
   value,
   onCancel,
