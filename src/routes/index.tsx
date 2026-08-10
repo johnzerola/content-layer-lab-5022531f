@@ -303,6 +303,8 @@ function Home() {
   const [compare, setCompare] = useState(false);
   /** mini editor de enquadramento direto na prévia */
   const [cropTune, setCropTune] = useState(false);
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
+
   // as transcrições rodam em fila (uma por vez) mesmo com render paralelo
   const capChain = useRef<Promise<unknown>>(Promise.resolve());
 
