@@ -299,6 +299,66 @@ export function TemplateCanvas({
       style={{ aspectRatio: `${W}/${H}` }}
     >
       <canvas ref={canvasRef} width={W} height={H} className="block h-full w-full" />
+
+      {debug && (
+        <div className="pointer-events-none absolute inset-0">
+          {/* grade */}
+          {Array.from({ length: Math.max(0, debugGrid - 1) }, (_, i) => (i + 1) / debugGrid).map((f) => (
+            <div key={`gx${f}`} className="absolute top-0 bottom-0 w-px bg-primary/25" style={{ left: `${f * 100}%` }} />
+          ))}
+          {Array.from({ length: Math.max(0, debugGrid - 1) }, (_, i) => (i + 1) / debugGrid).map((f) => (
+            <div key={`gy${f}`} className="absolute right-0 left-0 h-px bg-primary/25" style={{ top: `${f * 100}%` }} />
+          ))}
+          {/* centro */}
+          <div className="absolute top-0 bottom-0 left-1/2 w-px bg-primary/50" />
+          <div className="absolute right-0 left-0 top-1/2 h-px bg-primary/50" />
+          {/* safe areas: UI dos apps (topo ~14%, base ~20%, laterais 5%) */}
+          {debugSafeArea && (
+            <>
+              <div className="absolute inset-x-[5%] top-[14%] bottom-[20%] border border-dashed border-warn/70" />
+              <div className="absolute inset-x-0 top-0 h-[14%] bg-warn/10" />
+              <div className="absolute inset-x-0 bottom-0 h-[20%] bg-warn/10" />
+              <span className="absolute left-1 top-1 rounded bg-black/70 px-1 font-mono text-[9px] text-warn">
+                safe area
+              </span>
+            </>
+          )}
+          {/* bounding boxes */}
+          {debugBoxes &&
+            ids.map((id) => {
+              const l = layerOf(template, id) as
+                | (Rect & { visible: boolean; rotation?: number; opacity?: number; z?: number })
+                | null;
+              const r = rectOf(template, id);
+              if (!l || !r) return null;
+              const on = l.visible;
+              return (
+                <div
+                  key={`dbg-${id}`}
+                  className={`absolute border ${on ? "border-primary/70" : "border-muted-foreground/40 border-dashed"}`}
+                  style={{
+                    left: `${(r.x / W) * 100}%`,
+                    top: `${(r.y / H) * 100}%`,
+                    width: `${(r.w / W) * 100}%`,
+                    height: `${(r.h / H) * 100}%`,
+                  }}
+                >
+                  <span className="absolute -top-[13px] left-0 whitespace-nowrap rounded-sm bg-black/75 px-1 font-mono text-[9px] leading-[13px] text-primary">
+                    {labelOf(template, id)} {Math.round(r.x)},{Math.round(r.y)} · {Math.round(r.w)}×
+                    {Math.round(r.h)}
+                    {l.rotation ? ` · ${Math.round(l.rotation)}°` : ""}
+                    {l.opacity !== undefined && l.opacity < 1 ? ` · α${l.opacity.toFixed(2)}` : ""}
+                    {l.z !== undefined ? ` · z${l.z}` : ""}
+                  </span>
+                </div>
+              );
+            })}
+          <span className="absolute right-1 bottom-1 rounded bg-black/70 px-1 font-mono text-[9px] text-primary">
+            {W}×{H}
+          </span>
+        </div>
+      )}
+
       {interactive &&
         ids.map((id) => {
           const l = layerOf(template, id);
