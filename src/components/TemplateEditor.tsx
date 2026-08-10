@@ -107,6 +107,11 @@ export function TemplateEditor({
   const [selected, setSelected] = useState<SelId | null>("headline");
   const [open, setOpen] = useState<SelId | null>("headline");
   const [snap, setSnap] = useState(true);
+  const [debug, setDebug] = useState(false);
+  const [debugGrid, setDebugGrid] = useState(3);
+  const [debugSafe, setDebugSafe] = useState(true);
+  const [debugBoxes, setDebugBoxes] = useState(true);
+
 
   const past = useRef<Template[]>([]);
   const future = useRef<Template[]>([]);
