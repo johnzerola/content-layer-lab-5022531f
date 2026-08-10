@@ -30,7 +30,9 @@ import {
   type TransitionKind,
 } from "@/lib/preedit";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
+import { EditorTimeline } from "@/components/EditorTimeline";
 import type { CaptionCue } from "@/lib/captions";
+
 
 export interface PreEditResult {
   pre: PreEdit;
@@ -352,23 +354,27 @@ export function VideoStudio({
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button variant="secondary" size="icon" onClick={toggle} aria-label="Reproduzir">
-                {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
-              </Button>
-              <input
-                type="range"
-                min={0}
-                max={Math.max(0.1, duration)}
-                step={0.05}
-                value={time}
-                onChange={(e) => seek(Number(e.target.value))}
-                className="h-1.5 flex-1 accent-primary"
-              />
-              <span className="w-24 text-right font-mono text-[11px] text-muted-foreground">
-                {fmt(time)} / {fmt(duration)}
-              </span>
-            </div>
+            <EditorTimeline
+              url={url}
+              duration={duration}
+              time={time}
+              playing={playing}
+              start={start}
+              end={end}
+              keys={pre.keys}
+              transIn={pre.transIn}
+              transOut={pre.transOut}
+              cues={captions}
+              onSeek={seek}
+              onTogglePlay={toggle}
+              onTrim={(s, e) => {
+                setStart(s);
+                setEnd(e);
+              }}
+              onKeysChange={(keys) => set({ keys })}
+              onAddKey={addKey}
+            />
+
           </div>
 
           {/* controles */}
