@@ -2354,7 +2354,7 @@ function Home() {
                       tabIndex={0}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setItems((p) => p.filter((x) => x.id !== it.id));
+                        removeItemWithUndo(it.id);
                       }}
                       className="rounded-md p-1.5 text-muted-foreground hover:text-destructive"
                     >
