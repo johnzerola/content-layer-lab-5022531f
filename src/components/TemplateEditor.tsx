@@ -285,6 +285,13 @@ export function TemplateEditor({
             >
               <Magnet className="size-4" />
             </button>
+            <button
+              onClick={() => setDebug((d) => !d)}
+              className={`rounded-md border p-2 ${debug ? "border-primary text-primary" : "border-border"}`}
+              title="Modo de depuração: grade, safe areas e bounding boxes"
+            >
+              <Bug className="size-4" />
+            </button>
             <button onClick={onCancel} className="rounded-md p-2 hover:bg-surface-2" aria-label="Fechar">
               <X className="size-4" />
             </button>
@@ -299,11 +306,27 @@ export function TemplateEditor({
               onSelect={setSelected}
               onChange={setT}
               snap={snap}
+              debug={debug}
+              debugGrid={debugGrid}
+              debugSafeArea={debugSafe}
+              debugBoxes={debugBoxes}
             />
-            <p className="text-center text-xs text-muted-foreground">
-              Arraste elementos direto no preview · guias grudam nas bordas e no centro (Alt ignora)
-            </p>
+            {debug ? <DebugPanel
+              t={t}
+              selected={selected}
+              grid={debugGrid}
+              setGrid={setDebugGrid}
+              safe={debugSafe}
+              setSafe={setDebugSafe}
+              boxes={debugBoxes}
+              setBoxes={setDebugBoxes}
+            /> : (
+              <p className="text-center text-xs text-muted-foreground">
+                Arraste elementos direto no preview · guias grudam nas bordas e no centro (Alt ignora)
+              </p>
+            )}
           </div>
+
 
           <div className="space-y-4 lg:max-h-[62vh] lg:overflow-y-auto lg:pr-1">
             <Field label="Nome do template">
