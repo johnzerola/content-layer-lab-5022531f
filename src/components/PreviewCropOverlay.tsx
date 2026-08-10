@@ -204,9 +204,72 @@ export function PreviewCropOverlay({
         </button>
       </div>
 
-      <div className="pointer-events-none absolute bottom-1.5 left-1.5 rounded-md border border-border bg-background/85 px-1.5 py-1 font-mono text-[10px] text-muted-foreground backdrop-blur">
-        {hint ?? `x ${(c.x * 100).toFixed(0)}% · y ${(c.y * 100).toFixed(0)}% · ${(1 / c.w).toFixed(2)}x`}
+      {/* linha do tempo de keyframes de enquadramento */}
+      <div
+        onPointerDown={(e) => e.stopPropagation()}
+        className="absolute right-1.5 bottom-9 left-1.5 rounded-md border border-border bg-background/85 px-1.5 py-1 backdrop-blur"
+      >
+        <div className="mb-1 flex items-center justify-between gap-1">
+          <span className="font-mono text-[10px] text-muted-foreground">
+            {time.toFixed(1)}s{dur ? ` / ${dur.toFixed(1)}s` : ""} · {keys.length} kf
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={addKey}
+              className={`flex items-center gap-1 rounded border px-1.5 py-0.5 font-mono text-[10px] ${
+                nearIdx >= 0
+                  ? "border-primary/60 bg-primary/15 text-primary"
+                  : "border-border text-muted-foreground hover:border-primary hover:text-primary"
+              }`}
+              title="gravar enquadramento neste instante"
+            >
+              <Plus className="size-3" /> keyframe
+            </button>
+            {keys.length > 0 && (
+              <button
+                type="button"
+                onClick={() => onChange({ ...pre, keys: [] })}
+                className="rounded border border-border p-0.5 text-muted-foreground hover:border-destructive hover:text-destructive"
+                title="apagar todos os keyframes"
+              >
+                <Trash2 className="size-3" />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="relative h-4">
+          <div className="absolute top-1.5 right-0 left-0 h-px bg-border" />
+          {dur > 0 && (
+            <div
+              className="absolute top-0 h-4 w-px bg-primary"
+              style={{ left: `${clamp01(time / dur) * 100}%` }}
+            />
+          )}
+          {dur > 0 &&
+            keys.map((k) => (
+              <button
+                key={k.t}
+                type="button"
+                onClick={() => seek(k.t)}
+                onDoubleClick={() => delKey(k.t)}
+                title={`${k.t.toFixed(2)}s · clique p/ ir · duplo clique p/ apagar`}
+                className="absolute -translate-x-1/2 text-primary hover:text-destructive"
+                style={{ left: `${clamp01(k.t / dur) * 100}%` }}
+              >
+                <Diamond className="size-3 fill-current" />
+              </button>
+            ))}
+        </div>
       </div>
+
+      <div className="pointer-events-none absolute bottom-1.5 left-1.5 rounded-md border border-border bg-background/85 px-1.5 py-1 font-mono text-[10px] text-muted-foreground backdrop-blur">
+        {hint ??
+          (keys.length
+            ? `kf ${nearIdx >= 0 ? "editando" : "novo"} · ${(1 / c.w).toFixed(2)}x`
+            : `x ${(c.x * 100).toFixed(0)}% · y ${(c.y * 100).toFixed(0)}% · ${(1 / c.w).toFixed(2)}x`)}
+      </div>
+
     </div>
   );
 }
