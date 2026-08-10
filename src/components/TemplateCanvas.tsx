@@ -160,6 +160,7 @@ export function TemplateCanvas({
   useEffect(() => {
     if (!previewFile) {
       videoEl.current = null;
+      if (videoRef) videoRef.current = null;
       return;
     }
     const url = URL.createObjectURL(previewFile);
@@ -176,14 +177,17 @@ export function TemplateCanvas({
     v.addEventListener("timeupdate", onLoop);
     void v.play().catch(() => undefined);
     videoEl.current = v;
+    if (videoRef) videoRef.current = v;
     return () => {
       v.removeEventListener("loadedmetadata", onLoop);
       v.removeEventListener("timeupdate", onLoop);
       v.pause();
       videoEl.current = null;
+      if (videoRef) videoRef.current = null;
       URL.revokeObjectURL(url);
     };
-  }, [previewFile, loopStart, loopEnd]);
+  }, [previewFile, loopStart, loopEnd, videoRef]);
+
 
 
   // velocidade anti-duplicidade em tempo real
