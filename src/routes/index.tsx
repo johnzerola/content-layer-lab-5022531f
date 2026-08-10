@@ -1051,6 +1051,8 @@ function Home() {
                 : x,
             ),
           );
+          if (aborted) updateJob(id, { status: "cancelado", stage: "cancelado" });
+          else failJob(id, msg);
         } finally {
           ctrl.aborts.delete(id);
         }
