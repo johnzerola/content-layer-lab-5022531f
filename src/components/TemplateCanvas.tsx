@@ -119,6 +119,10 @@ export function TemplateCanvas({
   loopStart = 0,
   loopEnd,
   videoRef,
+  debug = false,
+  debugGrid = 3,
+  debugSafeArea = true,
+  debugBoxes = true,
 }: {
   template: Template;
   selected?: SelId | null;
@@ -136,7 +140,14 @@ export function TemplateCanvas({
   loopEnd?: number | undefined;
   /** expõe o <video> da prévia (usado pelo mini editor de keyframes) */
   videoRef?: { current: HTMLVideoElement | null };
+  /** modo de depuração: grade, áreas seguras e caixas das camadas */
+  debug?: boolean;
+  /** divisões da grade (2 = metades, 3 = terços...) */
+  debugGrid?: number;
+  debugSafeArea?: boolean;
+  debugBoxes?: boolean;
 }) {
+
 
 
   const W = template.canvasW ?? CANVAS_W;
