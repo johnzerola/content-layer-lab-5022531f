@@ -866,7 +866,7 @@ function Home() {
           tool: runMode,
           name: item.file.name,
           stage: "preparando",
-          meta: { modo: FLOWS[runMode].export.label ?? runMode, seguro: safe },
+          meta: { seguro: safe, plataformas: platforms.join(", ") },
         });
         updateJob(id, { status: "processando", safeMode: safe });
         setJobCancel(id, () => ac.abort());
