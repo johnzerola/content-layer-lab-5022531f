@@ -118,6 +118,7 @@ export function TemplateCanvas({
   speed = 1,
   loopStart = 0,
   loopEnd,
+  videoRef,
 }: {
   template: Template;
   selected?: SelId | null;
@@ -133,7 +134,10 @@ export function TemplateCanvas({
   /** janela exportada (clipagem + corte anti-duplicidade), em segundos do vídeo fonte */
   loopStart?: number;
   loopEnd?: number | undefined;
+  /** expõe o <video> da prévia (usado pelo mini editor de keyframes) */
+  videoRef?: { current: HTMLVideoElement | null };
 }) {
+
 
   const W = template.canvasW ?? CANVAS_W;
   const H = template.canvasH ?? CANVAS_H;
