@@ -478,6 +478,46 @@ function Home() {
     [addVideos],
   );
 
+  /** Remove um item da fila deixando um "desfazer" disponível por alguns segundos. */
+  const removeItemWithUndo = useCallback(
+    (id: string) => {
+      let backup: Item | undefined;
+      let index = -1;
+      setItemsIn((p) => {
+        index = p.findIndex((x) => x.id === id);
+        backup = p[index];
+        return p.filter((x) => x.id !== id);
+      });
+      undoable({
+        message: `"${backup?.file.name ?? "vídeo"}" removido da fila`,
+        undo: () => {
+          if (!backup) return;
+          setItemsIn((p) => {
+            if (p.some((x) => x.id === backup!.id)) return p;
+            const next = [...p];
+            next.splice(Math.max(0, index), 0, backup!);
+            return next;
+          });
+        },
+      });
+    },
+    [setItemsIn],
+  );
+
+  /** Recebe vídeos enviados por outra ferramenta (ex.: Monitora Live) sem reimportar. */
+  useEffect(() => {
+    const pending = takePendingTool();
+    if (pending && pending !== ("clips" as HandoffTool) && pending !== ("limpar" as HandoffTool)) {
+      // modos válidos do dashboard são tratados abaixo pelo próprio estado
+    }
+    const files = takeHandoff();
+    if (files.length) {
+      void addVideos(files);
+      toast.success(`${files.length} vídeo(s) recebido(s) de outra ferramenta`);
+    }
+  }, [addVideos]);
+
+
   /** Importa um vídeo apenas colando o link (baixa pelo servidor, sem upload). */
   const importFromLink = useCallback(async () => {
     const url = linkUrl.trim();
