@@ -969,22 +969,27 @@ function Home() {
                   x.id === id ? { ...x, stage: stageLabel, stepIndex: at + 1, stepTotal: total } : x,
                 ),
               );
+              updateJob(id, { stage: stageLabel });
               const { blob, ext } = await renderVideo(item.file, tpl, {
                 variation: variationOf(item, k),
                 offsetX: item.offsetX,
                 offsetY: item.offsetY,
                 headline: item.headline || undefined,
-                fps: plat.fps,
-                bitrate: (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
+                // modo seguro: menos quadros e bitrate menor para destravar o render
+                fps: safe ? 24 : plat.fps,
+                bitrate: safe ? 4_000_000 : (autoBitrate ? plat.bitrate : bitrate) * 1_000_000,
                 clip: item.clip,
                 pre: item.preEdit,
                 captions: cues,
                 plate,
                 signal: ac.signal,
-                onProgress: (p) =>
+                onProgress: (p) => {
+                  const value = (at + p) / total;
                   setItems((prev) =>
-                    prev.map((x) => (x.id === id ? { ...x, progress: (at + p) / total } : x)),
-                  ),
+                    prev.map((x) => (x.id === id ? { ...x, progress: value } : x)),
+                  );
+                  updateJob(id, { progress: value });
+                },
               });
               const label = [outs.length > 1 ? plat.short : "", n > 1 ? `v${k + 1}` : ""]
                 .filter(Boolean)
@@ -995,6 +1000,7 @@ function Home() {
           }
 
           doneCount.current++;
+          finishJob(id, `${outputs.length} arquivo(s) prontos`);
           const first = outputs[0]!;
           setItems((p) =>
             p.map((x) =>
