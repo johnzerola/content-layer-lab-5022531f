@@ -118,6 +118,7 @@ export function TemplateCanvas({
   speed = 1,
   loopStart = 0,
   loopEnd,
+  videoRef,
 }: {
   template: Template;
   selected?: SelId | null;
@@ -133,7 +134,10 @@ export function TemplateCanvas({
   /** janela exportada (clipagem + corte anti-duplicidade), em segundos do vídeo fonte */
   loopStart?: number;
   loopEnd?: number | undefined;
+  /** expõe o <video> da prévia (usado pelo mini editor de keyframes) */
+  videoRef?: { current: HTMLVideoElement | null };
 }) {
+
 
   const W = template.canvasW ?? CANVAS_W;
   const H = template.canvasH ?? CANVAS_H;
@@ -156,6 +160,7 @@ export function TemplateCanvas({
   useEffect(() => {
     if (!previewFile) {
       videoEl.current = null;
+      if (videoRef) videoRef.current = null;
       return;
     }
     const url = URL.createObjectURL(previewFile);
@@ -172,14 +177,17 @@ export function TemplateCanvas({
     v.addEventListener("timeupdate", onLoop);
     void v.play().catch(() => undefined);
     videoEl.current = v;
+    if (videoRef) videoRef.current = v;
     return () => {
       v.removeEventListener("loadedmetadata", onLoop);
       v.removeEventListener("timeupdate", onLoop);
       v.pause();
       videoEl.current = null;
+      if (videoRef) videoRef.current = null;
       URL.revokeObjectURL(url);
     };
-  }, [previewFile, loopStart, loopEnd]);
+  }, [previewFile, loopStart, loopEnd, videoRef]);
+
 
 
   // velocidade anti-duplicidade em tempo real

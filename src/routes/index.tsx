@@ -303,6 +303,8 @@ function Home() {
   const [compare, setCompare] = useState(false);
   /** mini editor de enquadramento direto na prévia */
   const [cropTune, setCropTune] = useState(false);
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
+
   // as transcrições rodam em fila (uma por vez) mesmo com render paralelo
   const capChain = useRef<Promise<unknown>>(Promise.resolve());
 
@@ -1608,10 +1610,12 @@ function Home() {
                           speed={previewVariation?.speed ?? 1}
                           loopStart={previewLoop.start}
                           loopEnd={previewLoop.end}
+                          videoRef={previewVideoRef}
                         />
                         {cropTune && (
                           <PreviewCropOverlay
                             pre={selected.preEdit ?? defaultPreEdit()}
+                            videoRef={previewVideoRef}
                             onChange={(next) =>
                               setItems((p) =>
                                 p.map((x) => (x.id === selected.id ? { ...x, preEdit: next } : x)),
@@ -1629,6 +1633,7 @@ function Home() {
                           />
                         )}
                       </div>
+
                     )}
                     {/* estilo rápido de legenda direto na prévia */}
                     <div className="flex flex-wrap items-center gap-1">
