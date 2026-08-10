@@ -1434,7 +1434,7 @@ function Home() {
             onProcess={(ids) => void processAll(ids)}
             onTogglePause={togglePause}
             onCancel={cancelAll}
-            onRemove={(id) => setItems((p) => p.filter((x) => x.id !== id))}
+            onRemove={(id) => removeItemWithUndo(id)}
             onDownload={(it) => it.blob && downloadBlob(it.blob, `corte-${it.id.slice(0, 6)}.${it.ext}`)}
             onZip={() => void downloadZipAll()}
             onSaveFolder={() => void saveFolder()}
