@@ -13,6 +13,7 @@ import {
   Wand2,
   Droplets,
   HardDrive,
+  Radio,
 } from "lucide-react";
 
 export type AppMode = "lote" | "clip" | "limpar";
