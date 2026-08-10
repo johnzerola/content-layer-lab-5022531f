@@ -16,7 +16,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { TemplateCanvas, LAYER_ORDER, LAYER_LABELS } from "./TemplateCanvas";
+import { TemplateCanvas, LAYER_ORDER, LAYER_LABELS, layerOf, selectableIds } from "./TemplateCanvas";
 import {
   defaultCaptions,
   makeExtra,
