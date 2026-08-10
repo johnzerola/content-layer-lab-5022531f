@@ -940,6 +940,7 @@ function Home() {
             setItems((p) =>
               p.map((x) => (x.id === id ? { ...x, stage: "recuperando fundo original" } : x)),
             );
+            updateJob(id, { stage: "recuperando fundo original" });
             try {
               plate = await buildBackgroundPlate(item.file, itemRegions, {
                 ...(item.clip ? { clip: item.clip } : {}),
