@@ -827,7 +827,7 @@ function Home() {
 
 
 
-  const processAll = async (onlyIds?: string[]) => {
+  const processAll = async (onlyIds?: string[], safe = false) => {
     // a fila roda presa à ferramenta em que foi disparada
     const runMode = modeRef.current;
     const runFlow = FLOWS[runMode].export;
