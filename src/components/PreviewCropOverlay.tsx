@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Move, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
-import { type PreCrop, type PreEdit } from "@/lib/preedit";
+import { Move, ZoomIn, ZoomOut, RotateCcw, Diamond, Trash2, Plus } from "lucide-react";
+import { type PreCrop, type PreEdit, type FrameKey, cropAt } from "@/lib/preedit";
+
 
 const FULL: PreCrop = { x: 0, y: 0, w: 1, h: 1 };
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
