@@ -10,7 +10,7 @@ import {
 } from "./template";
 import type { CaptionCue } from "./captions";
 import { exemplarDetail, inpaintTelea, resetInpaintCache } from "./inpaint";
-import { cropRect, preEditFilter, transitionAt, type PreEdit } from "./preedit";
+import { cropRect, cropAt, isFullCrop, preEditFilter, transitionAt, type PreEdit } from "./preedit";
 
 /**
  * Reconstrói a área (sem borrão) usando FMM de Telea multi-escala + refino exemplar.
@@ -628,12 +628,17 @@ function drawVideoLayer(
     const zoom = (opts?.zoom ?? 1) * rotPad;
     const srcAR = cr.ew / cr.eh;
     const boxAR = v.w / v.h;
+    // recorte manual: o que o usuário selecionou tem que aparecer inteiro,
+    // senão o "cover" reenquadra e o corte vira só um zoom
+    const manualCrop = !isFullCrop(cropAt(pre, opts?.time));
     // "auto": só recorta quando a orientação bate com a do quadro; senão mostra inteiro
     const useContain =
-      v.fit === "contain" || (v.fit === "auto" && Math.abs(srcAR - boxAR) / boxAR > 0.02);
+      v.fit === "contain" ||
+      ((v.fit === "auto" || manualCrop) && Math.abs(srcAR - boxAR) / boxAR > 0.02);
     const fitScale = useContain
       ? Math.min(v.w / cr.ew, v.h / cr.eh)
       : Math.max(v.w / cr.ew, v.h / cr.eh);
+
     const scale = fitScale * zoom;
     const dw = cr.ew * scale;
     const dh = cr.eh * scale;
