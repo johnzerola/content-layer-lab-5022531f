@@ -481,24 +481,23 @@ function Home() {
   /** Remove um item da fila deixando um "desfazer" disponível por alguns segundos. */
   const removeItemWithUndo = useCallback(
     (id: string) => {
+      const mode = modeRef.current;
       let backup: Item | undefined;
       let index = -1;
-      setItemsIn((p) => {
+      setItemsIn(mode, (p) => {
         index = p.findIndex((x) => x.id === id);
         backup = p[index];
         return p.filter((x) => x.id !== id);
       });
-      undoable({
-        message: `"${backup?.file.name ?? "vídeo"}" removido da fila`,
-        undo: () => {
-          if (!backup) return;
-          setItemsIn((p) => {
-            if (p.some((x) => x.id === backup!.id)) return p;
-            const next = [...p];
-            next.splice(Math.max(0, index), 0, backup!);
-            return next;
-          });
-        },
+      undoable(`"${backup?.file.name ?? "vídeo"}" removido da fila`, () => {
+        if (!backup) return;
+        const restored = backup;
+        setItemsIn(mode, (p) => {
+          if (p.some((x) => x.id === restored.id)) return p;
+          const next = [...p];
+          next.splice(Math.max(0, index), 0, restored);
+          return next;
+        });
       });
     },
     [setItemsIn],
@@ -507,15 +506,14 @@ function Home() {
   /** Recebe vídeos enviados por outra ferramenta (ex.: Monitora Live) sem reimportar. */
   useEffect(() => {
     const pending = takePendingTool();
-    if (pending && pending !== ("clips" as HandoffTool) && pending !== ("limpar" as HandoffTool)) {
-      // modos válidos do dashboard são tratados abaixo pelo próprio estado
-    }
-    const files = takeHandoff();
+    const tool: HandoffTool = pending ?? "lote";
+    const files = takeHandoff(tool);
     if (files.length) {
       void addVideos(files);
       toast.success(`${files.length} vídeo(s) recebido(s) de outra ferramenta`);
     }
   }, [addVideos]);
+
 
 
   /** Importa um vídeo apenas colando o link (baixa pelo servidor, sem upload). */
