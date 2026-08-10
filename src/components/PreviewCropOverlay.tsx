@@ -30,18 +30,80 @@ export function PreviewCropOverlay({
   pre,
   onChange,
   onReset,
+  videoRef,
 }: {
   pre: PreEdit;
   onChange: (next: PreEdit) => void;
   onReset?: () => void;
+  /** <video> da prévia, para gravar keyframes no tempo atual */
+  videoRef?: { current: HTMLVideoElement | null };
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [hint, setHint] = useState<string | null>(null);
+  const [time, setTime] = useState(0);
+  const [dur, setDur] = useState(0);
   const preRef = useRef(pre);
   preRef.current = pre;
 
-  const crop = () => preRef.current.crop ?? FULL;
-  const apply = (c: PreCrop) => onChange({ ...preRef.current, crop: normalize(c) });
+  // acompanha o tempo do vídeo da prévia para posicionar os keyframes
+  useEffect(() => {
+    if (!videoRef) return;
+    let raf = 0;
+    const tick = () => {
+      const v = videoRef.current;
+      if (v) {
+        setTime(v.currentTime || 0);
+        setDur(Number.isFinite(v.duration) ? v.duration : 0);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => cancelAnimationFrame(raf);
+  }, [videoRef]);
+
+  const keys = pre.keys ?? [];
+  const SNAP = 0.2;
+  const nearIdx = keys.findIndex((k) => Math.abs(k.t - time) <= SNAP);
+
+  const crop = () => cropAt(preRef.current, time) ?? preRef.current.crop ?? FULL;
+
+  const apply = (c: PreCrop) => {
+    const p = preRef.current;
+    const next = normalize(c);
+    const ks = p.keys ?? [];
+    if (ks.length === 0) {
+      onChange({ ...p, crop: next });
+      return;
+    }
+    // com keyframes, o ajuste grava/atualiza o keyframe do instante atual
+    const i = ks.findIndex((k) => Math.abs(k.t - time) <= SNAP);
+    const merged: FrameKey[] =
+      i >= 0
+        ? ks.map((k, j) => (j === i ? { t: k.t, crop: next } : k))
+        : [...ks, { t: Number(time.toFixed(2)), crop: next }].sort((a, b) => a.t - b.t);
+    onChange({ ...p, keys: merged });
+  };
+
+  const addKey = () => {
+    const p = preRef.current;
+    const c = normalize(crop());
+    const t = Number(time.toFixed(2));
+    const ks = (p.keys ?? []).filter((k) => Math.abs(k.t - t) > SNAP);
+    onChange({ ...p, keys: [...ks, { t, crop: c }].sort((a, b) => a.t - b.t) });
+    flash(`keyframe em ${t.toFixed(1)}s`);
+  };
+
+  const delKey = (t: number) => {
+    const p = preRef.current;
+    onChange({ ...p, keys: (p.keys ?? []).filter((k) => k.t !== t) });
+  };
+
+  const seek = (t: number) => {
+    const v = videoRef?.current;
+    if (v) v.currentTime = t;
+    setTime(t);
+  };
+
 
   const flash = (msg: string) => {
     setHint(msg);
