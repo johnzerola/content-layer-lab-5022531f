@@ -30,7 +30,9 @@ import {
   type TransitionKind,
 } from "@/lib/preedit";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
+import { EditorTimeline } from "@/components/EditorTimeline";
 import type { CaptionCue } from "@/lib/captions";
+
 
 export interface PreEditResult {
   pre: PreEdit;
