@@ -34,6 +34,9 @@ import { autoSyncTemplates, enableCloudQuotaFallback, logBatch, logExports, type
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
+import { failJob, finishJob, setJobCancel, setJobRetry, startJob, updateJob } from "@/lib/jobs";
+import { undoable } from "@/lib/undo";
+import { takeHandoff, takePendingTool, type HandoffTool } from "@/lib/handoff";
 
 import {
   applyRatio,
