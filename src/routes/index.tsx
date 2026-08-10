@@ -1610,10 +1610,12 @@ function Home() {
                           speed={previewVariation?.speed ?? 1}
                           loopStart={previewLoop.start}
                           loopEnd={previewLoop.end}
+                          videoRef={previewVideoRef}
                         />
                         {cropTune && (
                           <PreviewCropOverlay
                             pre={selected.preEdit ?? defaultPreEdit()}
+                            videoRef={previewVideoRef}
                             onChange={(next) =>
                               setItems((p) =>
                                 p.map((x) => (x.id === selected.id ? { ...x, preEdit: next } : x)),
@@ -1631,6 +1633,7 @@ function Home() {
                           />
                         )}
                       </div>
+
                     )}
                     {/* estilo rápido de legenda direto na prévia */}
                     <div className="flex flex-wrap items-center gap-1">
