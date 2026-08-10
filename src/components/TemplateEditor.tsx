@@ -10,6 +10,8 @@ import {
   ArrowUp,
   ArrowDown,
   Magnet,
+  Bug,
+
   Type as TypeIcon,
   Image as ImageIcon,
 } from "lucide-react";
