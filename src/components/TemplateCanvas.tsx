@@ -7,7 +7,7 @@ import {
   type SelId,
   type Template,
 } from "@/lib/template";
-import { drawFrame, preloadImage, resetPatchCache, type DrawOpts } from "@/lib/draw";
+import { drawFrame, preloadImage, type DrawOpts } from "@/lib/draw";
 
 type Rect = { x: number; y: number; w: number; h: number };
 
