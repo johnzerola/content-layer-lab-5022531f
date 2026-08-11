@@ -101,21 +101,66 @@ def auto_detect(job_id: str, mode: str, samples: int = 12) -> List[Dict]:
     return []
 
 
-def _temporal_score(frames: List[np.ndarray], masks: np.ndarray) -> float:
-    """Consistência temporal do resultado dentro das áreas reconstruídas."""
-    diffs = []
-    for i in range(1, len(frames)):
-        area = masks[i] > 0
-        if not area.any():
+def _regions_roi(regions, width, height):
+    """ROI onde a limpeza pode acontecer (união das regiões `remove`)."""
+    roi = np.zeros((height, width), np.uint8)
+    any_remove = False
+    for region in regions:
+        if region.get("role") == "protect":
             continue
-        a = frames[i][area].astype(np.float32)
-        b = frames[i - 1][area].astype(np.float32)
-        if a.shape != b.shape:
-            continue
-        diffs.append(float(np.mean(np.abs(a - b)) / 255.0))
-    if not diffs:
-        return 1.0
-    return max(0.0, 1.0 - float(np.mean(diffs)) * 4.0)
+        any_remove = True
+        roi = np.maximum(roi, mask_svc.region_to_mask(region, width, height))
+    if not any_remove:
+        roi[:] = 255
+    return roi
+
+
+def _protect_static(regions, width, height):
+    prot = np.zeros((width and height and (height, width) or (1, 1)), np.uint8)
+    for region in regions:
+        if region.get("role") == "protect":
+            prot = np.maximum(prot, mask_svc.region_to_mask(region, width, height))
+    return prot
+
+
+def _window_masks(frames, regions, info, mode, dynamic, key_step, roi, static_protect,
+                  auto_protect: bool):
+    """Máscara por frame da janela.
+
+    Em modo texto/legenda a máscara é recalculada em frames-chave e
+    interpolada por optical flow — é isso que acompanha legenda que muda
+    durante o vídeo. Fora disso, usa a geometria marcada pelo usuário.
+    """
+    n = len(frames)
+    h, w = info.height, info.width
+    base = roi.copy()
+
+    if mode in ("subtitle", "text", "smart") and dynamic:
+        keys = list(range(0, n, max(1, key_step)))
+        if keys[-1] != n - 1:
+            keys.append(n - 1)
+        key_masks = [
+            frame_text_mask(frames[k], roi=base, subtitle_only=(mode == "subtitle"))
+            for k in keys
+        ]
+        masks = tracking.interpolate_keyframes(frames, keys, key_masks)
+    else:
+        masks = [base.copy() for _ in range(n)]
+
+    protect = static_protect.copy()
+    if auto_protect:
+        auto = protect_svc.sampled_protect_mask(frames, step=max(2, n // 6))
+        if auto is not None:
+            protect = np.maximum(protect, auto)
+
+    inv = cv2.bitwise_not(protect) if protect.max() > 0 else None
+    out = np.zeros((n, h, w), np.uint8)
+    for i, m in enumerate(masks):
+        m = cv2.bitwise_and(m, base)
+        if inv is not None:
+            m = cv2.bitwise_and(m, inv)
+        out[i] = mask_svc.refine(m)
+    return out
 
 
 def run_pipeline(
@@ -125,7 +170,14 @@ def run_pipeline(
     masks_data: List[Dict],
     callback_url: Optional[str] = None,
     progress_cb=None,
+    options: Optional[Dict] = None,
 ) -> Dict:
+    opts = options or {}
+    dynamic = bool(opts.get("dynamic", True))
+    auto_protect = bool(opts.get("protect_subject", True))
+    key_step = int(opts.get("key_step", 4))
+    verify_on = bool(opts.get("verify", True))
+
     job_dir = os.path.join(STORAGE_DIR, job_id)
     input_path = os.path.join(job_dir, "input.mp4")
     tmp_path = os.path.join(job_dir, "video_only.mp4")
@@ -148,6 +200,7 @@ def run_pipeline(
 
         emit(8, "detectando cortes de cena", "analyzing")
         scenes = detect_scenes(input_path)
+        cuts = sorted({int(s) for s, _ in scenes})
 
         regions = list(masks_data or [])
         if not regions:
@@ -156,89 +209,113 @@ def run_pipeline(
         if not regions:
             raise ValueError("nenhuma área para remover foi detectada ou marcada")
 
-        emit(20, "gerando máscaras", "tracking")
-        masks = mask_svc.build_masks(regions, info.width, info.height, info.frames, info.fps)
+        roi = _regions_roi(regions, info.width, info.height)
+        static_protect = _protect_static(regions, info.width, info.height)
 
-        # refino em nível de pixel para legenda/texto: só letra+stroke+sombra
-        if mode in ("subtitle", "text", "smart"):
-            step = max(1, info.frames // 40)
-            for idx in range(0, info.frames, step):
-                frame_list = read_chunk(input_path, idx, 1)
-                if not frame_list:
-                    break
-                pixel = np.zeros((info.height, info.width), np.uint8)
-                for region in regions:
-                    if region.get("role") == "protect":
-                        continue
-                    box_mask = mask_svc.region_to_mask(region, info.width, info.height)
-                    xs, ys = np.where(box_mask > 0)[1], np.where(box_mask > 0)[0]
-                    if xs.size == 0:
-                        continue
-                    box = (int(xs.min()), int(ys.min()),
-                           int(xs.max() - xs.min()), int(ys.max() - ys.min()))
-                    pixel = np.maximum(pixel, text_pixel_mask(frame_list[0], box))
-                for f in range(idx, min(info.frames, idx + step)):
-                    masks[f] = np.maximum(masks[f], pixel)
-
-        for i in range(len(masks)):
-            masks[i] = mask_svc.refine(masks[i])
-        masks = mask_svc.limit_to_scene(masks, scenes)
-
-        emit(28, "estabilizando máscara no tempo", "tracking")
-        for start, end in scenes:
-            if end > start + 1:
-                masks[start:end] = stabilize(masks[start:end])
-
-        emit(32, f"reconstruindo fundo ({device_name()})", "inpainting")
         engine = build_engine(preset)
         n_passes = passes_for(preset)
-        chunk = 80 if cuda_available() else 24
-        overlap = 16 if cuda_available() else 6
+        core = 64 if cuda_available() else 20
+        overlap = 12 if cuda_available() else 5
+        total = max(1, info.frames)
 
-        frames = list(read_frames(input_path))
-        total = min(len(frames), len(masks))
-        frames, masks = frames[:total], masks[:total]
-
-        for p in range(n_passes):
-            base = 32 + p * (45 / n_passes)
-            span = 45 / n_passes
-
-            def on_progress(ratio: float, base=base, span=span, p=p) -> None:
-                emit(base + ratio * span, f"reconstruindo fundo (passe {p + 1}/{n_passes})",
-                     "inpainting")
-
-            frames = process_windowed(engine, frames, masks, chunk, overlap, on_progress)
-
-        emit(80, "validando consistência temporal", "refining")
-        score = _temporal_score(frames, masks)
-        if score < 0.6:
-            emit(84, "refinando resíduos", "refining")
-            residual = LamaEngine()
-            frames = process_windowed(residual, frames, masks, chunk, overlap)
-            score = _temporal_score(frames, masks)
-
-        emit(88, "codificando vídeo final", "encoding")
+        emit(20, f"reconstruindo fundo ({device_name()})", "inpainting")
         writer = RawWriter(tmp_path, info.width, info.height, info.fps)
-        for frame in frames:
-            writer.write(frame)
+        segments: List[Dict] = []
+        written = 0
+        start = 0
+        worst_temporal = 1.0
+        worst_sharp = 1.0
+        worst_text = 0.0
+
+        while start < total:
+            ctx_a = max(0, start - overlap)
+            read_len = min(total, start + core + overlap) - ctx_a
+            frames = read_chunk(input_path, ctx_a, read_len)
+            if not frames:
+                break
+            # não atravessa corte de cena dentro da janela de contexto
+            end = min(total, start + core)
+            for cut in cuts:
+                if start < cut < end:
+                    end = cut
+                    break
+            core_len = end - start
+
+            masks = _window_masks(frames, regions, info, mode, dynamic, key_step,
+                                  roi, static_protect, auto_protect)
+            masks = tracking.stabilize(masks) if len(masks) > 2 else masks
+
+            result = list(frames)
+            for _ in range(n_passes):
+                result = process_windowed(engine, result, masks, len(result), 0)
+
+            metrics = {"residual_text": 0.0, "sharpness_ratio": 1.0,
+                       "temporal_consistency": 1.0}
+            if verify_on:
+                need, metrics = verify.audit_window(result, masks)
+                if need:
+                    emit(min(94.0, 20 + (written / total) * 70),
+                         "reprocessando trecho com resíduo", "refining")
+                    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
+                    grown = np.array([cv2.dilate(m, k) for m in masks], dtype=np.uint8)
+                    if static_protect.max() > 0:
+                        invp = cv2.bitwise_not(static_protect)
+                        grown = np.array([cv2.bitwise_and(m, invp) for m in grown],
+                                         dtype=np.uint8)
+                    retry = process_windowed(TemporalFillEngine(14), list(frames), grown,
+                                             len(frames), 0)
+                    retry = process_windowed(engine, retry, grown, len(retry), 0)
+                    _, m2 = verify.audit_window(retry, grown)
+                    if (m2["residual_text"] <= metrics["residual_text"]
+                            and m2["sharpness_ratio"] >= metrics["sharpness_ratio"] * 0.95):
+                        result, masks, metrics = retry, grown, m2
+
+            offset = start - ctx_a
+            for i in range(offset, offset + core_len):
+                if i < len(result):
+                    writer.write(result[i])
+                    written += 1
+
+            covered = float(np.mean([(m > 0).mean() for m in masks[offset:offset + core_len]])) \
+                if core_len > 0 else 0.0
+            segments.append({
+                "from": round(start / info.fps, 3),
+                "to": round(end / info.fps, 3),
+                "coverage": round(covered, 5),
+                **metrics,
+            })
+            worst_temporal = min(worst_temporal, metrics["temporal_consistency"])
+            worst_sharp = min(worst_sharp, metrics["sharpness_ratio"])
+            worst_text = max(worst_text, metrics["residual_text"])
+
+            emit(min(92.0, 20 + (written / total) * 70),
+                 f"reconstruindo fundo ({written}/{total} frames)", "inpainting")
+            empty_cache()
+            start = end
+
         writer.close()
         empty_cache()
 
         emit(95, "remontando áudio", "encoding")
         mux_audio(tmp_path, input_path, output_path, info.has_audio)
 
-        result = {
+        result_payload = {
             "job_id": job_id,
             "status": "completed",
             "progress": 100,
             "stage": "concluído",
             "result_url": f"/v1/jobs/{job_id}/result",
             "detections": regions,
+            "segments": segments,
             "metrics": {
-                "temporal_consistency": round(score, 3),
+                "temporal_consistency": round(worst_temporal, 3),
+                "sharpness_ratio": round(worst_sharp, 3),
+                "residual_text": round(worst_text, 4),
                 "device": device_name(),
-                "frames": total,
+                "frames": written,
                 "engine": engine.name,
+                "dynamic_masks": dynamic,
+                "subject_protection": auto_protect,
             },
             "probe": {
                 "width": info.width, "height": info.height,
@@ -246,8 +323,8 @@ def run_pipeline(
                 "has_audio": info.has_audio,
             },
         }
-        _notify(callback_url, result)
-        return result
+        _notify(callback_url, result_payload)
+        return result_payload
 
     except Exception as exc:
         empty_cache()
