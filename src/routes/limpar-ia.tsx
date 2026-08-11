@@ -62,27 +62,43 @@ function LimparIAPage() {
     video.playsInline = true;
     video.preload = "metadata";
     video.src = url;
-    await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve();
-      video.onerror = () => reject(new Error("não foi possível ler o vídeo"));
-      setTimeout(() => reject(new Error("timeout ao ler metadados")), 5000);
-    });
 
-    const canvas = document.createElement("canvas");
-    canvas.width = 160;
-    canvas.height = 90;
-    const ctx = canvas.getContext("2d");
-    video.currentTime = Math.min(video.duration * 0.2, 1);
-    await new Promise<void>((resolve) => {
-      video.onseeked = () => {
-        ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-        resolve();
-      };
-    });
-    const poster = canvas.toDataURL("image/jpeg", 0.6);
-    URL.revokeObjectURL(url);
+    let w = 1920;
+    let h = 1080;
+    let poster: string | null = null;
 
-    setItem({ id: crypto.randomUUID(), file, poster, w: video.videoWidth, h: video.videoHeight });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        video.onloadedmetadata = () => resolve();
+        video.onerror = () => reject(new Error("não foi possível ler o vídeo"));
+        setTimeout(() => reject(new Error("timeout ao ler metadados")), 5000);
+      });
+      w = video.videoWidth || w;
+      h = video.videoHeight || h;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = 160;
+      canvas.height = 90;
+      const ctx = canvas.getContext("2d");
+      if (ctx && video.duration && isFinite(video.duration)) {
+        video.currentTime = Math.min(video.duration * 0.2, 1);
+        await new Promise<void>((resolve) => {
+          video.onseeked = () => {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            resolve();
+          };
+          video.onerror = () => resolve();
+          setTimeout(() => resolve(), 1000);
+        });
+        poster = canvas.toDataURL("image/jpeg", 0.6);
+      }
+    } catch (e) {
+      toast.warning("Preview não disponível — arquivo será processado mesmo assim.");
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+
+    setItem({ id: crypto.randomUUID(), file, poster, w, h });
     setResultUrl(null);
   }, []);
 
