@@ -334,8 +334,40 @@ export function VideoStudio({
         toast.info("Divida o vídeo antes de remover um trecho.");
         return v;
       }
-      return { ...v, segments: base.filter((_, idx) => idx !== i) };
+      const next = base.filter((_, idx) => idx !== i);
+      // preserva o tempo: se o playhead estava no trecho removido, vai pro próximo
+      const gone = base[i];
+      if (gone && time >= gone.start && time <= gone.end) {
+        const target = next[Math.min(i, next.length - 1)];
+        if (target) seek(target.start);
+      }
+      return { ...v, segments: next };
     });
+
+  /** remove as pausas automaticamente analisando o áudio */
+  const cutSilence = async () => {
+    setCutting(true);
+    try {
+      const { segments, removed } = await detectSpeechSegments(file, {
+        sensitivity: sens,
+        minSilence: minSil,
+        window: { start, end },
+      });
+      if (!segments.length) {
+        toast.error("Não achei fala suficiente — baixe a sensibilidade.");
+        return;
+      }
+      setPre((v) => ({ ...v, segments }));
+      const first = segments[0];
+      if (first && (time < first.start || time > (segments[segments.length - 1]?.end ?? 0))) seek(first.start);
+      toast.success(`${segments.length} trechos com fala · ${removed.toFixed(1)}s de silêncio removidos`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao analisar o áudio.");
+    } finally {
+      setCutting(false);
+    }
+  };
+
 
   /** traduz a legenda mantendo os tempos por palavra */
   const translate = async () => {
