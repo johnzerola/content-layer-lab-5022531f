@@ -42,6 +42,7 @@ import { translateWords } from "@/lib/translate.functions";
 import { detectSpeechSegments } from "@/lib/silence";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { LayoutPreview } from "@/components/LayoutPreview";
+import { FramingStudio } from "@/components/FramingStudio";
 import { EditorTimeline } from "@/components/EditorTimeline";
 import type { CaptionCue } from "@/lib/captions";
 
@@ -88,7 +89,7 @@ type Drag = {
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-type Tab = "trim" | "layout" | "crop" | "keys" | "trans" | "color" | "caps" | "text";
+type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text";
 
 /** Miniatura esquemática de cada layout (9:16). */
 function LayoutGlyph({ id }: { id: LayoutKind }) {
