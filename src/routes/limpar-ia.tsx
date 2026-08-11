@@ -50,7 +50,6 @@ function LimparIAPage() {
   }, []);
 
   const onFile = useCallback(async (files: FileList | null) => {
-    console.log("onFile called", files?.length);
     const file = files?.item(0);
     if (!file) return;
     if (!file.type.startsWith("video/")) {
