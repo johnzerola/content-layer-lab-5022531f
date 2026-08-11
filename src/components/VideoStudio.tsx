@@ -694,6 +694,57 @@ export function VideoStudio({
                     </button>
                   ))}
                 </div>
+
+                {["blur", "spotlight", "centered"].includes(pre.layout ?? "auto") && (
+                  <div className="space-y-3 rounded-lg border border-border p-3">
+                    <div className="flex gap-1.5">
+                      {(["blur", "color"] as const).map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => set({ bgMode: m })}
+                          className={`flex-1 rounded-md border px-2 py-1.5 font-mono text-[11px] transition ${
+                            (pre.bgMode ?? "blur") === m
+                              ? "border-primary bg-primary/10 text-foreground"
+                              : "border-border text-muted-foreground hover:border-primary/50"
+                          }`}
+                        >
+                          {m === "blur" ? "Fundo desfocado" : "Cor fixa"}
+                        </button>
+                      ))}
+                    </div>
+                    {(pre.bgMode ?? "blur") === "blur" ? (
+                      <div className="space-y-1">
+                        <p className="font-mono text-[10px] text-muted-foreground">
+                          Intensidade do desfoque · {Math.round((pre.bgBlur ?? 1) * 100)}%
+                        </p>
+                        <Slider
+                          value={[pre.bgBlur ?? 1]}
+                          min={0}
+                          max={2}
+                          step={0.05}
+                          onValueChange={([v]) => set({ bgBlur: v ?? 1 })}
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={pre.bgColor ?? "#000000"}
+                          onChange={(e) => set({ bgColor: e.target.value })}
+                          className="h-8 w-12 cursor-pointer rounded border border-border bg-transparent"
+                          aria-label="Cor do fundo"
+                        />
+                        <span className="font-mono text-[11px] text-muted-foreground">
+                          {(pre.bgColor ?? "#000000").toUpperCase()}
+                        </span>
+                      </div>
+                    )}
+                    <p className="font-mono text-[10px] text-muted-foreground">
+                      O mesmo valor é usado na prévia e na exportação.
+                    </p>
+                  </div>
+                )}
+
                 <p className="font-mono text-[11px] text-muted-foreground">
                   O layout vale para o preview e para a exportação — troque o enquadramento por keyframes
                   para acompanhar o rosto dentro do layout escolhido.
