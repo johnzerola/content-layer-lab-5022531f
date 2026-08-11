@@ -109,3 +109,23 @@ GET  /v1/jobs/{id}/result     (MP4 final)
 
 Presets: `fast` (STTN) · `quality` (ProPainter) · `max` (ProPainter contexto
 maior + segundo passe).
+
+## v2 — legenda dinâmica, sem borrão
+
+- Máscara por frame: em modos `subtitle` / `text` / `smart`, o detector roda em
+  frames-chave (`options.key_step`, padrão 3) e a máscara é transportada entre
+  eles por optical flow. Legenda karaokê que muda palavra a palavra é
+  acompanhada.
+- Proteção de sujeito: `options.protect_subject` (padrão `true`) subtrai
+  rosto/pessoa da máscara. Usa mediapipe quando instalado, senão Haar cascade.
+- Anti-borrão: nenhum resultado final sai de difusão. Ordem: reconstrução
+  temporal real → motor neural → síntese por casamento de trechos
+  (`patch_fill`).
+- Verificação automática: `options.verify` (padrão `true`) mede texto residual
+  (OCR), nitidez da área reconstruída versus o entorno e consistência temporal;
+  trechos reprovados são reprocessados com máscara ampliada.
+- Streaming: janelas com contexto, sem carregar o vídeo inteiro na memória, e
+  sem atravessar corte de cena.
+- A resposta traz `segments[]` com métricas por trecho, além de `metrics`.
+
+Opcional: `pip install mediapipe` melhora a proteção de pessoa.
