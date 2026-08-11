@@ -47,8 +47,14 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [health, setHealth] = useState<{ online: boolean; reason?: string } | null>(null);
   const [polling, setPolling] = useState(false);
 
+  const getHealth = useServerFn(cleanerHealth);
+  const createJob = useServerFn(createCleanerJob);
+  const detectJob = useServerFn(detectCleanerJob);
+  const processJob = useServerFn(processCleanerJob);
+  const refreshJob = useServerFn(refreshCleanerJob);
+
   useEffect(() => {
-    videoCleanerApi.getHealth().then(setHealth);
+    getHealth().then(setHealth);
   }, []);
 
   // Polling for job status
@@ -57,7 +63,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     if (polling && job?.id) {
       timer = window.setInterval(async () => {
         try {
-          const status = await videoCleanerApi.getStatus(job.id);
+          const status = await refreshJob({ data: { id: job.id } });
           setJob(prev => ({ ...prev, ...status }));
           if (status.status === "completed") {
             setPolling(false);
@@ -82,25 +88,44 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
 
     try {
-      const jobId = crypto.randomUUID();
-      // Em um cenário real, o backend Lovable criaria o registro no DB primeiro.
-      // Aqui estamos simulando a criação do Job no worker.
-      setJob({
-        id: jobId,
-        filename: item.file.name,
-        status: "uploading",
-        progress: 0,
-        mode,
-        preset,
-        masks: [],
-        detections: [],
-        created_at: new Date().toISOString(),
-      } as any);
-
-      await videoCleanerApi.uploadVideo(jobId, item.file, (p) => setUploadProgress(p));
+      const { job: newJob, upload } = await createJob({ 
+        data: { 
+          filename: item.file.name, 
+          size: item.file.size,
+          mode,
+          preset
+        } 
+      });
       
-      setJob(prev => prev ? ({ ...prev, status: "queued", progress: 0 }) : null);
-      toast.success("Upload concluído! Pronto para detecção.");
+      setJob(newJob as any);
+
+      if (upload) {
+        // Direct upload to worker using the token from server
+        const formData = new FormData();
+        formData.append("file", item.file);
+
+        await new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("POST", upload.url);
+          xhr.setRequestHeader("x-job-token", upload.token);
+
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              setUploadProgress(Math.round((e.loaded / e.total) * 100));
+            }
+          };
+
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve(true);
+            else reject(new Error(xhr.responseText));
+          };
+          xhr.onerror = () => reject(new Error("Erro de conexão"));
+          xhr.send(formData);
+        });
+        
+        setJob(prev => prev ? ({ ...prev, status: "queued", progress: 0 }) : null);
+        toast.success("Upload concluído! Pronto para detecção.");
+      }
     } catch (e) {
       toast.error("Erro no upload: " + (e instanceof Error ? e.message : "Desconhecido"));
     }
@@ -110,10 +135,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     if (!job?.id) return;
     try {
       setJob(prev => prev ? ({ ...prev, status: "detecting", stage: "detectando áreas..." }) : null);
-      const res = await videoCleanerApi.detect(job.id, mode);
-      setMasks(res.regions);
-      setJob(prev => prev ? ({ ...prev, status: "queued", stage: "áreas detectadas" }) : null);
-      toast.info(`${res.regions.length} áreas encontradas.`);
+      const res = await detectJob({ data: { id: job.id, mode } });
+      setMasks(res.detections as any);
+      setJob(res as any);
+      toast.info(`${res.detections.length} áreas encontradas.`);
     } catch (e) {
       toast.error("Erro na detecção: " + (e instanceof Error ? e.message : "Desconhecido"));
     }
@@ -122,13 +147,14 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const handleProcess = async () => {
     if (!job?.id) return;
     try {
-      await videoCleanerApi.process({
-        jobId: job.id,
-        mode,
-        preset,
-        masks,
-        options: {},
-        callbackUrl: window.location.origin + "/api/public/cleaner-callback"
+      await processJob({
+        data: {
+          id: job.id,
+          mode,
+          preset,
+          masks: masks as any,
+          options: {}
+        }
       });
       setPolling(true);
       toast.success("Processamento iniciado na GPU.");
