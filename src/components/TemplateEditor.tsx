@@ -28,6 +28,8 @@ import {
   type TextLayer,
 } from "@/lib/template";
 import { BUILTIN_FONTS, fileToFont, registerFonts } from "@/lib/fonts";
+import { defaultAntiDup, makeVariation, describeVariation } from "@/lib/variation";
+
 
 const KEY_OF: Record<LayerId, keyof Template> = {
   video: "video",
@@ -215,6 +217,31 @@ export function TemplateEditor({
   const [debugGrid, setDebugGrid] = useState(3);
   const [debugSafe, setDebugSafe] = useState(true);
   const [debugBoxes, setDebugBoxes] = useState(true);
+  const [adPreview, setAdPreview] = useState(false);
+  const [adSeed, setAdSeed] = useState(() => Math.random().toString(36).slice(2, 8));
+
+  const adVariation = useMemo(
+    () => makeVariation({ ...defaultAntiDup(), ...(t.antiDup ?? {}), mirror: t.mirror, speed: t.speed }, adSeed),
+    [t.antiDup, t.mirror, t.speed, adSeed],
+  );
+  const adOpts = useMemo(
+    () =>
+      adPreview
+        ? {
+            mirror: adVariation.mirror,
+            brightness: adVariation.brightness,
+            saturation: adVariation.saturation,
+            zoom: adVariation.zoom,
+            noise: adVariation.noise,
+            rotate: adVariation.rotate,
+            border: adVariation.border,
+            borderColor: adVariation.borderColor,
+          }
+        : undefined,
+    [adPreview, adVariation],
+  );
+
+
 
 
   const past = useRef<Template[]>([]);
@@ -414,7 +441,10 @@ export function TemplateEditor({
               debugGrid={debugGrid}
               debugSafeArea={debugSafe}
               debugBoxes={debugBoxes}
+              drawOpts={adOpts}
+              speed={adPreview ? adVariation.speed : 1}
             />
+
             {debug ? <DebugPanel
               t={t}
               selected={selected}
@@ -926,6 +956,26 @@ export function TemplateEditor({
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
+                  checked={adPreview}
+                  onChange={(e) => setAdPreview(e.target.checked)}
+                  className="size-4 accent-[var(--primary)]"
+                />
+                Pré-visualizar efeito no preview
+              </label>
+              {adPreview ? (
+                <div className="mt-2 space-y-2 rounded-lg border border-primary/40 bg-background/40 p-2">
+                  <p className="text-xs text-muted-foreground">{describeVariation(adVariation)}</p>
+                  <button
+                    className="rounded-md border border-border px-2 py-1 text-xs hover:border-primary"
+                    onClick={() => setAdSeed(Math.random().toString(36).slice(2, 8))}
+                  >
+                    Sortear outra variação
+                  </button>
+                </div>
+              ) : null}
+              <label className="mt-3 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
                   checked={t.mirror}
                   onChange={(e) => setT({ ...t, mirror: e.target.checked })}
                   className="size-4 accent-[var(--primary)]"
@@ -946,6 +996,7 @@ export function TemplateEditor({
                 Muda a duração e o fingerprint do arquivo. Não há garantia de que plataformas tratem o vídeo como novo.
               </p>
             </div>
+
           </div>
         </div>
 
