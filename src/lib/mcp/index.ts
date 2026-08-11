@@ -1,4 +1,4 @@
-import { auth, defineMcp } from "@lovable.dev/mcp-js";
+import { auth, defineMcp, type McpDefinitionInput } from "@lovable.dev/mcp-js";
 import listTemplates from "./tools/list-templates";
 import getTemplate from "./tools/get-template";
 import listProjects from "./tools/list-projects";
