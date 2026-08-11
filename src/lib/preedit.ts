@@ -84,7 +84,9 @@ export function defaultPreEdit(): PreEdit {
   return {
     crop: null,
     keys: [],
+    framing: null,
     segments: [],
+
     layout: "auto",
     bgMode: "blur",
     bgBlur: 1,
@@ -179,8 +181,10 @@ export function hasPreEdit(p?: PreEdit | null) {
   return (
     !isFullCrop(p.crop) ||
     (p.keys?.length ?? 0) > 0 ||
+    Boolean(p.framing?.enabled && p.framing.segments.length) ||
     (p.segments?.length ?? 0) > 1 ||
     (p.layout ?? "auto") !== "auto" ||
+
     (p.bgMode ?? "blur") !== "blur" ||
     (p.bgBlur ?? 1) !== 1 ||
     (p.transIn?.kind ?? "none") !== "none" ||
