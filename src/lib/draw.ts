@@ -609,7 +609,7 @@ function drawVideoLayer(
       const bottom = { x: v.x, y: v.y + topH, w: v.w, h: v.h - topH };
       paintBackdrop(box, 40, 0.45);
       dest = paint(top, "cover");
-      paint(bottom, "contain", full, { useOffset: false });
+      paint(bottom, "contain", sec, { useOffset: false });
       ctx.save();
       ctx.fillStyle = "rgba(0,0,0,0.5)";
       ctx.fillRect(v.x, v.y + topH - 1, v.w, 2);
