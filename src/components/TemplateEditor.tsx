@@ -215,6 +215,31 @@ export function TemplateEditor({
   const [debugGrid, setDebugGrid] = useState(3);
   const [debugSafe, setDebugSafe] = useState(true);
   const [debugBoxes, setDebugBoxes] = useState(true);
+  const [adPreview, setAdPreview] = useState(false);
+  const [adSeed, setAdSeed] = useState(() => Math.random().toString(36).slice(2, 8));
+
+  const adVariation = useMemo(
+    () => makeVariation({ ...defaultAntiDup(), ...(t.antiDup ?? {}), mirror: t.mirror, speed: t.speed }, adSeed),
+    [t.antiDup, t.mirror, t.speed, adSeed],
+  );
+  const adOpts = useMemo(
+    () =>
+      adPreview
+        ? {
+            mirror: adVariation.mirror,
+            brightness: adVariation.brightness,
+            saturation: adVariation.saturation,
+            zoom: adVariation.zoom,
+            noise: adVariation.noise,
+            rotate: adVariation.rotate,
+            border: adVariation.border,
+            borderColor: adVariation.borderColor,
+          }
+        : undefined,
+    [adPreview, adVariation],
+  );
+
+
 
 
   const past = useRef<Template[]>([]);
