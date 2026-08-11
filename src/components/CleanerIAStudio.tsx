@@ -17,7 +17,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { videoCleanerApi } from "@/services/videoCleanerApi";
+import { useServerFn } from "@tanstack/react-start";
+import { 
+  createCleanerJob, 
+  detectCleanerJob, 
+  processCleanerJob, 
+  refreshCleanerJob,
+  cleanerHealth 
+} from "@/lib/cleaner.functions";
 import type { CleanerJob, CleanerRegion, CleanerStatus } from "@/lib/cleaner";
 
 type Props = {
