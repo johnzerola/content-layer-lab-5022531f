@@ -956,6 +956,26 @@ export function TemplateEditor({
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
+                  checked={adPreview}
+                  onChange={(e) => setAdPreview(e.target.checked)}
+                  className="size-4 accent-[var(--primary)]"
+                />
+                Pré-visualizar efeito no preview
+              </label>
+              {adPreview ? (
+                <div className="mt-2 space-y-2 rounded-lg border border-primary/40 bg-background/40 p-2">
+                  <p className="text-xs text-muted-foreground">{describeVariation(adVariation)}</p>
+                  <button
+                    className="rounded-md border border-border px-2 py-1 text-xs hover:border-primary"
+                    onClick={() => setAdSeed(Math.random().toString(36).slice(2, 8))}
+                  >
+                    Sortear outra variação
+                  </button>
+                </div>
+              ) : null}
+              <label className="mt-3 flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
                   checked={t.mirror}
                   onChange={(e) => setT({ ...t, mirror: e.target.checked })}
                   className="size-4 accent-[var(--primary)]"
@@ -976,6 +996,7 @@ export function TemplateEditor({
                 Muda a duração e o fingerprint do arquivo. Não há garantia de que plataformas tratem o vídeo como novo.
               </p>
             </div>
+
           </div>
         </div>
 
