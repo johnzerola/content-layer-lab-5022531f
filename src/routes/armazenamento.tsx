@@ -20,7 +20,7 @@ export const Route = createFileRoute("/armazenamento")({
       {
         name: "description",
         content:
-          "Veja quanto espaço os templates ocupam, selecione versões antigas e apague o que não usa para evitar o limite de armazenamento.",
+          "Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required. veja para criar isto de realmente remover, sem cria um borrap, efeito blur, ou quaqluer outra coisa assim",
       },
       { property: "og:title", content: "Armazenamento e versões de templates — VaiViral" },
       {
