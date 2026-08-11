@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  AudioLines,
   Crop,
   FlipHorizontal,
   FlipVertical,
@@ -38,6 +39,7 @@ import {
   type TransitionKind,
 } from "@/lib/preedit";
 import { translateWords } from "@/lib/translate.functions";
+import { detectSpeechSegments } from "@/lib/silence";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { LayoutPreview } from "@/components/LayoutPreview";
 import { EditorTimeline } from "@/components/EditorTimeline";
@@ -157,6 +159,9 @@ export function VideoStudio({
   const [draft, setDraft] = useState(texts ?? { headline: "", name: "", handle: "", cta: "" });
   const [lang, setLang] = useState(LANGS[0]!.id);
   const [translating, setTranslating] = useState(false);
+  const [sens, setSens] = useState(0.5);
+  const [minSil, setMinSil] = useState(0.35);
+  const [cutting, setCutting] = useState(false);
   /** proporção travada do recorte (largura/altura em pixels da fonte) */
   const [lock, setLock] = useState<number | null>(null);
 
@@ -333,8 +338,40 @@ export function VideoStudio({
         toast.info("Divida o vídeo antes de remover um trecho.");
         return v;
       }
-      return { ...v, segments: base.filter((_, idx) => idx !== i) };
+      const next = base.filter((_, idx) => idx !== i);
+      // preserva o tempo: se o playhead estava no trecho removido, vai pro próximo
+      const gone = base[i];
+      if (gone && time >= gone.start && time <= gone.end) {
+        const target = next[Math.min(i, next.length - 1)];
+        if (target) seek(target.start);
+      }
+      return { ...v, segments: next };
     });
+
+  /** remove as pausas automaticamente analisando o áudio */
+  const cutSilence = async () => {
+    setCutting(true);
+    try {
+      const { segments, removed } = await detectSpeechSegments(file, {
+        sensitivity: sens,
+        minSilence: minSil,
+        window: { start, end },
+      });
+      if (!segments.length) {
+        toast.error("Não achei fala suficiente — baixe a sensibilidade.");
+        return;
+      }
+      setPre((v) => ({ ...v, segments }));
+      const first = segments[0];
+      if (first && (time < first.start || time > (segments[segments.length - 1]?.end ?? 0))) seek(first.start);
+      toast.success(`${segments.length} trechos com fala · ${removed.toFixed(1)}s de silêncio removidos`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Falha ao analisar o áudio.");
+    } finally {
+      setCutting(false);
+    }
+  };
+
 
   /** traduz a legenda mantendo os tempos por palavra */
   const translate = async () => {
@@ -595,6 +632,35 @@ export function VideoStudio({
                       Divida o vídeo para remover partes do meio e exportar só os trechos bons.
                     </p>
                   )}
+                </div>
+
+                <div className="space-y-2 rounded-lg border border-border p-2">
+                  <p className="font-mono text-[11px] text-foreground">Remover silêncio automaticamente</p>
+                  <Field label={`Sensibilidade · ${Math.round(sens * 100)}%`}>
+                    <Slider
+                      value={[sens]}
+                      min={0.1}
+                      max={0.95}
+                      step={0.05}
+                      onValueChange={([v]) => setSens(v ?? 0.5)}
+                    />
+                  </Field>
+                  <Field label={`Pausa mínima · ${minSil.toFixed(2)}s`}>
+                    <Slider
+                      value={[minSil]}
+                      min={0.15}
+                      max={1.5}
+                      step={0.05}
+                      onValueChange={([v]) => setMinSil(v ?? 0.35)}
+                    />
+                  </Field>
+                  <Button size="sm" variant="secondary" disabled={cutting} onClick={cutSilence}>
+                    <AudioLines className="mr-1 size-3.5" />
+                    {cutting ? "Analisando áudio…" : "Cortar pausas"}
+                  </Button>
+                  <p className="font-mono text-[10px] text-muted-foreground">
+                    Analisa o áudio e mantém só os trechos com fala — os trechos ficam editáveis na timeline.
+                  </p>
                 </div>
                 <p className="font-mono text-[11px] text-muted-foreground">
                   Duração final: {fmt(Math.max(0, outDur))}
