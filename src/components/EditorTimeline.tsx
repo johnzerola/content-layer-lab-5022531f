@@ -569,12 +569,29 @@ export function EditorTimeline({
           </div>
 
           {/* trechos (corte multi-segmento) */}
-          {!!segments?.length && segments.length > 1 && (
-            <div className="relative mt-1 h-7 rounded-md border border-border bg-background">
+          {!!segments?.length && (
+            <div className="relative mt-1 h-8 rounded-md border border-border bg-background">
+              <span className="pointer-events-none absolute left-1 top-0.5 font-mono text-[9px] text-muted-foreground">
+                trechos
+              </span>
+              {/* lacunas removidas */}
+              {segments.map((s, i) => {
+                const prev = i === 0 ? start : segments[i - 1]!.end;
+                const gap = s.start - prev;
+                if (gap <= 0.02) return null;
+                return (
+                  <span
+                    key={`gap-${i}`}
+                    className="absolute bottom-0.5 top-3 rounded-sm border border-destructive/40 bg-destructive/15"
+                    style={{ left: prev * pps, width: Math.max(2, gap * pps) }}
+                    title={`removido · ${fmt(gap)}`}
+                  />
+                );
+              })}
               {segments.map((s, i) => (
                 <span
                   key={`${i}-${s.start}`}
-                  className="absolute top-1 flex h-5 items-center justify-between gap-1 overflow-hidden rounded border border-primary/60 bg-primary/15 px-1 font-mono text-[9px] text-foreground"
+                  className="absolute bottom-0.5 top-3 flex items-center justify-between gap-1 overflow-hidden rounded border border-primary/60 bg-primary/20 px-1 font-mono text-[9px] text-foreground"
                   style={{ left: s.start * pps, width: Math.max(16, (s.end - s.start) * pps) }}
                   title={`trecho ${i + 1} · ${fmt(s.end - s.start)}`}
                 >
@@ -587,7 +604,7 @@ export function EditorTimeline({
                   >
                     {i + 1} · {fmt(s.end - s.start)}
                   </button>
-                  {onDeleteSegment && (
+                  {onDeleteSegment && segments.length > 1 && (
                     <button
                       onPointerDown={(e) => {
                         e.stopPropagation();
@@ -603,6 +620,7 @@ export function EditorTimeline({
               ))}
             </div>
           )}
+
 
           {/* keyframes */}
 
