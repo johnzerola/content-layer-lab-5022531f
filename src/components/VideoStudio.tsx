@@ -348,7 +348,7 @@ export function VideoStudio({
   /** grava o recorte atual como keyframe no instante do playhead */
   const addKey = () =>
     setPre((v) => {
-      const c = v.crop ?? cropAt(v, time) ?? { x: 0, y: 0, w: 1, h: 1 };
+      const c = cropAt(v, time) ?? v.crop ?? { x: 0, y: 0, w: 1, h: 1 };
       const t = Number(time.toFixed(2));
       const key: FrameKey = { t, crop: { ...c } };
       const keys = [...v.keys.filter((k) => Math.abs(k.t - t) > 0.05), key].sort((a, b) => a.t - b.t);
