@@ -50,6 +50,12 @@ export interface PreEdit {
   segments: Segment[];
   /** layout do quadro final */
   layout: LayoutKind;
+  /** fundo dos layouts com preenchimento: desfoque do próprio vídeo ou cor fixa */
+  bgMode: "blur" | "color";
+  /** intensidade do desfoque do fundo (0..2, 1 = padrão) */
+  bgBlur: number;
+  /** cor usada quando bgMode = "color" */
+  bgColor: string;
   /** transição de abertura */
   transIn: Transition;
   /** transição de saída */
