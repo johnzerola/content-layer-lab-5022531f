@@ -53,6 +53,72 @@ export type Database = {
         }
         Relationships: []
       }
+      cleaner_jobs: {
+        Row: {
+          created_at: string
+          detections: Json
+          error: string | null
+          filename: string
+          id: string
+          masks: Json
+          metrics: Json | null
+          mode: string
+          options: Json
+          preset: string
+          preview_url: string | null
+          probe: Json | null
+          progress: number
+          result_url: string | null
+          size_bytes: number | null
+          stage: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          detections?: Json
+          error?: string | null
+          filename: string
+          id?: string
+          masks?: Json
+          metrics?: Json | null
+          mode?: string
+          options?: Json
+          preset?: string
+          preview_url?: string | null
+          probe?: Json | null
+          progress?: number
+          result_url?: string | null
+          size_bytes?: number | null
+          stage?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          detections?: Json
+          error?: string | null
+          filename?: string
+          id?: string
+          masks?: Json
+          metrics?: Json | null
+          mode?: string
+          options?: Json
+          preset?: string
+          preview_url?: string | null
+          probe?: Json | null
+          progress?: number
+          result_url?: string | null
+          size_bytes?: number | null
+          stage?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       exports: {
         Row: {
           bytes: number
