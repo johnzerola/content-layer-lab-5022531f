@@ -99,7 +99,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   }, [polling, job?.id]);
 
   const visible = masks.filter(
-    (m) => (m.from ?? 0) <= time && time <= (m.to ?? duration || Infinity),
+    (m) => (m.from ?? 0) <= time && time <= (m.to ?? (duration || Infinity)),
   );
 
   const pointAt = useCallback((e: React.PointerEvent) => {
@@ -388,7 +388,13 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 size="sm"
                 variant="ghost"
                 onClick={() =>
-                  setMasks((p) => p.map((m) => (m.id === sel.id ? { ...m, from: undefined, to: undefined } : m)))
+                  setMasks((p) =>
+                    p.map((m) => {
+                      if (m.id !== sel.id) return m;
+                      const { from: _f, to: _t, ...rest } = m;
+                      return rest as CleanerRegion;
+                    }),
+                  )
                 }
               >
                 Vídeo inteiro
