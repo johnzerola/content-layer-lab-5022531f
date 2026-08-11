@@ -178,6 +178,8 @@ export function hasPreEdit(p?: PreEdit | null) {
     (p.keys?.length ?? 0) > 0 ||
     (p.segments?.length ?? 0) > 1 ||
     (p.layout ?? "auto") !== "auto" ||
+    (p.bgMode ?? "blur") !== "blur" ||
+    (p.bgBlur ?? 1) !== 1 ||
     (p.transIn?.kind ?? "none") !== "none" ||
 
     (p.transOut?.kind ?? "none") !== "none" ||
