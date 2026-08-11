@@ -7,7 +7,7 @@ import {
   type SelId,
   type Template,
 } from "@/lib/template";
-import { drawFrame, preloadImage, resetPatchCache, type DrawOpts } from "@/lib/draw";
+import { drawFrame, preloadImage, type DrawOpts } from "@/lib/draw";
 
 type Rect = { x: number; y: number; w: number; h: number };
 
@@ -206,10 +206,7 @@ export function TemplateCanvas({
     if (videoEl.current) videoEl.current.playbackRate = Math.max(0.25, Math.min(4, speed || 1));
   }, [speed, previewFile]);
 
-  // trocou o vídeo ou as áreas de limpeza: a reconstrução em cache não vale mais
-  useEffect(() => {
-    resetPatchCache();
-  }, [previewFile, template.cleanup]);
+  // Patch cache removido: limpeza profissional agora é feita no backend CleanerIA.
 
 
   useEffect(() => {

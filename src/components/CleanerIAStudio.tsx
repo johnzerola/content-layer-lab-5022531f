@@ -3,6 +3,8 @@ import {
   AlertCircle,
   Eraser,
   MousePointer2,
+  PenTool,
+  Pentagon,
   RefreshCw,
   Shield,
   Sparkles,
@@ -40,7 +42,7 @@ type Props = {
   onComplete: (resultUrl: string) => void;
 };
 
-type Tool = "select" | "rect" | "protect" | "erase";
+type Tool = "select" | "rect" | "poly" | "brush" | "protect" | "erase";
 
 const MODES: CleanerMode[] = ["smart", "subtitle", "watermark", "object", "passerby"];
 const PRESETS: CleanerPreset[] = ["fast", "quality", "max"];
@@ -59,10 +61,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [draft, setDraft] = useState<CleanerRegion | null>(null);
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [brushSize, setBrushSize] = useState(0.015);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const dragStart = useRef<{ x: number; y: number } | null>(null);
+  const polyPoints = useRef<{ x: number; y: number }[]>([]);
 
   const getHealth = useServerFn(cleanerHealth);
   const createJob = useServerFn(createCleanerJob);
@@ -98,6 +102,15 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     return () => window.clearInterval(timer);
   }, [polling, job?.id]);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && tool === "poly") finishPolygon();
+      if (e.key === "Escape" && tool === "poly") cancelPolygon();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tool]);
+
   const visible = masks.filter(
     (m) => (m.from ?? 0) <= time && time <= (m.to ?? (duration || Infinity)),
   );
@@ -111,20 +124,74 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     };
   }, []);
 
+  const hitTest = (p: { x: number; y: number }, m: CleanerRegion) => {
+    if (m.kind === "rect") {
+      return p.x >= (m.x ?? 0) && p.x <= (m.x ?? 0) + (m.w ?? 0) &&
+             p.y >= (m.y ?? 0) && p.y <= (m.y ?? 0) + (m.h ?? 0);
+    }
+    if (m.kind === "poly" && m.points && m.points.length > 2) {
+      // teste de ponto em polígono via ray-casting simples
+      let inside = false;
+      const pts = m.points;
+      for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const pi = pts[i];
+        const pj = pts[j];
+        if (!pi || !pj) continue;
+        const xi = pi.x, yi = pi.y;
+        const xj = pj.x, yj = pj.y;
+        const intersect = ((yi > p.y) !== (yj > p.y)) &&
+          (p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+    if (m.kind === "brush" && m.points) {
+      return m.points.some((pt) => Math.hypot(pt.x - p.x, pt.y - p.y) < (m.size ?? 0.01));
+    }
+    return false;
+  };
+
   const onDown = (e: React.PointerEvent) => {
     if (tool === "select" || job?.status === "completed") return;
     const p = pointAt(e);
     if (tool === "erase") {
-      const hit = [...visible].reverse().find(
-        (m) =>
-          p.x >= (m.x ?? 0) && p.x <= (m.x ?? 0) + (m.w ?? 0) &&
-          p.y >= (m.y ?? 0) && p.y <= (m.y ?? 0) + (m.h ?? 0),
-      );
+      const hit = [...visible].reverse().find((m) => hitTest(p, m));
       if (hit) setMasks((prev) => prev.filter((m) => m.id !== hit.id));
       return;
     }
     (e.target as Element).setPointerCapture?.(e.pointerId);
     dragStart.current = p;
+
+    if (tool === "poly") {
+      polyPoints.current = [...polyPoints.current, p];
+      setDraft({
+        id: rid(),
+        kind: "poly",
+        role: "remove",
+        points: polyPoints.current,
+        grow: 0.004,
+        track: true,
+        enabled: true,
+        label: "Polígono",
+      });
+      return;
+    }
+
+    if (tool === "brush") {
+      setDraft({
+        id: rid(),
+        kind: "brush",
+        role: "remove",
+        points: [p],
+        size: brushSize,
+        grow: 0,
+        track: true,
+        enabled: true,
+        label: "Pincel",
+      });
+      return;
+    }
+
     setDraft({
       id: rid(),
       kind: "rect",
@@ -138,8 +205,15 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   };
 
   const onMove = (e: React.PointerEvent) => {
-    if (!dragStart.current || !draft) return;
     const p = pointAt(e);
+    if (tool === "brush" && draft?.kind === "brush") {
+      setDraft({
+        ...draft,
+        points: [...(draft.points ?? []), p],
+      });
+      return;
+    }
+    if (!dragStart.current || !draft || draft.kind !== "rect") return;
     const s = dragStart.current;
     setDraft({
       ...draft,
@@ -151,12 +225,44 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   };
 
   const onUp = () => {
-    if (draft && (draft.w ?? 0) > 0.01 && (draft.h ?? 0) > 0.01) {
+    if (draft?.kind === "poly") {
+      // polígono só é finalizado com duplo-clique ou tecla Enter
+      return;
+    }
+    if (draft?.kind === "brush" && (draft.points?.length ?? 0) > 1) {
+      setMasks((prev) => [...prev, draft]);
+      setSelected(draft.id);
+    }
+    if (draft?.kind === "rect" && (draft.w ?? 0) > 0.01 && (draft.h ?? 0) > 0.01) {
       setMasks((prev) => [...prev, draft]);
       setSelected(draft.id);
     }
     setDraft(null);
     dragStart.current = null;
+  };
+
+  const finishPolygon = () => {
+    if (polyPoints.current.length > 2) {
+      const region: CleanerRegion = {
+        id: rid(),
+        kind: "poly",
+        role: "remove",
+        points: polyPoints.current,
+        grow: 0.004,
+        track: true,
+        enabled: true,
+        label: "Polígono",
+      };
+      setMasks((prev) => [...prev, region]);
+      setSelected(region.id);
+    }
+    polyPoints.current = [];
+    setDraft(null);
+  };
+
+  const cancelPolygon = () => {
+    polyPoints.current = [];
+    setDraft(null);
   };
 
   const startUpload = async () => {
@@ -249,9 +355,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             } disabled:opacity-60`}
           >
             <span className="block text-sm font-display font-bold">{MODE_LABEL[m]}</span>
-            <span className="block text-[10px] leading-tight text-muted-foreground">
-              {m === "smart" ? "'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            src/routes/limpar-ia.tsx + componentes: upload/drag-drop com progresso real, painel esquerdo Auto/Manual, player central com editor de máscaras (Smart Brush, pincel, retângulo, polígono, borracha, protect), painel direito de configurações, timeline de keyframes de máscara, before/after com o MP4 realmente processado, histórico e link no menu lateral.\n\nworker/ em Python: FastAPI + fila, ffprobe/extração de frames e áudio, detecção de cena, detector de texto (PP-OCR/DBNet), segmentação e refino de máscara, tracking por optical flow, protect mask por segmentação de sujeito, adaptadores ProPainterProvider / E2FGVIProvider / STTNProvider / DiffuEraserProvider, processamento em janelas com overlap, validação de consistência temporal, segundo passe automático, composição final em FFmpeg preservando resolução/FPS/áudio, Dockerfile, requirements.txt e README com pesos, variáveis (CLEANER_WORKER_URL, CLEANER_WORKER_SECRET, PUBLIC_SITE_URL) e como subir na GPU." : MODE_HINT[m]}
-            </span>
+            <span className="block text-[10px] leading-tight text-muted-foreground">{MODE_HINT[m]}</span>
           </button>
         ))}
       </aside>
@@ -263,6 +367,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           onPointerDown={onDown}
           onPointerMove={onMove}
           onPointerUp={onUp}
+          onDoubleClick={() => tool === "poly" && finishPolygon()}
           className={`panel relative aspect-video overflow-hidden rounded-2xl border border-border/60 bg-black ${
             tool === "select" ? "cursor-default" : tool === "erase" ? "cursor-pointer" : "cursor-crosshair"
           }`}
@@ -278,29 +383,75 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           />
 
           {job?.status !== "completed" &&
-            [...visible, ...(draft ? [draft] : [])].map((m) => (
-              <div
-                key={m.id}
-                onClick={() => tool === "select" && setSelected(m.id)}
-                className={`absolute border-2 ${
-                  m.role === "protect"
-                    ? "border-emerald-400 bg-emerald-400/10"
-                    : selected === m.id
-                      ? "border-primary bg-primary/25"
-                      : "border-primary/70 bg-primary/15"
-                }`}
-                style={{
-                  left: `${(m.x ?? 0) * 100}%`,
-                  top: `${(m.y ?? 0) * 100}%`,
-                  width: `${(m.w ?? 0) * 100}%`,
-                  height: `${(m.h ?? 0) * 100}%`,
-                }}
-              >
-                <span className="absolute -top-5 left-0 whitespace-nowrap rounded bg-background/80 px-1 font-mono text-[9px] uppercase">
-                  {m.label || m.role}
-                </span>
-              </div>
-            ))}
+            [...visible, ...(draft ? [draft] : [])].map((m) => {
+              const baseClasses = m.role === "protect"
+                ? "border-emerald-400 bg-emerald-400/10"
+                : selected === m.id
+                  ? "border-primary bg-primary/25"
+                  : "border-primary/70 bg-primary/15";
+
+              if (m.kind === "poly" && m.points) {
+                const pts = m.points.map((pt) => `${pt.x * 100}% ${pt.y * 100}%`).join(",");
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => tool === "select" && setSelected(m.id)}
+                    className={`absolute inset-0 ${tool === "select" ? "pointer-events-auto" : "pointer-events-none"}`}
+                  >
+                    <svg className="absolute inset-0 size-full" preserveAspectRatio="none">
+                      <polygon
+                        points={pts}
+                        className={`fill-current ${m.role === "protect" ? "text-emerald-400/10" : "text-primary/20"} stroke-current ${m.role === "protect" ? "text-emerald-400" : "text-primary/70"}`}
+                        strokeWidth="2"
+                      />
+                    </svg>
+                    <span className="absolute left-0 top-0 -translate-y-full whitespace-nowrap rounded bg-background/80 px-1 font-mono text-[9px] uppercase">
+                      {m.label || m.role}
+                    </span>
+                  </div>
+                );
+              }
+
+              if (m.kind === "brush" && m.points) {
+                return (
+                  <svg
+                    key={m.id}
+                    onClick={() => tool === "select" && setSelected(m.id)}
+                    className={`absolute inset-0 size-full ${tool === "select" ? "cursor-pointer" : "pointer-events-none"}`}
+                    preserveAspectRatio="none"
+                  >
+                    {m.points.map((pt, i) => (
+                      <circle
+                        key={i}
+                        cx={`${pt.x * 100}%`}
+                        cy={`${pt.y * 100}%`}
+                        r={`${(m.size ?? 0.01) * 50}%`}
+                        className={`${m.role === "protect" ? "fill-emerald-400/30 stroke-emerald-400" : "fill-primary/40 stroke-primary/70"}`}
+                        strokeWidth="1"
+                      />
+                    ))}
+                  </svg>
+                );
+              }
+
+              return (
+                <div
+                  key={m.id}
+                  onClick={() => tool === "select" && setSelected(m.id)}
+                  className={`absolute border-2 ${baseClasses} ${tool === "select" ? "cursor-pointer" : ""}`}
+                  style={{
+                    left: `${(m.x ?? 0) * 100}%`,
+                    top: `${(m.y ?? 0) * 100}%`,
+                    width: `${(m.w ?? 0) * 100}%`,
+                    height: `${(m.h ?? 0) * 100}%`,
+                  }}
+                >
+                  <span className="absolute -top-5 left-0 whitespace-nowrap rounded bg-background/80 px-1 font-mono text-[9px] uppercase">
+                    {m.label || m.role}
+                  </span>
+                </div>
+              );
+            })}
 
           {running && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/70 backdrop-blur-sm">
@@ -326,6 +477,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         <div className="flex flex-wrap items-center gap-2">
           {([
             ["rect", "Retângulo", Square],
+            ["poly", "Polígono", Pentagon],
+            ["brush", "Pincel", PenTool],
             ["protect", "Proteger", Shield],
             ["erase", "Apagar", Eraser],
             ["select", "Selecionar", MousePointer2],
@@ -344,6 +497,32 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             {time.toFixed(2)}s / {duration.toFixed(2)}s
           </span>
         </div>
+
+        {tool === "poly" && (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs">
+            <span>Clique para adicionar pontos. Duplo-clique ou Enter fecha o polígono.</span>
+            <div className="ml-auto flex gap-2">
+              <Button size="sm" variant="outline" onClick={finishPolygon}>Fechar</Button>
+              <Button size="sm" variant="ghost" onClick={cancelPolygon}>Cancelar</Button>
+            </div>
+          </div>
+        )}
+
+        {tool === "brush" && (
+          <div className="flex items-center gap-3 rounded-lg border border-border/60 bg-surface/40 p-2 text-xs">
+            <span className="mono-label">Tamanho</span>
+            <input
+              type="range"
+              min={0.005}
+              max={0.06}
+              step={0.001}
+              value={brushSize}
+              onChange={(e) => setBrushSize(parseFloat(e.target.value))}
+              className="w-32"
+            />
+            <span className="font-mono">{Math.round(brushSize * 1000)}</span>
+          </div>
+        )}
 
         {/* Timeline de máscaras */}
         <div className="panel space-y-2 rounded-2xl border border-border/50 bg-surface/30 p-3">

@@ -37,16 +37,25 @@ pip install -r requirements.txt
 
 ## Pesos dos modelos
 
-Baixe para `backend/models/`:
+Baixe automaticamente:
+
+```bash
+python scripts/download_weights.py --all
+```
+
+Ou manualmente para `backend/models/`:
 
 - **ProPainter** — `ProPainter.pth` do repositório oficial `sczhou/ProPainter`
   (release "weights"). Também é preciso o pacote `model/` do ProPainter no
   `PYTHONPATH` para o import `model.propainter`.
 - **STTN** — `sttn.pth` do repositório `researchmm/STTN`.
 - **LaMa** — `big-lama.pt` (TorchScript) do `advimman/lama`.
+- **E2FGVI** — `e2fgvi.pth` do repositório `MCG-NJU/E2FGVI`.
+- **DiffuEraser** — `diffueraser.pt` do repositório `L-YeZ/DiffuEraser`.
 
 Sem pesos, o motor cai em `TemporalFillEngine`: reconstrução real do fundo
 buscando o pixel em frames vizinhos com alinhamento por optical flow (sem blur).
+O worker loga explicitamente qual engine efetivamente rodou.
 
 ## Variáveis de ambiente
 

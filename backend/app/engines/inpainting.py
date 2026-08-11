@@ -94,8 +94,12 @@ class TemporalFillEngine(InpaintingEngine):
 
 
 class _WeightedNeuralEngine(InpaintingEngine):
-    """Base para motores neurais com pesos em disco. Se os pesos não existirem,
-    delega para TemporalFillEngine (mesmo contrato, sem blur)."""
+    """Base para motores neurais com pesos em disco.
+
+    Se os pesos não existirem, delega para TemporalFillEngine (mesmo contrato,
+    sem blur), mas sempre loga qual engine efetivamente rodou para facilitar
+    debug em produção.
+    """
 
     weights_env = ""
     default_weights = ""
@@ -106,18 +110,23 @@ class _WeightedNeuralEngine(InpaintingEngine):
         self.model = None
         self.weights = os.getenv(self.weights_env, self.default_weights)
         self._fallback: Optional[TemporalFillEngine] = None
+        self._used_fallback = False
 
     def _load(self) -> bool:
         if self.model is not None:
             return True
         if not self.weights or not os.path.exists(self.weights):
+            print(f"[{self.name}] pesos não encontrados em {self.weights}; usando temporal-fill")
+            self._used_fallback = True
             return False
         try:
             self.model = self._build()
+            self._used_fallback = False
             return self.model is not None
         except Exception as exc:  # pragma: no cover
-            print(f"[{self.name}] falha ao carregar pesos: {exc}")
+            print(f"[{self.name}] falha ao carregar pesos: {exc}; usando temporal-fill")
             self.model = None
+            self._used_fallback = True
             return False
 
     def _build(self):  # pragma: no cover - depende dos pesos
@@ -133,9 +142,10 @@ class _WeightedNeuralEngine(InpaintingEngine):
             except RuntimeError as exc:  # OOM tratado pelo chamador
                 if "out of memory" in str(exc).lower():
                     raise
-                print(f"[{self.name}] erro na inferência: {exc}")
+                print(f"[{self.name}] erro na inferência: {exc}; usando temporal-fill")
         if self._fallback is None:
             self._fallback = TemporalFillEngine(self.context_radius)
+        self._used_fallback = True
         return self._fallback.process(frames, masks)
 
 
@@ -213,6 +223,49 @@ class LamaEngine(_WeightedNeuralEngine):
             arr = (y.clamp(0, 1).permute(1, 2, 0).cpu().numpy() * 255).astype(np.uint8)[..., ::-1]
             out.append(np.where(mask[..., None] == 0, frame, arr))
         return np.array(out)
+
+
+class E2FGVIEngine(_WeightedNeuralEngine):
+    """Flow-Guided Video Inpainting — alternativa rápida para objetos móveis."""
+
+    name = "e2fgvi"
+    weights_env = "E2FGVI_WEIGHTS"
+    default_weights = "models/e2fgvi.pth"
+
+    def __init__(self):
+        super().__init__(context_radius=8)
+
+    def _build(self):  # pragma: no cover
+        from model.e2fgvi import InpaintGenerator  # type: ignore
+
+        net = InpaintGenerator()
+        net.load_state_dict(torch.load(self.weights, map_location="cpu"), strict=False)  # type: ignore[union-attr]
+        return net.to("cuda" if cuda_available() else "cpu").eval()
+
+    def _infer(self, frames: np.ndarray, masks: np.ndarray) -> np.ndarray:  # pragma: no cover
+        # E2FGVI usa o mesmo formato de tensores I/O que ProPainter
+        return ProPainterEngine._infer(self, frames, masks)
+
+
+class DiffuEraserEngine(_WeightedNeuralEngine):
+    """Difusão guiada por texto/máscara para resíduos difíceis (qualidade máxima)."""
+
+    name = "diffueraser"
+    weights_env = "DIFFUERASER_WEIGHTS"
+    default_weights = "models/diffueraser.pt"
+
+    def __init__(self):
+        super().__init__(context_radius=20, fp16=False)
+
+    def _build(self):  # pragma: no cover
+        from model.diffueraser import DiffuEraser  # type: ignore
+
+        net = DiffuEraser()
+        net.load_state_dict(torch.load(self.weights, map_location="cpu"), strict=False)  # type: ignore[union-attr]
+        return net.to("cuda" if cuda_available() else "cpu").eval()
+
+    def _infer(self, frames: np.ndarray, masks: np.ndarray) -> np.ndarray:  # pragma: no cover
+        return ProPainterEngine._infer(self, frames, masks)
 
 
 PRESETS = {

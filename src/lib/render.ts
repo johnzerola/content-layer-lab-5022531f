@@ -1,5 +1,5 @@
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
-import { drawFrame, resetPatchCache } from "./draw";
+import { drawFrame } from "./draw";
 import { encodeMp4, webCodecsSupported } from "./encode";
 import type { Variation } from "./variation";
 import type { CaptionCue } from "./captions";
@@ -144,8 +144,6 @@ export async function renderVideo(
   template: Template,
   opts: RenderOptions,
 ): Promise<{ blob: Blob; ext: string }> {
-  // cada render começa com o cache de reconstrução limpo (vídeo/regiões diferentes)
-  resetPatchCache();
   if (webCodecsSupported()) {
 
     try {
