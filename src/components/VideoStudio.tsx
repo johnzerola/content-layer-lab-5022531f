@@ -561,19 +561,26 @@ export function VideoStudio({
 
             {tab === "layout" && (
               <div className="space-y-3">
+                <LayoutPreview videoRef={videoRef} pre={pre} clip={{ start, end }} />
+                <p className="text-center font-mono text-[10px] text-muted-foreground">
+                  saída 9:16 real — o mesmo desenho usado na exportação
+                </p>
                 <div className="grid grid-cols-2 gap-2">
                   {LAYOUTS.map((l) => (
                     <button
                       key={l.id}
                       onClick={() => set({ layout: l.id as LayoutKind })}
-                      className={`rounded-lg border p-2 text-left transition ${
+                      className={`flex gap-2 rounded-lg border p-2 text-left transition ${
                         (pre.layout ?? "auto") === l.id
                           ? "border-primary bg-primary/10"
                           : "border-border hover:border-primary/50"
                       }`}
                     >
-                      <span className="block font-mono text-[11px] text-foreground">{l.label}</span>
-                      <span className="block font-mono text-[10px] text-muted-foreground">{l.hint}</span>
+                      <LayoutGlyph id={l.id} />
+                      <span className="min-w-0">
+                        <span className="block font-mono text-[11px] text-foreground">{l.label}</span>
+                        <span className="block font-mono text-[10px] text-muted-foreground">{l.hint}</span>
+                      </span>
                     </button>
                   ))}
                 </div>
