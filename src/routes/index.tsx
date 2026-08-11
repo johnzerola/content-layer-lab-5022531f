@@ -34,7 +34,6 @@ import { autoSyncTemplates, enableCloudQuotaFallback, logBatch, logExports, type
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
-import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
 import { failJob, finishJob, setJobCancel, setJobRetry, startJob, updateJob } from "@/lib/jobs";
 import { undoable } from "@/lib/undo";
