@@ -80,6 +80,49 @@ const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
 type Tab = "trim" | "layout" | "crop" | "keys" | "trans" | "color" | "caps" | "text";
 
+/** Miniatura esquemática de cada layout (9:16). */
+function LayoutGlyph({ id }: { id: LayoutKind }) {
+  const box = "absolute rounded-[2px] bg-primary/60";
+  return (
+    <span className="relative block h-10 w-[22px] shrink-0 overflow-hidden rounded border border-border bg-muted">
+      {id === "fill" && <span className={`${box} inset-0`} />}
+      {(id === "fit" || id === "horizontal") && <span className={`${box} inset-x-0 top-1/2 h-3 -translate-y-1/2`} />}
+      {id === "auto" && <span className={`${box} inset-x-0 top-1/2 h-6 -translate-y-1/2`} />}
+      {id === "blur" && (
+        <>
+          <span className="absolute inset-0 bg-primary/20 blur-[2px]" />
+          <span className={`${box} inset-x-0 top-1/2 h-4 -translate-y-1/2`} />
+        </>
+      )}
+      {id === "centered" && (
+        <>
+          <span className="absolute inset-0 bg-primary/15" />
+          <span className={`${box} inset-x-[2px] top-1/2 h-3 -translate-y-1/2`} />
+        </>
+      )}
+      {id === "split" && (
+        <>
+          <span className={`${box} inset-x-0 top-0 h-[19px]`} />
+          <span className={`${box} inset-x-0 bottom-0 h-[19px] opacity-60`} />
+        </>
+      )}
+      {id === "trio" && (
+        <>
+          <span className={`${box} inset-x-0 top-0 h-[12px]`} />
+          <span className={`${box} inset-x-0 top-[13px] h-[12px] opacity-80`} />
+          <span className={`${box} inset-x-0 bottom-0 h-[12px] opacity-60`} />
+        </>
+      )}
+      {id === "spotlight" && (
+        <>
+          <span className={`${box} inset-x-0 top-0 h-[26px]`} />
+          <span className={`${box} inset-x-0 bottom-0 h-[12px] opacity-50`} />
+        </>
+      )}
+    </span>
+  );
+}
+
 const LANGS = [
   { id: "inglês", label: "Inglês" },
   { id: "espanhol", label: "Espanhol" },
