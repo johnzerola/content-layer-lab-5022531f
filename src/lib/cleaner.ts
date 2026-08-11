@@ -10,7 +10,7 @@
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [k: string]: JsonValue };
 
-export type CleanerMode = "subtitle" | "text" | "watermark" | "logo" | "object";
+export type CleanerMode = "smart" | "subtitle" | "text" | "watermark" | "logo" | "object" | "passerby";
 export type CleanerPreset = "fast" | "quality" | "max";
 
 export type CleanerStatus =
@@ -50,19 +50,23 @@ export const STAGE_LABEL: Record<CleanerStatus, string> = {
 };
 
 export const MODE_LABEL: Record<CleanerMode, string> = {
+  smart: "Smart",
   subtitle: "Legenda",
   text: "Texto",
   watermark: "Marca d'água",
   logo: "Logo",
   object: "Objeto",
+  passerby: "Passante",
 };
 
 export const MODE_HINT: Record<CleanerMode, string> = {
+  smart: "detecta legenda, texto e marca d'água de uma vez",
   subtitle: "detector de texto queimado + estabilização temporal da máscara",
   text: "qualquer texto sobreposto, em qualquer posição da tela",
   watermark: "detecta também alpha blending de marca semitransparente",
   logo: "blob de cor/forma persistente, inclusive logo animado",
   object: "seleção manual + rastreamento por optical flow",
+  passerby: "remove pessoas ou objetos que cruzam a cena",
 };
 
 export const PRESET_LABEL: Record<CleanerPreset, string> = {
