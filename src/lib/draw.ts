@@ -716,6 +716,39 @@ function drawVideoLayer(
       ctx.fillStyle = "rgba(0,0,0,0.5)";
       ctx.fillRect(v.x, v.y + v.h / 2 - 1, v.w, 2);
       ctx.restore();
+    } else if (layout === "trio") {
+      const h = v.h / 3;
+      const a = { x: v.x, y: v.y, w: v.w, h };
+      const b = { x: v.x, y: v.y + h, w: v.w, h };
+      const c = { x: v.x, y: v.y + h * 2, w: v.w, h };
+      dest = paint(a, "cover");
+      paint(b, "cover");
+      paint(c, "cover", full, { useOffset: false });
+      ctx.save();
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fillRect(v.x, v.y + h - 1, v.w, 2);
+      ctx.fillRect(v.x, v.y + h * 2 - 1, v.w, 2);
+      ctx.restore();
+    } else if (layout === "spotlight") {
+      const topH = v.h * 0.68;
+      const top = { x: v.x, y: v.y, w: v.w, h: topH };
+      const bottom = { x: v.x, y: v.y + topH, w: v.w, h: v.h - topH };
+      paint(box, "cover", full, { blur: 40, dim: 0.45, useOffset: false });
+      dest = paint(top, "cover");
+      paint(bottom, "contain", full, { useOffset: false });
+      ctx.save();
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fillRect(v.x, v.y + topH - 1, v.w, 2);
+      ctx.restore();
+    } else if (layout === "centered") {
+      paint(box, "cover", full, { blur: 60, dim: 0.55, useOffset: false });
+      dest = paint(box, "contain", full, { useOffset: false });
+    } else if (layout === "horizontal") {
+      ctx.save();
+      ctx.fillStyle = t.background || "#000";
+      ctx.fillRect(v.x, v.y, v.w, v.h);
+      ctx.restore();
+      dest = paint(box, "contain", full, { useOffset: false });
     } else {
       // "auto": só recorta quando a orientação bate com a do quadro; senão mostra inteiro
       const useContain =
