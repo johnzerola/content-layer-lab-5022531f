@@ -287,10 +287,21 @@ export function transitionAt(
   return none;
 }
 
+/** Retângulo em pixels de um recorte normalizado + dimensões após o giro. */
+export function rectForCrop(c: PreCrop, w: number, h: number, rotate = 0) {
+  const sx = Math.max(0, Math.round(c.x * w));
+  const sy = Math.max(0, Math.round(c.y * h));
+  const sw = Math.max(2, Math.min(w - sx, Math.round(c.w * w)));
+  const sh = Math.max(2, Math.min(h - sy, Math.round(c.h * h)));
+  const quarter = (((rotate / 90) | 0) % 4 + 4) % 4;
+  return { sx, sy, sw, sh, quarter, ew: quarter % 2 ? sh : sw, eh: quarter % 2 ? sw : sh };
+}
+
 /** Retângulo em pixels da fonte + dimensões efetivas após o giro. */
 export function cropRect(p: PreEdit | null | undefined, w: number, h: number, time?: number) {
   const anim = cropAt(p, time);
   const c = anim && !isFullCrop(anim) ? anim : FULL;
+
   const sx = Math.max(0, Math.round(c.x * w));
   const sy = Math.max(0, Math.round(c.y * h));
   const sw = Math.max(2, Math.min(w - sx, Math.round(c.w * w)));
