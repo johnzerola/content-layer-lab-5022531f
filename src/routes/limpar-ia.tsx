@@ -104,6 +104,7 @@ function LimparIAPage() {
   }, []);
 
   const drop = (e: React.DragEvent) => {
+    console.log("drop");
     e.preventDefault();
     onFile(e.dataTransfer.files);
   };
