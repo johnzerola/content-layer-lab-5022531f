@@ -1421,6 +1421,21 @@ function Home() {
               </select>
             </div>
           </section>
+        ) : mode === "limpar-ia" ? (
+          <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
+            <div>
+              <p className="mono-label">AI Video Cleaner</p>
+              <p className="text-lg font-semibold">Remoção Profissional com ProPainter (GPU)</p>
+              <p className="font-mono text-[11px] text-muted-foreground">
+                reconstrução temporal avançada utilizando frames vizinhos para restaurar o fundo original
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+               <span className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-mono text-[11px] text-primary">
+                 <Sparkles className="size-3" /> motor gpu
+               </span>
+            </div>
+          </section>
         ) : (
           <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
             <div>
