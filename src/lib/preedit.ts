@@ -23,11 +23,24 @@ export interface FrameKey {
   crop: PreCrop;
 }
 
+/** Layout do clipe vertical (estilo Clipzi). */
+export type LayoutKind = "auto" | "fill" | "fit" | "blur" | "split";
+
+/** Trecho mantido do vídeo original (corte multi-segmento). */
+export interface Segment {
+  start: number;
+  end: number;
+}
+
 export interface PreEdit {
   /** recorte de área do vídeo original (null = quadro inteiro) */
   crop: PreCrop | null;
   /** keyframes de enquadramento (vazio = recorte fixo acima) */
   keys: FrameKey[];
+  /** trechos mantidos (vazio = usa a janela de corte simples) */
+  segments: Segment[];
+  /** layout do quadro final */
+  layout: LayoutKind;
   /** transição de abertura */
   transIn: Transition;
   /** transição de saída */
@@ -53,6 +66,8 @@ export function defaultPreEdit(): PreEdit {
   return {
     crop: null,
     keys: [],
+    segments: [],
+    layout: "auto",
     transIn: { kind: "none", dur: 0.5 },
     transOut: { kind: "none", dur: 0.5 },
     rotate: 0,
@@ -67,6 +82,59 @@ export function defaultPreEdit(): PreEdit {
     blur: 0,
   };
 }
+
+export const LAYOUTS: { id: LayoutKind; label: string; hint: string }[] = [
+  { id: "auto", label: "Automático", hint: "Preenche quando a orientação bate, senão mostra inteiro" },
+  { id: "fill", label: "Tela cheia", hint: "Preenche todo o quadro (corta as bordas)" },
+  { id: "fit", label: "Inteiro", hint: "Vídeo completo com barras pretas" },
+  { id: "blur", label: "Fundo desfocado", hint: "Vídeo inteiro sobre o próprio quadro desfocado" },
+  { id: "split", label: "Dividido", hint: "Recorte em cima, quadro completo embaixo" },
+];
+
+/** Trechos válidos: usa os segmentos quando existirem, senão a janela de corte. */
+export function keptSegments(
+  p: PreEdit | null | undefined,
+  clip?: { start: number; end: number } | null,
+  duration?: number,
+): Segment[] {
+  const lo = clip?.start ?? 0;
+  const hi = clip?.end ?? duration ?? Infinity;
+  const segs = (p?.segments ?? [])
+    .map((s) => ({ start: Math.max(lo, s.start), end: Math.min(hi, s.end) }))
+    .filter((s) => s.end - s.start > 0.05)
+    .sort((a, b) => a.start - b.start);
+  if (segs.length) return segs;
+  return Number.isFinite(hi) ? [{ start: lo, end: hi }] : [];
+}
+
+/** Duração total dos trechos mantidos. */
+export function segmentsDuration(segs: Segment[]) {
+  return segs.reduce((acc, s) => acc + Math.max(0, s.end - s.start), 0);
+}
+
+/** Converte o tempo da saída (0..total) para o tempo do vídeo original. */
+export function srcTimeAt(segs: Segment[], out: number) {
+  let left = Math.max(0, out);
+  for (const s of segs) {
+    const len = Math.max(0, s.end - s.start);
+    if (left < len) return s.start + left;
+    left -= len;
+  }
+  const last = segs[segs.length - 1];
+  return last ? last.end : out;
+}
+
+/** Divide o trecho que contém `t` em dois (corte de tesoura). */
+export function splitAt(segs: Segment[], t: number): Segment[] {
+  const out: Segment[] = [];
+  for (const s of segs) {
+    if (t > s.start + 0.12 && t < s.end - 0.12) {
+      out.push({ start: s.start, end: t }, { start: t, end: s.end });
+    } else out.push(s);
+  }
+  return out;
+}
+
 
 const FULL: PreCrop = { x: 0, y: 0, w: 1, h: 1 };
 
@@ -86,7 +154,10 @@ export function hasPreEdit(p?: PreEdit | null) {
   return (
     !isFullCrop(p.crop) ||
     (p.keys?.length ?? 0) > 0 ||
+    (p.segments?.length ?? 0) > 1 ||
+    (p.layout ?? "auto") !== "auto" ||
     (p.transIn?.kind ?? "none") !== "none" ||
+
     (p.transOut?.kind ?? "none") !== "none" ||
     p.rotate !== 0 ||
     p.flipH ||

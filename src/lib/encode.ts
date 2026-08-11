@@ -3,7 +3,7 @@ import { drawFrame } from "./draw";
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
 import type { Variation } from "./variation";
 import type { CaptionCue } from "./captions";
-import type { PreEdit } from "./preedit";
+import { keptSegments, segmentsDuration, srcTimeAt, type PreEdit } from "./preedit";
 import { cleanMp4Metadata } from "./mp4meta";
 
 export interface EncodeOptions {
@@ -112,8 +112,7 @@ async function pickAudioCodec(channels: number, sampleRate: number): Promise<"aa
 
 async function decodeAudio(
   file: File,
-  trimStart: number,
-  dur: number,
+  segments: { start: number; end: number }[],
   speed: number,
   pitchCents = 0,
   eqDb = 0,
@@ -128,38 +127,47 @@ async function decodeAudio(
 
     const sampleRate = 48000;
     const channels = Math.min(2, decoded.numberOfChannels);
+    const dur = segments.reduce((a, s) => a + Math.max(0, s.end - s.start), 0);
     const outLen = Math.max(1, Math.floor((dur / speed) * sampleRate));
     const off = new OfflineAudioContext(channels, outLen, sampleRate);
-    const src = off.createBufferSource();
-    src.buffer = decoded;
-    src.playbackRate.value = speed;
-    // anti-duplicidade: leve alteração de tom (cents) sem mudar a duração de saída
-    if (pitchCents) {
-      try {
-        src.detune.value = pitchCents;
-      } catch {
-        /* navegador sem detune */
+
+    let cursor = 0;
+    for (const seg of segments) {
+      const len = Math.max(0, seg.end - seg.start);
+      if (len <= 0.01) continue;
+      const src = off.createBufferSource();
+      src.buffer = decoded;
+      src.playbackRate.value = speed;
+      // anti-duplicidade: leve alteração de tom (cents) sem mudar a duração de saída
+      if (pitchCents) {
+        try {
+          src.detune.value = pitchCents;
+        } catch {
+          /* navegador sem detune */
+        }
       }
+      let node: AudioNode = src;
+      if (eqDb) {
+        // realce/corte sutil de agudos: muda o fingerprint do áudio sem soar diferente
+        const shelf = off.createBiquadFilter();
+        shelf.type = "highshelf";
+        shelf.frequency.value = 5200;
+        shelf.gain.value = eqDb;
+        node.connect(shelf);
+        node = shelf;
+      }
+      node.connect(off.destination);
+      src.start(cursor, seg.start, len);
+      cursor += len / speed;
     }
 
-    let node: AudioNode = src;
-    if (eqDb) {
-      // realce/corte sutil de agudos: muda o fingerprint do áudio sem soar diferente
-      const shelf = off.createBiquadFilter();
-      shelf.type = "highshelf";
-      shelf.frequency.value = 5200;
-      shelf.gain.value = eqDb;
-      node.connect(shelf);
-      node = shelf;
-    }
-    node.connect(off.destination);
-    src.start(0, trimStart, dur);
     const rendered = await off.startRendering();
     return { rendered, channels, sampleRate };
   } catch {
     return null;
   }
 }
+
 
 /** Renderiza para MP4 (H.264 + AAC) usando WebCodecs — mais rápido que tempo real. */
 export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
@@ -195,7 +203,10 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     const clipEnd = Math.min(video.duration, opts.clip?.end ?? video.duration);
     const clipDur = Math.max(0.5, clipEnd - clipStart);
     const trimStart = clipStart + Math.min(v.trimStart, Math.max(0, clipDur - 0.5));
-    const effDur = Math.max(0.2, clipDur - (trimStart - clipStart) - v.trimEnd);
+    const trimEnd = Math.max(trimStart + 0.2, clipStart + clipDur - v.trimEnd);
+    // trechos mantidos (corte multi-segmento do editor); sem segmentos = janela única
+    const segments = keptSegments(opts.pre, { start: trimStart, end: trimEnd }, video.duration);
+    const effDur = Math.max(0.2, segmentsDuration(segments));
     const outDur = effDur / v.speed;
     const totalFrames = Math.max(1, Math.round(outDur * fps));
 
@@ -204,10 +215,11 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     // continuamos com o vídeo, em vez de deixar o lote parado em 0% por horas.
     opts.onProgress?.(0.005);
     const audio = await withTimeout(
-      decodeAudio(opts.file, trimStart, effDur, v.speed, v.pitch, v.eq),
+      decodeAudio(opts.file, segments, v.speed, v.pitch, v.eq),
       Math.min(60_000, Math.max(20_000, effDur * 250)),
       "A faixa de áudio não pôde ser preparada",
     ).catch((error) => {
+
       console.warn("Áudio ignorado para evitar bloqueio da exportação:", error);
       return null;
     });
@@ -265,7 +277,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     const emit = async () => {
       const startedAt = performance.now();
       // tempo do vídeo fonte correspondente a este frame (legendas sincronizadas)
-      const srcTime = trimStart + (frameIndex / fps) * v.speed;
+      const srcTime = srcTimeAt(segments, (frameIndex / fps) * v.speed);
       drawFrame(
         ctx,
         tpl,
@@ -350,7 +362,7 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     // repetições que faziam o MP4 baixado parecer travando.
     while (frameIndex < totalFrames) {
       if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
-      await seekTo(trimStart + (frameIndex / fps) * v.speed);
+      await seekTo(srcTimeAt(segments, (frameIndex / fps) * v.speed));
       await emit();
       if (frameIndex % 3 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
     }
