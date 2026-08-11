@@ -7,7 +7,7 @@
  * exportável em JSON para depurar renderizações lentas ou travadas.
  */
 
-export type JobTool = "lote" | "clip" | "limpar" | "live";
+export type JobTool = "lote" | "clip" | "limpar" | "limpar-ia" | "live";
 export type JobStatus = "na fila" | "processando" | "pronto" | "erro" | "cancelado";
 
 export interface JobStep {
@@ -41,6 +41,7 @@ export const TOOL_LABEL: Record<JobTool, string> = {
   lote: "ViralBatch",
   clip: "CorteIA",
   limpar: "LimpaVídeo",
+  "limpar-ia": "CleanerIA",
   live: "Monitora Live",
 };
 
