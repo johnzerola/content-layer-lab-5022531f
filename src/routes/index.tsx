@@ -908,7 +908,7 @@ function Home() {
         // central de atividade: um trabalho por vídeo, com etapas cronometradas
         startJob({
           id,
-          tool: runMode,
+          tool: runMode as any,
           name: item.file.name,
           stage: "preparando",
           meta: { seguro: safe, plataformas: platforms.join(", ") },
