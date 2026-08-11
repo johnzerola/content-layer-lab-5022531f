@@ -596,6 +596,35 @@ export function VideoStudio({
                     </p>
                   )}
                 </div>
+
+                <div className="space-y-2 rounded-lg border border-border p-2">
+                  <p className="font-mono text-[11px] text-foreground">Remover silêncio automaticamente</p>
+                  <Field label={`Sensibilidade · ${Math.round(sens * 100)}%`}>
+                    <Slider
+                      value={[sens]}
+                      min={0.1}
+                      max={0.95}
+                      step={0.05}
+                      onValueChange={([v]) => setSens(v ?? 0.5)}
+                    />
+                  </Field>
+                  <Field label={`Pausa mínima · ${minSil.toFixed(2)}s`}>
+                    <Slider
+                      value={[minSil]}
+                      min={0.15}
+                      max={1.5}
+                      step={0.05}
+                      onValueChange={([v]) => setMinSil(v ?? 0.35)}
+                    />
+                  </Field>
+                  <Button size="sm" variant="secondary" disabled={cutting} onClick={cutSilence}>
+                    <AudioLines className="mr-1 size-3.5" />
+                    {cutting ? "Analisando áudio…" : "Cortar pausas"}
+                  </Button>
+                  <p className="font-mono text-[10px] text-muted-foreground">
+                    Analisa o áudio e mantém só os trechos com fala — os trechos ficam editáveis na timeline.
+                  </p>
+                </div>
                 <p className="font-mono text-[11px] text-muted-foreground">
                   Duração final: {fmt(Math.max(0, outDur))}
                   {segs.length > 1 ? ` · ${segs.length} trechos` : ""}
