@@ -730,11 +730,30 @@ export function VideoStudio({
             {tab === "caps" && (
               <div className="space-y-3">
                 {captions?.length ? (
-                  <CaptionTimeline
-                    file={file}
-                    cues={captions}
-                    onChange={(cues) => onCaptionsChange?.(cues)}
-                  />
+                  <>
+                    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-2">
+                      <Languages className="size-3.5 text-primary" />
+                      <select
+                        value={lang}
+                        onChange={(e) => setLang(e.target.value)}
+                        className="rounded-md border border-border bg-background px-2 py-1 font-mono text-[11px] text-foreground"
+                      >
+                        {LANGS.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.label}
+                          </option>
+                        ))}
+                      </select>
+                      <Button size="sm" variant="secondary" disabled={translating} onClick={() => void translate()}>
+                        {translating ? "Traduzindo…" : "Traduzir legenda"}
+                      </Button>
+                    </div>
+                    <CaptionTimeline
+                      file={file}
+                      cues={captions}
+                      onChange={(cues) => onCaptionsChange?.(cues)}
+                    />
+                  </>
                 ) : (
                   <p className="font-mono text-[11px] text-muted-foreground">
                     Sem legenda ainda. Gere a transcrição no painel de legendas e volte aqui para corrigir
@@ -743,6 +762,7 @@ export function VideoStudio({
                 )}
               </div>
             )}
+
 
             {tab === "text" && (
               <div className="space-y-3">
