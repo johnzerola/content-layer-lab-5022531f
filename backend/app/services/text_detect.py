@@ -107,3 +107,27 @@ def text_pixel_mask(frame: np.ndarray, box: Box, dilate_ratio: float = 0.18) -> 
 
     mask[y:y + h, x:x + w] = local
     return mask
+
+
+def frame_text_mask(
+    frame: np.ndarray,
+    roi: np.ndarray | None = None,
+    subtitle_only: bool = False,
+) -> np.ndarray:
+    """Máscara de pixels de texto do frame inteiro (letra + stroke + sombra).
+
+    Usada na varredura temporal: cada frame recebe a SUA máscara, então
+    legenda karaokê/dinâmica é acompanhada palavra a palavra.
+    """
+    h_img, w_img = frame.shape[:2]
+    out = np.zeros((h_img, w_img), np.uint8)
+    for box in detect_text_boxes(frame):
+        x, y, w, h = box
+        if subtitle_only and (y + h / 2) < h_img * 0.42:
+            continue
+        if roi is not None:
+            sub = roi[max(0, y):y + h, max(0, x):x + w]
+            if sub.size == 0 or (sub > 0).mean() < 0.25:
+                continue
+        out = np.maximum(out, text_pixel_mask(frame, box))
+    return out
