@@ -76,7 +76,15 @@ const fmt = (s: number) => {
 };
 
 type Handle = "nw" | "ne" | "sw" | "se" | "n" | "s" | "w" | "e";
-type Drag = { mode: "move" | Handle; x: number; y: number; crop: NonNullable<PreEdit["crop"]> };
+type Drag = {
+  mode: "move" | Handle;
+  x: number;
+  y: number;
+  crop: NonNullable<PreEdit["crop"]>;
+  /** instante do vídeo quando o arraste começou (para gravar o keyframe certo) */
+  t: number;
+};
+
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
@@ -181,8 +189,27 @@ export function VideoStudio({
   const boxRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<Drag | null>(null);
 
-  const crop = pre.crop ?? { x: 0, y: 0, w: 1, h: 1 };
+  /** recorte mostrado agora: segue os keyframes quando existirem */
+  const crop = cropAt(pre, time) ?? pre.crop ?? { x: 0, y: 0, w: 1, h: 1 };
   const set = (p: Partial<PreEdit>) => setPre((v) => ({ ...v, ...p }));
+
+  /** tolerância para considerar que o playhead está "em cima" de um keyframe */
+  const SNAP = 0.2;
+  const nearKey = pre.keys.find((k) => Math.abs(k.t - time) <= SNAP) ?? null;
+
+  /** aplica um recorte: sem keyframes vira recorte fixo; com keyframes grava/edita o ponto atual */
+  const applyCrop = (next: NonNullable<PreEdit["crop"]>, at: number) =>
+    setPre((v) => {
+      if (v.keys.length === 0) return { ...v, crop: next };
+      const t = Number(at.toFixed(2));
+      const i = v.keys.findIndex((k) => Math.abs(k.t - t) <= SNAP);
+      const keys =
+        i >= 0
+          ? v.keys.map((k, j) => (j === i ? { t: k.t, crop: next } : k))
+          : [...v.keys, { t, crop: next }].sort((a, b) => a.t - b.t);
+      return { ...v, keys };
+    });
+
 
   // loop de reprodução dentro da janela de corte
   useEffect(() => {
@@ -228,11 +255,13 @@ export function VideoStudio({
         x: (e.clientX - b.left) / b.width,
         y: (e.clientY - b.top) / b.height,
         crop: { ...crop },
+        t: videoRef.current?.currentTime ?? time,
       };
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
-    [crop],
+    [crop, time],
   );
+
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
@@ -288,9 +317,20 @@ export function VideoStudio({
           next.y = clamp(next.y, 0, 1 - next.h);
         }
       }
-      setPre((v) => ({ ...v, crop: next }));
+      // sem keyframes = recorte fixo; com keyframes o arraste grava/edita o ponto do instante atual
+      setPre((v) => {
+        if (v.keys.length === 0) return { ...v, crop: next };
+        const t = Number(d.t.toFixed(2));
+        const i = v.keys.findIndex((k) => Math.abs(k.t - t) <= 0.2);
+        const keys =
+          i >= 0
+            ? v.keys.map((k, j) => (j === i ? { t: k.t, crop: next } : k))
+            : [...v.keys, { t, crop: next }].sort((a, b) => a.t - b.t);
+        return { ...v, keys };
+      });
     },
     [lock, width, height],
+
   );
 
   /** aplica uma proporção (ou libera) centralizando o recorte */
@@ -308,7 +348,7 @@ export function VideoStudio({
   /** grava o recorte atual como keyframe no instante do playhead */
   const addKey = () =>
     setPre((v) => {
-      const c = v.crop ?? cropAt(v, time) ?? { x: 0, y: 0, w: 1, h: 1 };
+      const c = cropAt(v, time) ?? v.crop ?? { x: 0, y: 0, w: 1, h: 1 };
       const t = Number(time.toFixed(2));
       const key: FrameKey = { t, crop: { ...c } };
       const keys = [...v.keys.filter((k) => Math.abs(k.t - t) > 0.05), key].sort((a, b) => a.t - b.t);
@@ -477,7 +517,11 @@ export function VideoStudio({
                   </div>
                   <span className="pointer-events-none absolute -top-6 left-0 rounded bg-background/90 px-1.5 py-0.5 font-mono text-[10px] text-foreground">
                     {cropPx.w}×{cropPx.h}
+                    {pre.keys.length > 0
+                      ? ` · ${nearKey ? `ajustando ${fmt(nearKey.t)}` : `nova posição em ${fmt(time)}`}`
+                      : ""}
                   </span>
+
                   {HANDLES.map((h) => {
                     const cursor =
                       h === "n" || h === "s"
@@ -777,6 +821,60 @@ export function VideoStudio({
                   Arraste o retângulo (ou as alças das bordas) para escolher a área que fica no vídeo.
                   {lock ? " Proporção travada — o recorte mantém o formato." : ""}
                 </p>
+                <div className="rounded-lg border border-border p-2.5">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      Posições de corte · {pre.keys.length}
+                    </span>
+                    <div className="flex gap-1.5">
+                      <Button size="sm" onClick={addKey}>
+                        {nearKey ? `Ajustar em ${fmt(time)}` : `Nova posição em ${fmt(time)}`}
+                      </Button>
+                      {pre.keys.length > 0 && (
+                        <Button variant="secondary" size="sm" onClick={() => set({ keys: [] })}>
+                          Limpar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {pre.keys.length === 0 ? (
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      Sem posições — o recorte vale para o vídeo todo. Crie posições para a câmera
+                      acompanhar quem está falando.
+                    </p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {[...pre.keys]
+                        .sort((a, b) => a.t - b.t)
+                        .map((k, i, arr) => {
+                          const until = arr[i + 1]?.t ?? end;
+                          const on = nearKey?.t === k.t;
+                          return (
+                            <li
+                              key={k.t}
+                              className={`flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 font-mono text-[11px] ${
+                                on ? "border-primary bg-primary/10" : "border-border"
+                              }`}
+                            >
+                              <button className="text-primary" onClick={() => seek(k.t)}>
+                                {fmt(k.t)} — {fmt(until)}
+                              </button>
+                              <span className="text-muted-foreground">
+                                x {Math.round(k.crop.x * 100)}% · y {Math.round(k.crop.y * 100)}% ·{" "}
+                                {(1 / Math.max(0.01, k.crop.w)).toFixed(2)}x
+                              </span>
+                              <button
+                                className="text-destructive"
+                                onClick={() => set({ keys: pre.keys.filter((x) => x.t !== k.t) })}
+                              >
+                                remover
+                              </button>
+                            </li>
+                          );
+                        })}
+                    </ul>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="secondary" size="sm" onClick={centerCrop}>
                     Centralizar
@@ -789,11 +887,12 @@ export function VideoStudio({
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Num label="X %" value={crop.x} onChange={(n) => set({ crop: { ...crop, x: Math.min(n, 1 - crop.w) } })} />
-                  <Num label="Y %" value={crop.y} onChange={(n) => set({ crop: { ...crop, y: Math.min(n, 1 - crop.h) } })} />
-                  <Num label="Larg. %" value={crop.w} onChange={(n) => set({ crop: { ...crop, w: Math.min(Math.max(n, 0.06), 1 - crop.x) } })} />
-                  <Num label="Alt. %" value={crop.h} onChange={(n) => set({ crop: { ...crop, h: Math.min(Math.max(n, 0.06), 1 - crop.y) } })} />
+                  <Num label="X %" value={crop.x} onChange={(n) => applyCrop({ ...crop, x: Math.min(n, 1 - crop.w) }, time)} />
+                  <Num label="Y %" value={crop.y} onChange={(n) => applyCrop({ ...crop, y: Math.min(n, 1 - crop.h) }, time)} />
+                  <Num label="Larg. %" value={crop.w} onChange={(n) => applyCrop({ ...crop, w: Math.min(Math.max(n, 0.06), 1 - crop.x) }, time)} />
+                  <Num label="Alt. %" value={crop.h} onChange={(n) => applyCrop({ ...crop, h: Math.min(Math.max(n, 0.06), 1 - crop.y) }, time)} />
                 </div>
+
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="secondary"
