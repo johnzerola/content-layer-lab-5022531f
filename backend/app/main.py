@@ -1,19 +1,16 @@
-import os
-import time
-import logging
-import uuid
-from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, UploadFile, File, Header, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+import os
+import uuid
+import hmac
+import hashlib
+from typing import List, Optional
 from pydantic import BaseModel
-import uvicorn
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("cleaner-api")
+app = FastAPI(title="AI Video Cleaner Worker")
 
-app = FastAPI(title="AI Video Cleaner Worker API")
-
+# Enable CORS for the Lovable frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,113 +18,90 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mocked state for MVP demonstration (in real use, this would be Redis/Celery)
-JOBS = {}
+STORAGE_DIR = "storage"
+os.makedirs(STORAGE_DIR, exist_ok=True)
+
+# Secret shared with the Lovable server
+WORKER_SECRET = os.getenv("CLEANER_WORKER_SECRET", "default_secret")
 
 class Region(BaseModel):
     id: str
     kind: str
     role: str
-    x: Optional[float] = None
-    y: Optional[float] = None
-    w: Optional[float] = None
-    h: Optional[float] = None
-    points: Optional[List[Dict[str, float]]] = None
-    size: Optional[float] = None
-    grow: Optional[float] = None
+    x: float
+    y: float
+    w: float
+    h: float
     from_time: Optional[float] = None
     to_time: Optional[float] = None
-    track: Optional[bool] = None
-
-class DetectRequest(BaseModel):
-    mode: str
-    roi: Optional[Region] = None
 
 class ProcessRequest(BaseModel):
-    jobId: str
     mode: str
     preset: str
-    masks: List[Region]
-    options: Dict[str, Any]
-    callbackUrl: str
+    masks: List[dict]
+    options: dict = {}
+    callbackUrl: Optional[str] = None
 
 @app.get("/v1/health")
 async def health():
-    return {
-        "online": True,
-        "gpu": "NVIDIA RTX 4090" if os.environ.get("CUDA_VISIBLE_DEVICES") else "CPU",
-        "engines": ["ProPainter", "STTN", "Lama"],
-        "version": "1.0.0"
-    }
+    return {"online": True, "cuda": False} # Simplified for MVP
 
 @app.post("/v1/jobs/{job_id}/upload")
-async def upload_video(job_id: str, file: UploadFile = File(...)):
-    # In a real scenario, save the file to a temporary location
-    file_path = f"/tmp/{job_id}_{file.filename}"
+async def upload_video(job_id: str, file: UploadFile = File(...), x_job_token: str = Header(None)):
+    # Verify token (HMAC of job_id)
+    expected = hmac.new(WORKER_SECRET.encode(), job_id.encode(), hashlib.sha256).hexdigest()
+    if x_job_token != expected:
+        raise HTTPException(401, "Invalid job token")
+    
+    job_dir = os.path.join(STORAGE_DIR, job_id)
+    os.makedirs(job_dir, exist_ok=True)
+    
+    file_path = os.path.join(job_dir, "input.mp4")
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
-    
-    JOBS[job_id] = {
-        "status": "queued",
-        "file_path": file_path,
-        "progress": 0,
-        "stage": "upload concluído"
-    }
-    return {"ok": True}
+        
+    return {"ok": True, "filename": file.filename}
 
 @app.post("/v1/jobs/{job_id}/detect")
-async def detect_masks(job_id: str, req: DetectRequest):
-    # Mocking detection
-    logger.info(f"Detecting {req.mode} in job {job_id}")
-    return {
-        "regions": [
-            {
-                "id": str(uuid.uuid4())[:8],
-                "kind": "rect",
-                "role": "remove",
-                "x": 0.2, "y": 0.8, "w": 0.6, "h": 0.1,
-                "label": "legenda detectada",
-                "score": 0.95
-            }
-        ]
-    }
+async def detect_objects(job_id: str, mode: str):
+    # Mock detection: returns a central rectangle for subtitles if mode is subtitle
+    regions = []
+    if mode == "subtitle":
+        regions.append({
+            "id": "det_1",
+            "kind": "rect",
+            "role": "remove",
+            "x": 0.1, "y": 0.7, "w": 0.8, "h": 0.15,
+            "label": "Legenda Detectada"
+        })
+    return {"regions": regions}
 
 @app.post("/v1/jobs/{job_id}/process")
-async def process_video(job_id: str, req: ProcessRequest, background_tasks: BackgroundTasks):
-    if job_id not in JOBS:
-        JOBS[job_id] = {"status": "queued", "progress": 0}
+async def start_process(job_id: str, req: ProcessRequest, background_tasks: BackgroundTasks):
+    # In a full setup, this would trigger a Celery task
+    # For MVP without Redis, we use FastAPI BackgroundTasks
+    from .workers.tasks import process_video_task
     
-    JOBS[job_id].update({
-        "status": "analyzing",
-        "mode": req.mode,
-        "preset": req.preset,
-        "masks": req.masks,
-        "progress": 2
-    })
+    # Run task in background
+    background_tasks.add_task(
+        process_video_task, 
+        None, # self for celery, not used in background_tasks
+        job_id, 
+        req.mode, 
+        req.preset, 
+        req.masks, 
+        req.callbackUrl
+    )
     
-    # In production, this would dispatch to Celery
-    background_tasks.add_task(dummy_process, job_id, req.callbackUrl)
-    
-    return {"status": "accepted"}
+    return {"status": "queued", "job_id": job_id}
 
-@app.get("/v1/jobs/{job_id}")
-async def get_status(job_id: str):
-    if job_id not in JOBS:
-        raise HTTPException(status_code=404, detail="Job not found")
-    return JOBS[job_id]
-
-async def dummy_process(job_id: str, callback_url: str):
-    stages = ["analyzing", "detecting", "tracking", "inpainting", "refining", "encoding"]
-    for i, stage in enumerate(stages):
-        JOBS[job_id]["status"] = stage
-        JOBS[job_id]["stage"] = stage
-        JOBS[job_id]["progress"] = int((i + 1) / len(stages) * 100)
-        time.sleep(2)  # Simulating heavy GPU work
-    
-    JOBS[job_id]["status"] = "completed"
-    JOBS[job_id]["progress"] = 100
-    JOBS[job_id]["result_url"] = "https://example.com/result.mp4"
-    # In reality, trigger the callbackUrl with HMAC signature
+@app.get("/v1/jobs/{job_id}/result")
+async def get_result(job_id: str):
+    file_path = os.path.join(STORAGE_DIR, job_id, "output.mp4")
+    if not os.path.exists(file_path):
+        raise HTTPException(404, "Result not ready")
+    return FileResponse(file_path)
 
 if __name__ == "__main__":
+    import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
