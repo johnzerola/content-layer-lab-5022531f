@@ -39,6 +39,7 @@ import {
   type TransitionKind,
 } from "@/lib/preedit";
 import { translateWords } from "@/lib/translate.functions";
+import { detectSpeechSegments } from "@/lib/silence";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { LayoutPreview } from "@/components/LayoutPreview";
 import { EditorTimeline } from "@/components/EditorTimeline";
