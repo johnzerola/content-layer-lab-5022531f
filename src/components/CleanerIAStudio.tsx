@@ -53,6 +53,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [uploading, setUploading] = useState(false);
   const [mode, setMode] = useState<CleanerMode>("subtitle");
   const [preset, setPreset] = useState<CleanerPreset>("quality");
+  const [dynamicMask, setDynamicMask] = useState(true);
+  const [protectSubject, setProtectSubject] = useState(true);
+  const [verifyPass, setVerifyPass] = useState(true);
   const [masks, setMasks] = useState<CleanerRegion[]>([]);
   const [health, setHealth] = useState<{ online: boolean; reason?: string } | null>(null);
   const [polling, setPolling] = useState(false);
@@ -326,7 +329,20 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       return;
     }
     try {
-      await processJob({ data: { id: job.id, mode, preset, masks, options: {} } });
+      await processJob({
+        data: {
+          id: job.id,
+          mode,
+          preset,
+          masks,
+          options: {
+            dynamic: dynamicMask,
+            protect_subject: protectSubject,
+            verify: verifyPass,
+            key_step: dynamicMask ? 3 : 8,
+          },
+        },
+      });
       setPolling(true);
       setJob((prev) => (prev ? { ...prev, status: "inpainting", progress: 1 } : prev));
       toast.success("Reconstrução iniciada na GPU.");
@@ -629,6 +645,48 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             ))}
           </div>
 
+
+          <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
+            <span className="mono-label">Precisão</span>
+            {[
+              {
+                key: "dyn",
+                on: dynamicMask,
+                set: setDynamicMask,
+                title: "Legenda dinâmica",
+                hint: "Máscara recalculada quadro a quadro — acompanha legenda que muda durante o vídeo",
+              },
+              {
+                key: "prot",
+                on: protectSubject,
+                set: setProtectSubject,
+                title: "Proteger pessoa/rosto",
+                hint: "Impede que a reconstrução invada o sujeito",
+              },
+              {
+                key: "ver",
+                on: verifyPass,
+                set: setVerifyPass,
+                title: "Verificar resultado",
+                hint: "Confere texto residual e nitidez; reprocessa o trecho falho automaticamente",
+              },
+            ].map((o) => (
+              <label key={o.key} className="flex cursor-pointer items-start gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={o.on}
+                  disabled={polling}
+                  onChange={(e) => o.set(e.target.checked)}
+                  className="mt-0.5 size-3.5 accent-[var(--primary)]"
+                />
+                <span>
+                  <span className="block font-semibold">{o.title}</span>
+                  <span className="block text-[10px] text-muted-foreground">{o.hint}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+
           {!job ? (
             <Button className="w-full shadow-glow" onClick={startUpload} disabled={!health?.online || uploading}>
               <Upload className="mr-2 size-4" /> Enviar para GPU
@@ -699,11 +757,68 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         </section>
 
         {job?.metrics && (
-          <section className="rounded-2xl border border-border/70 bg-surface/50 p-4 text-[11px]">
-            <p className="mono-label mb-2">Métricas</p>
-            <pre className="whitespace-pre-wrap font-mono text-[10px] text-muted-foreground">
-              {JSON.stringify(job.metrics, null, 1)}
-            </pre>
+          <section className="space-y-2 rounded-2xl border border-border/70 bg-surface/50 p-4 text-[11px]">
+            <p className="mono-label">Relatório de qualidade</p>
+            {(() => {
+              const m = job.metrics as Record<string, unknown>;
+              const num = (k: string) => (typeof m[k] === "number" ? (m[k] as number) : null);
+              const text = num("residual_text");
+              const sharp = num("sharpness_ratio");
+              const temporal = num("temporal_consistency");
+              const rows: Array<[string, string, boolean]> = [];
+              if (text !== null)
+                rows.push([
+                  "Texto residual",
+                  text <= 0.001 ? "nenhum" : `${(text * 100).toFixed(1)}% da área`,
+                  text <= 0.02,
+                ]);
+              if (sharp !== null)
+                rows.push([
+                  "Nitidez vs. entorno",
+                  `${sharp.toFixed(2)}x`,
+                  sharp >= 0.7,
+                ]);
+              if (temporal !== null)
+                rows.push([
+                  "Estabilidade no tempo",
+                  `${(temporal * 100).toFixed(0)}%`,
+                  temporal >= 0.7,
+                ]);
+              if (typeof m["engine"] === "string") rows.push(["Motor", String(m["engine"]), true]);
+              if (typeof m["device"] === "string") rows.push(["Dispositivo", String(m["device"]), true]);
+              return rows.map(([label, value, ok]) => (
+                <div key={label} className="flex items-center justify-between gap-2">
+                  <span className="text-muted-foreground">{label}</span>
+                  <span className={ok ? "font-semibold text-emerald-500" : "font-semibold text-amber-500"}>
+                    {value}
+                  </span>
+                </div>
+              ));
+            })()}
+            {Array.isArray((job as unknown as { segments?: unknown }).segments) && (
+              <div className="mt-2 space-y-1">
+                <p className="mono-label">Trechos limpos</p>
+                <div className="flex flex-wrap gap-1">
+                  {((job as unknown as { segments: Array<Record<string, number>> }).segments || []).map(
+                    (seg, i) => {
+                      const bad =
+                        (seg["residual_text"] ?? 0) > 0.02 || (seg["sharpness_ratio"] ?? 1) < 0.7;
+                      return (
+                        <span
+                          key={i}
+                          title={`${seg["from"]}s – ${seg["to"]}s`}
+                          className={`rounded px-1.5 py-0.5 text-[9px] font-mono ${
+                            bad ? "bg-amber-500/20 text-amber-500" : "bg-emerald-500/15 text-emerald-500"
+                          }`}
+                        >
+                          {Math.round(seg["from"] ?? 0)}s
+                        </span>
+                      );
+                    },
+                  )}
+                </div>
+              </div>
+            )}
           </section>
         )}
 

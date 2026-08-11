@@ -78,3 +78,53 @@ def static_regions(path_frames: Sequence[np.ndarray], min_ratio: float = 0.7) ->
     static = ((std < 6.0) & (edges > (1.0 - min_ratio))).astype(np.uint8) * 255
     return cv2.morphologyEx(static, cv2.MORPH_CLOSE,
                             cv2.getStructuringElement(cv2.MORPH_RECT, (15, 9)))
+
+
+def interpolate_keyframes(
+    frames: Sequence[np.ndarray],
+    keys: Sequence[int],
+    key_masks: Sequence[np.ndarray],
+) -> List[np.ndarray]:
+    """Máscara por frame a partir de máscaras calculadas em frames-chave.
+
+    Entre dois keyframes a máscara é transportada por optical flow nos dois
+    sentidos e unida, para não perder texto que entra ou sai no meio.
+    """
+    n = len(frames)
+    if not keys:
+        return [np.zeros(frames[0].shape[:2], np.uint8) for _ in range(n)]
+    grays = [cv2.cvtColor(f, cv2.COLOR_BGR2GRAY) for f in frames]
+    out: List[np.ndarray] = [np.zeros(frames[0].shape[:2], np.uint8) for _ in range(n)]
+    for k, m in zip(keys, key_masks):
+        if 0 <= k < n:
+            out[k] = np.maximum(out[k], m)
+
+    key_set = sorted(set(int(k) for k in keys if 0 <= k < n))
+    for a, b in zip(key_set, key_set[1:]):
+        if b - a <= 1:
+            continue
+        fwd = out[a].copy()
+        for i in range(a + 1, b):
+            flow = cv2.calcOpticalFlowFarneback(grays[i], grays[i - 1], None,
+                                                0.5, 3, 21, 3, 5, 1.2, 0)
+            fwd = _warp(fwd, flow)
+            out[i] = np.maximum(out[i], fwd)
+        bwd = out[b].copy()
+        for i in range(b - 1, a, -1):
+            flow = cv2.calcOpticalFlowFarneback(grays[i], grays[i + 1], None,
+                                                0.5, 3, 21, 3, 5, 1.2, 0)
+            bwd = _warp(bwd, flow)
+            out[i] = np.maximum(out[i], bwd)
+
+    first, last = key_set[0], key_set[-1]
+    cur = out[first].copy()
+    for i in range(first - 1, -1, -1):
+        flow = cv2.calcOpticalFlowFarneback(grays[i], grays[i + 1], None, 0.5, 3, 21, 3, 5, 1.2, 0)
+        cur = _warp(cur, flow)
+        out[i] = np.maximum(out[i], cur)
+    cur = out[last].copy()
+    for i in range(last + 1, n):
+        flow = cv2.calcOpticalFlowFarneback(grays[i], grays[i - 1], None, 0.5, 3, 21, 3, 5, 1.2, 0)
+        cur = _warp(cur, flow)
+        out[i] = np.maximum(out[i], cur)
+    return out

@@ -34,6 +34,76 @@ def empty_cache() -> None:
     gc.collect()
 
 
+def patch_fill(image: np.ndarray, hole: np.ndarray, patch: int = 13, search: int = 96) -> np.ndarray:
+    """Síntese por casamento de trechos (exemplar-based).
+
+    Substitui a difusão (`cv2.inpaint`), que é justamente o que deixa mancha
+    lisa. Aqui cada bloco do buraco é preenchido com um trecho REAL do próprio
+    frame, escolhido pela melhor correspondência ao redor — a textura
+    (pele, tecido, grão, gradiente) continua existindo.
+    """
+    if hole.max() == 0:
+        return image
+    h, w = hole.shape[:2]
+    out = image.copy()
+    remaining = (hole > 0).astype(np.uint8) * 255
+    # semente coerente para o casamento inicial
+    seed = cv2.inpaint(out, remaining, 3, cv2.INPAINT_TELEA)
+    out[remaining > 0] = seed[remaining > 0]
+
+    step = max(4, patch // 2)
+    ys, xs = np.where(remaining > 0)
+    if ys.size == 0:
+        return out
+    y0, y1 = int(ys.min()), int(ys.max())
+    x0, x1 = int(xs.min()), int(xs.max())
+    half = patch // 2
+
+    for by in range(y0, y1 + 1, step):
+        for bx in range(x0, x1 + 1, step):
+            if remaining[by:by + step, bx:bx + step].max() == 0:
+                continue
+            ty0, tx0 = max(0, by - half), max(0, bx - half)
+            ty1, tx1 = min(h, by + step + half), min(w, bx + step + half)
+            tmpl = out[ty0:ty1, tx0:tx1]
+            tmask = (remaining[ty0:ty1, tx0:tx1] == 0).astype(np.uint8) * 255
+            if tmpl.shape[0] < 5 or tmpl.shape[1] < 5 or tmask.max() == 0:
+                continue
+            sy0, sx0 = max(0, ty0 - search), max(0, tx0 - search)
+            sy1, sx1 = min(h, ty1 + search), min(w, tx1 + search)
+            src = out[sy0:sy1, sx0:sx1]
+            src_hole = remaining[sy0:sy1, sx0:sx1]
+            if src.shape[0] <= tmpl.shape[0] or src.shape[1] <= tmpl.shape[1]:
+                continue
+            try:
+                res = cv2.matchTemplate(src, tmpl, cv2.TM_CCORR_NORMED, mask=tmask)
+            except Exception:
+                continue
+            res[~np.isfinite(res)] = -1.0
+            # descarta candidatos que também contenham buraco
+            occ = cv2.boxFilter((src_hole > 0).astype(np.float32), -1,
+                                (tmpl.shape[1], tmpl.shape[0]), normalize=True)
+            occ = occ[: res.shape[0], : res.shape[1]]
+            res[occ > 0.02] = -1.0
+            _, best_val, _, best_loc = cv2.minMaxLoc(res)
+            if best_val <= 0:
+                continue
+            cand = src[best_loc[1]:best_loc[1] + tmpl.shape[0],
+                       best_loc[0]:best_loc[0] + tmpl.shape[1]]
+            if cand.shape != tmpl.shape:
+                continue
+            fill = remaining[ty0:ty1, tx0:tx1] > 0
+            blended = out[ty0:ty1, tx0:tx1]
+            blended[fill] = cand[fill]
+            out[ty0:ty1, tx0:tx1] = blended
+            remaining[by:by + step, bx:bx + step] = 0
+
+    if remaining.max() > 0:
+        rest = cv2.inpaint(out, remaining, 3, cv2.INPAINT_TELEA)
+        out[remaining > 0] = rest[remaining > 0]
+    return out
+
+
 class InpaintingEngine:
     """Interface comum a todos os motores."""
 
@@ -87,8 +157,8 @@ class TemporalFillEngine(InpaintingEngine):
                     acc[idx] = warped[idx]
                     remaining[idx] = 0
             if remaining.max() > 0:
-                # resto sem referência temporal: síntese espacial coerente
-                acc = cv2.inpaint(acc, remaining, 7, cv2.INPAINT_NS)
+                # resto sem referência temporal: síntese por trechos reais
+                acc = patch_fill(acc, remaining)
             out[i] = acc
         return np.array(out)
 
