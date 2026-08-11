@@ -317,9 +317,20 @@ export function VideoStudio({
           next.y = clamp(next.y, 0, 1 - next.h);
         }
       }
-      setPre((v) => ({ ...v, crop: next }));
+      // sem keyframes = recorte fixo; com keyframes o arraste grava/edita o ponto do instante atual
+      setPre((v) => {
+        if (v.keys.length === 0) return { ...v, crop: next };
+        const t = Number(d.t.toFixed(2));
+        const i = v.keys.findIndex((k) => Math.abs(k.t - t) <= 0.2);
+        const keys =
+          i >= 0
+            ? v.keys.map((k, j) => (j === i ? { t: k.t, crop: next } : k))
+            : [...v.keys, { t, crop: next }].sort((a, b) => a.t - b.t);
+        return { ...v, keys };
+      });
     },
     [lock, width, height],
+
   );
 
   /** aplica uma proporção (ou libera) centralizando o recorte */
