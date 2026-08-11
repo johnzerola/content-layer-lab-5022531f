@@ -460,7 +460,11 @@ function drawVideoLayer(
   if (source && source.width) {
     // pré-edição do vídeo fonte (recorte, giro, espelho e cor)
     const pre = opts?.pre;
-    const cr = cropRect(pre, source.width, source.height, opts?.time);
+    // câmera virtual por trecho tem prioridade sobre o recorte simples
+    const fr = resolveFraming(pre?.framing ?? null, opts?.time);
+    const cr = fr
+      ? rectForCrop(fr.primary, source.width, source.height, pre?.rotate ?? 0)
+      : cropRect(pre, source.width, source.height, opts?.time);
     // a rotação exige um leve zoom extra pra não aparecer canto vazio
     const rotPad = rot ? 1 + Math.abs(rot) / 40 : 1;
     const zoom = (opts?.zoom ?? 1) * rotPad;
@@ -468,8 +472,9 @@ function drawVideoLayer(
     const boxAR = v.w / v.h;
     // recorte manual: o que o usuário selecionou tem que aparecer inteiro,
     // senão o "cover" reenquadra e o corte vira só um zoom
-    const manualCrop = !isFullCrop(cropAt(pre, opts?.time));
-    const layout = pre?.layout ?? "auto";
+    const manualCrop = fr ? true : !isFullCrop(cropAt(pre, opts?.time));
+    const layout = fr ? fr.layout : (pre?.layout ?? "auto");
+
     const mirror = Boolean(opts?.mirror ?? t.mirror);
     if (mirror) {
       ctx.translate(v.x * 2 + v.w, 0);
