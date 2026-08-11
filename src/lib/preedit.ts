@@ -98,6 +98,10 @@ export const LAYOUTS: { id: LayoutKind; label: string; hint: string }[] = [
   { id: "fit", label: "Inteiro", hint: "Vídeo completo com barras pretas" },
   { id: "blur", label: "Fundo desfocado", hint: "Vídeo inteiro sobre o próprio quadro desfocado" },
   { id: "split", label: "Dividido", hint: "Recorte em cima, quadro completo embaixo" },
+  { id: "trio", label: "Trio", hint: "Três faixas: recorte, destaque com zoom e quadro completo" },
+  { id: "spotlight", label: "Destaque", hint: "Recorte grande em cima e o quadro inteiro embaixo" },
+  { id: "centered", label: "Centralizado", hint: "Quadro completo no centro com fundo suave" },
+  { id: "horizontal", label: "Horizontal", hint: "Vídeo original centralizado, sem cortes" },
 ];
 
 /** Trechos válidos: usa os segmentos quando existirem, senão a janela de corte. */
