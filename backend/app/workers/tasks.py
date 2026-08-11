@@ -17,7 +17,7 @@ import requests
 from celery import Celery
 
 from ..engines.inpainting import (
-    LamaEngine,
+    TemporalFillEngine,
     build_engine,
     cuda_available,
     device_name,
@@ -26,9 +26,11 @@ from ..engines.inpainting import (
     process_windowed,
 )
 from ..services import mask as mask_svc
+from ..services import protect as protect_svc
+from ..services import tracking
+from ..services import verify
 from ..services.scene import detect_scenes
-from ..services.text_detect import detect_text_boxes, text_pixel_mask
-from ..services.tracking import stabilize
+from ..services.text_detect import detect_text_boxes, frame_text_mask, text_pixel_mask
 from ..services.watermark import detect_watermarks
 from ..utils.video import RawWriter, mux_audio, probe, read_chunk, read_frames
 
@@ -116,7 +118,7 @@ def _regions_roi(regions, width, height):
 
 
 def _protect_static(regions, width, height):
-    prot = np.zeros((width and height and (height, width) or (1, 1)), np.uint8)
+    prot = np.zeros((height, width), np.uint8)
     for region in regions:
         if region.get("role") == "protect":
             prot = np.maximum(prot, mask_svc.region_to_mask(region, width, height))
