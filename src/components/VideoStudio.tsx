@@ -817,6 +817,60 @@ export function VideoStudio({
                   Arraste o retângulo (ou as alças das bordas) para escolher a área que fica no vídeo.
                   {lock ? " Proporção travada — o recorte mantém o formato." : ""}
                 </p>
+                <div className="rounded-lg border border-border p-2.5">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      Posições de corte · {pre.keys.length}
+                    </span>
+                    <div className="flex gap-1.5">
+                      <Button size="sm" onClick={addKey}>
+                        {nearKey ? `Ajustar em ${fmt(time)}` : `Nova posição em ${fmt(time)}`}
+                      </Button>
+                      {pre.keys.length > 0 && (
+                        <Button variant="secondary" size="sm" onClick={() => set({ keys: [] })}>
+                          Limpar
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  {pre.keys.length === 0 ? (
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      Sem posições — o recorte vale para o vídeo todo. Crie posições para a câmera
+                      acompanhar quem está falando.
+                    </p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {[...pre.keys]
+                        .sort((a, b) => a.t - b.t)
+                        .map((k, i, arr) => {
+                          const until = arr[i + 1]?.t ?? end;
+                          const on = nearKey?.t === k.t;
+                          return (
+                            <li
+                              key={k.t}
+                              className={`flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 font-mono text-[11px] ${
+                                on ? "border-primary bg-primary/10" : "border-border"
+                              }`}
+                            >
+                              <button className="text-primary" onClick={() => seek(k.t)}>
+                                {fmt(k.t)} — {fmt(until)}
+                              </button>
+                              <span className="text-muted-foreground">
+                                x {Math.round(k.crop.x * 100)}% · y {Math.round(k.crop.y * 100)}% ·{" "}
+                                {(1 / Math.max(0.01, k.crop.w)).toFixed(2)}x
+                              </span>
+                              <button
+                                className="text-destructive"
+                                onClick={() => set({ keys: pre.keys.filter((x) => x.t !== k.t) })}
+                              >
+                                remover
+                              </button>
+                            </li>
+                          );
+                        })}
+                    </ul>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <Button variant="secondary" size="sm" onClick={centerCrop}>
                     Centralizar
@@ -829,11 +883,12 @@ export function VideoStudio({
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <Num label="X %" value={crop.x} onChange={(n) => set({ crop: { ...crop, x: Math.min(n, 1 - crop.w) } })} />
-                  <Num label="Y %" value={crop.y} onChange={(n) => set({ crop: { ...crop, y: Math.min(n, 1 - crop.h) } })} />
-                  <Num label="Larg. %" value={crop.w} onChange={(n) => set({ crop: { ...crop, w: Math.min(Math.max(n, 0.06), 1 - crop.x) } })} />
-                  <Num label="Alt. %" value={crop.h} onChange={(n) => set({ crop: { ...crop, h: Math.min(Math.max(n, 0.06), 1 - crop.y) } })} />
+                  <Num label="X %" value={crop.x} onChange={(n) => applyCrop({ ...crop, x: Math.min(n, 1 - crop.w) }, time)} />
+                  <Num label="Y %" value={crop.y} onChange={(n) => applyCrop({ ...crop, y: Math.min(n, 1 - crop.h) }, time)} />
+                  <Num label="Larg. %" value={crop.w} onChange={(n) => applyCrop({ ...crop, w: Math.min(Math.max(n, 0.06), 1 - crop.x) }, time)} />
+                  <Num label="Alt. %" value={crop.h} onChange={(n) => applyCrop({ ...crop, h: Math.min(Math.max(n, 0.06), 1 - crop.y) }, time)} />
                 </div>
+
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="secondary"
