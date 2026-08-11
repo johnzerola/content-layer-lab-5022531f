@@ -584,7 +584,8 @@ function drawVideoLayer(
       const top = { x: v.x, y: v.y, w: v.w, h: v.h / 2 };
       const bottom = { x: v.x, y: v.y + v.h / 2, w: v.w, h: v.h / 2 };
       dest = paint(top, "cover");
-      paint(bottom, "cover", full, { useOffset: false });
+      paint(bottom, "cover", sec, { useOffset: false });
+
       ctx.save();
       ctx.fillStyle = "rgba(0,0,0,0.5)";
       ctx.fillRect(v.x, v.y + v.h / 2 - 1, v.w, 2);
