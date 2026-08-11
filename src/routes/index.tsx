@@ -1305,9 +1305,14 @@ function Home() {
   return (
     <AppShell
       mode={mode}
-      onMode={setMode}
+      onMode={(m) => setMode(m as Mode)}
       count={items.length}
-      counts={{ lote: queues.lote.length, clip: queues.clip.length, limpar: queues.limpar.length }}
+      counts={{ 
+        lote: queues.lote.length, 
+        clip: queues.clip.length, 
+        limpar: queues.limpar.length,
+        "limpar-ia": queues["limpar-ia"].length 
+      }}
       onLibrary={() => setLibraryOpen(true)}
       onCloud={() => setCloudOpen(true)}
     >

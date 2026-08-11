@@ -6,7 +6,7 @@ import { z } from "zod";
  * Communicates with the backend defined in /backend/app/main.py.
  */
 
-const API_BASE = import.meta.env.VITE_VIDEO_CLEANER_API_URL || "http://localhost:8000";
+const API_BASE = (import.meta.env as any).VITE_VIDEO_CLEANER_API_URL || "http://localhost:8000";
 
 export const videoCleanerApi = {
   async getHealth() {

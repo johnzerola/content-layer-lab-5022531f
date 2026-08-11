@@ -3,7 +3,7 @@
  * Cada ferramenta (ViralBatch, CorteIA, LimpaVídeo) tem a sua própria fila,
  * as suas próprias fontes de entrada e as suas próprias regras de saída.
  */
-export type Mode = "lote" | "clip" | "limpar";
+export type Mode = "lote" | "clip" | "limpar" | "limpar-ia";
 
 const slug = (s: string) =>
   s
@@ -114,6 +114,28 @@ export const FLOWS: Record<Mode, Flow> = {
       keepSourceName: true,
       zipPrefix: "limpavideo",
       filePrefix: "limpo",
+    },
+  },
+  "limpar-ia": {
+    brand: "CleanerIA",
+    import: {
+      step: "01",
+      title: "Importe o vídeo para limpeza profissional",
+      hint: "a reconstrução ProPainter utiliza frames vizinhos para restaurar o fundo",
+      folder: false,
+      link: false,
+      linkPlaceholder: "",
+      linkHint: "",
+      multiple: false,
+      filesLabel: "Selecionar vídeo",
+    },
+    export: {
+      title: "Resultado da limpeza IA",
+      platforms: false,
+      variants: false,
+      keepSourceName: true,
+      zipPrefix: "cleaneria",
+      filePrefix: "pro-limpo",
     },
   },
 };
