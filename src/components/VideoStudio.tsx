@@ -181,8 +181,27 @@ export function VideoStudio({
   const boxRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<Drag | null>(null);
 
-  const crop = pre.crop ?? { x: 0, y: 0, w: 1, h: 1 };
+  /** recorte mostrado agora: segue os keyframes quando existirem */
+  const crop = cropAt(pre, time) ?? pre.crop ?? { x: 0, y: 0, w: 1, h: 1 };
   const set = (p: Partial<PreEdit>) => setPre((v) => ({ ...v, ...p }));
+
+  /** tolerância para considerar que o playhead está "em cima" de um keyframe */
+  const SNAP = 0.2;
+  const nearKey = pre.keys.find((k) => Math.abs(k.t - time) <= SNAP) ?? null;
+
+  /** aplica um recorte: sem keyframes vira recorte fixo; com keyframes grava/edita o ponto atual */
+  const applyCrop = (next: NonNullable<PreEdit["crop"]>, at: number) =>
+    setPre((v) => {
+      if (v.keys.length === 0) return { ...v, crop: next };
+      const t = Number(at.toFixed(2));
+      const i = v.keys.findIndex((k) => Math.abs(k.t - t) <= SNAP);
+      const keys =
+        i >= 0
+          ? v.keys.map((k, j) => (j === i ? { t: k.t, crop: next } : k))
+          : [...v.keys, { t, crop: next }].sort((a, b) => a.t - b.t);
+      return { ...v, keys };
+    });
+
 
   // loop de reprodução dentro da janela de corte
   useEffect(() => {
