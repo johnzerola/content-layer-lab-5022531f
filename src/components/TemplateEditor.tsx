@@ -441,7 +441,10 @@ export function TemplateEditor({
               debugGrid={debugGrid}
               debugSafeArea={debugSafe}
               debugBoxes={debugBoxes}
+              drawOpts={adOpts}
+              speed={adPreview ? adVariation.speed : 1}
             />
+
             {debug ? <DebugPanel
               t={t}
               selected={selected}
