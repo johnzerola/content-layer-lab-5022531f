@@ -10,201 +10,41 @@ import {
 import type { CaptionCue } from "./captions";
 import { cropRect, cropAt, isFullCrop, preEditFilter, transitionAt, type PreEdit } from "./preedit";
 
-/**
- * Reconstrói a área (sem borrão) usando FMM de Telea multi-escala + refino exemplar.
- * `hq` (exportação / pausa) roda em resolução total, com inicialização coarse-to-fine
- * e mistura suave nas bordas — sem borrão e sem emenda visível.
+/** Fallback local para regiões de limpeza quando o motor IA não está disponível.
+ *  O processamento profissional agora acontece no backend Python (CleanerIA).
  */
-type PatchCache = {
-  sig: Uint8ClampedArray;
-  /** máscara das amostras válidas (fora do buraco) */
-  keep: Uint8Array;
-  patch: HTMLCanvasElement;
-};
-const patchCache = new Map<string, PatchCache>();
-const SIG = 16;
-let sigCanvas: HTMLCanvasElement | null = null;
-
-/** assinatura barata (16x16) do entorno da área — detecta se o fundo mudou */
-function areaSignature(src: CanvasImageSource, sw: number, sh: number) {
-  if (!sigCanvas) sigCanvas = document.createElement("canvas");
-  sigCanvas.width = SIG;
-  sigCanvas.height = SIG;
-  const c = sigCanvas.getContext("2d", { willReadFrequently: true });
-  if (!c) return null;
-  c.clearRect(0, 0, SIG, SIG);
-  c.drawImage(src, 0, 0, sw, sh, 0, 0, SIG, SIG);
-  return c.getImageData(0, 0, SIG, SIG).data;
-}
-
-function sigDiff(a: Uint8ClampedArray, b: Uint8ClampedArray, keep: Uint8Array) {
-  let s = 0;
-  let n = 0;
-  for (let i = 0; i < keep.length; i++) {
-    if (!keep[i]) continue;
-    const p = i * 4;
-    s += Math.abs(a[p]! - b[p]!) + Math.abs(a[p + 1]! - b[p + 1]!) + Math.abs(a[p + 2]! - b[p + 2]!);
-    n += 3;
-  }
-  return n ? s / n : 255;
-}
-
-/** limpa o cache de reconstrução (trocou de vídeo / de regiões) */
-export function resetPatchCache() {
-  patchCache.clear();
-}
-
 function inpaintArea(
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
   w: number,
   h: number,
-  detail: number,
-  hq = false,
 ) {
   const canvas = ctx.canvas;
-  // margem de contexto: pixels válidos de onde a estrutura é propagada
-  const pad = Math.max(hq ? 16 : 8, Math.round(Math.min(w, h) * (hq ? 0.9 : 0.6)));
+  const pad = Math.max(8, Math.round(Math.min(w, h) * 0.6));
   const sx = Math.max(0, x - pad);
   const sy = Math.max(0, y - pad);
   const sw = Math.min(canvas.width - sx, w + pad * 2);
   const sh = Math.min(canvas.height - sy, h + pad * 2);
   if (sw < 4 || sh < 4) return;
-
-  // Cache: enquanto o fundo em volta da área não muda (marca d'água / barra de legenda
-  // sobre cena estática), a reconstrução anterior é reaproveitada em vez de recalculada.
-  const key = `${Math.round(x)}:${Math.round(y)}:${Math.round(w)}:${Math.round(h)}:${detail.toFixed(2)}:${hq ? 1 : 0}`;
-  const sig = areaSignature(canvas, sw, sh) ?? null;
-  let keep: Uint8Array | null = null;
-  if (sig) {
-    keep = new Uint8Array(SIG * SIG);
-    const kx0 = Math.floor(((x - sx) / sw) * SIG);
-    const kx1 = Math.ceil(((x - sx + w) / sw) * SIG);
-    const ky0 = Math.floor(((y - sy) / sh) * SIG);
-    const ky1 = Math.ceil(((y - sy + h) / sh) * SIG);
-    for (let j = 0; j < SIG; j++)
-      for (let i = 0; i < SIG; i++)
-        keep[j * SIG + i] = i >= kx0 && i < kx1 && j >= ky0 && j < ky1 ? 0 : 1;
-    const hit = patchCache.get(key);
-    if (hit && sigDiff(hit.sig, sig, keep) < 4) {
-      ctx.drawImage(hit.patch, 0, 0, hit.patch.width, hit.patch.height, x, y, w, h);
-      return;
-    }
-  }
-
-
-  // preview: buracos grandes resolvem em escala menor (fluidez).
-  // alta qualidade: sempre resolução total.
-  const area = w * h;
-  const scale = hq ? 1 : area > 90000 ? 0.5 : area > 260000 ? 0.35 : 1;
-  const W = Math.max(4, Math.round(sw * scale));
-  const H = Math.max(4, Math.round(sh * scale));
-
   const work = document.createElement("canvas");
-  work.width = W;
-  work.height = H;
+  work.width = sw;
+  work.height = sh;
   const wc = work.getContext("2d", { willReadFrequently: true });
   if (!wc) return;
-  wc.drawImage(canvas, sx, sy, sw, sh, 0, 0, W, H);
-
-  const mx0 = Math.max(0, Math.round((x - sx) * scale));
-  const my0 = Math.max(0, Math.round((y - sy) * scale));
-  const mx1 = Math.min(W, Math.round((x - sx + w) * scale));
-  const my1 = Math.min(H, Math.round((y - sy + h) * scale));
-
-  const buildMask = (mw: number, mh: number, s: number) => {
-    const m = new Uint8Array(mw * mh);
-    const a0 = Math.max(0, Math.round((x - sx) * s));
-    const b0 = Math.max(0, Math.round((y - sy) * s));
-    const a1 = Math.min(mw, Math.round((x - sx + w) * s));
-    const b1 = Math.min(mh, Math.round((y - sy + h) * s));
-    for (let yy = b0; yy < b1; yy++) for (let xx = a0; xx < a1; xx++) m[yy * mw + xx] = 1;
-    return m;
-  };
-
-  // coarse-to-fine: resolve primeiro numa escala menor e usa como palpite inicial,
-  // o que dá estrutura muito melhor em buracos largos (barras de legenda inteiras).
-  if (hq && Math.min(w, h) > 24) {
-    const cs = 0.4;
-    const CW = Math.max(4, Math.round(W * cs));
-    const CH = Math.max(4, Math.round(H * cs));
-    const cc = document.createElement("canvas");
-    cc.width = CW;
-    cc.height = CH;
-    const cctx = cc.getContext("2d", { willReadFrequently: true });
-    if (cctx) {
-      cctx.drawImage(work, 0, 0, CW, CH);
-      const cimg = cctx.getImageData(0, 0, CW, CH);
-      resetInpaintCache();
-      inpaintTelea(cimg.data, buildMask(CW, CH, scale * cs), CW, CH, {
-        radius: Math.max(3, Math.round(Math.min(CW, CH) * 0.12)),
-      });
-      cctx.putImageData(cimg, 0, 0);
-      // injeta o palpite só dentro do buraco
-      wc.save();
-      wc.beginPath();
-      wc.rect(mx0, my0, Math.max(1, mx1 - mx0), Math.max(1, my1 - my0));
-      wc.clip();
-      wc.imageSmoothingEnabled = true;
-      wc.imageSmoothingQuality = "high";
-      wc.drawImage(cc, 0, 0, CW, CH, 0, 0, W, H);
-      wc.restore();
-    }
+  wc.drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+  const data = wc.getImageData(0, 0, sw, sh).data;
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    r += data[i]!;
+    g += data[i + 1]!;
+    b += data[i + 2]!;
+    n++;
   }
-
-  const img = wc.getImageData(0, 0, W, H);
-  const mask = buildMask(W, H, scale);
-
-  resetInpaintCache();
-  inpaintTelea(img.data, mask, W, H, {
-    radius: Math.max(3, Math.round(Math.min(W, H) * (hq ? 0.09 : 0.06))),
-  });
-  exemplarDetail(img.data, mask, W, H, detail);
-  if (hq) exemplarDetail(img.data, mask, W, H, detail * 0.5);
-  wc.putImageData(img, 0, 0);
-
-  const rw = Math.max(1, mx1 - mx0);
-  const rh = Math.max(1, my1 - my0);
-
-  const store = (patch: HTMLCanvasElement) => {
-    if (!sig || !keep) return;
-    if (patchCache.size > 24) patchCache.clear();
-    patchCache.set(key, { sig: new Uint8ClampedArray(sig), keep, patch });
-  };
-
-  // mistura suave nas bordas para não deixar emenda entre reconstruído e original
-  const feather = hq ? Math.max(1.5, Math.min(6, Math.min(w, h) * 0.06)) : 0;
-  if (feather > 0.5) {
-    const fc = document.createElement("canvas");
-    fc.width = rw;
-    fc.height = rh;
-    const fx = fc.getContext("2d");
-    if (fx) {
-      fx.drawImage(work, mx0, my0, rw, rh, 0, 0, rw, rh);
-      fx.globalCompositeOperation = "destination-in";
-      fx.filter = `blur(${feather}px)`;
-      fx.fillStyle = "#fff";
-      fx.fillRect(feather, feather, Math.max(1, rw - feather * 2), Math.max(1, rh - feather * 2));
-      fx.filter = "none";
-      fx.globalCompositeOperation = "source-over";
-      ctx.drawImage(fc, 0, 0, rw, rh, x, y, w, h);
-      store(fc);
-      return;
-    }
-  }
-
-  // devolve apenas a área reconstruída (bordas originais ficam intactas)
-  const smooth = ctx.imageSmoothingEnabled;
-  ctx.imageSmoothingEnabled = scale < 1;
-  ctx.drawImage(work, mx0, my0, rw, rh, x, y, w, h);
-  ctx.imageSmoothingEnabled = smooth;
-  const keepC = document.createElement("canvas");
-  keepC.width = rw;
-  keepC.height = rh;
-  keepC.getContext("2d")?.drawImage(work, mx0, my0, rw, rh, 0, 0, rw, rh);
-  store(keepC);
+  ctx.fillStyle = n ? `rgb(${Math.round(r / n)},${Math.round(g / n)},${Math.round(b / n)})` : "#000000";
+  ctx.fillRect(x, y, w, h);
 }
+
 
 
 
