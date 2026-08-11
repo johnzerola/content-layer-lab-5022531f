@@ -16,7 +16,7 @@ import {
   Radio,
 } from "lucide-react";
 
-export type AppMode = "lote" | "clip" | "limpar";
+export type AppMode = "lote" | "clip" | "limpar" | "limpar-ia";
 
 type ModeDef = {
   id: AppMode;
@@ -77,6 +77,20 @@ const MODES: ModeDef[] = [
     icon: Eraser,
     badge: Droplets,
   },
+  {
+    id: "limpar-ia",
+    label: "AI Video Cleaner",
+    hint: "remoção profissional com GPU",
+    brand: "CleanerIA",
+    mark: "CI",
+    tagline: "inpainting profissional",
+    headline: "Remoção Profissional com ProPainter",
+    description:
+      "Módulo de alta fidelidade que utiliza GPU externa para reconstrução temporal profunda. Ideal para vídeos complexos onde a restauração local não é suficiente.",
+    chips: ["ProPainter engine", "GPU backend", "temporal tracking", "4K support"],
+    icon: Sparkle,
+    badge: Wand2,
+  },
 ];
 
 interface Props {
@@ -98,7 +112,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
   // mantém portais (modais, toasts) na mesma identidade de cor
   useEffect(() => {
     const root = document.documentElement;
-    root.classList.remove("theme-lote", "theme-clip", "theme-limpar");
+    root.classList.remove("theme-lote", "theme-clip", "theme-limpar", "theme-limpar-ia");
     root.classList.add(`theme-${mode}`);
   }, [mode]);
 

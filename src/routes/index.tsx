@@ -33,6 +33,7 @@ import { CloudPanel } from "@/components/CloudPanel";
 import { autoSyncTemplates, enableCloudQuotaFallback, logBatch, logExports, type ProjectSnapshot } from "@/lib/cloud";
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
+import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
 import { failJob, finishJob, setJobCancel, setJobRetry, startJob, updateJob } from "@/lib/jobs";
 import { undoable } from "@/lib/undo";
@@ -242,11 +243,17 @@ function Home() {
 
 
   // filas totalmente separadas por ferramenta
-  const [queues, setQueues] = useState<Record<Mode, Item[]>>({ lote: [], clip: [], limpar: [] });
+  const [queues, setQueues] = useState<Record<Mode, Item[]>>({
+    lote: [],
+    clip: [],
+    limpar: [],
+    "limpar-ia": [],
+  });
   const [selectedIds, setSelectedIds] = useState<Record<Mode, string | null>>({
     lote: null,
     clip: null,
     limpar: null,
+    "limpar-ia": null,
   });
   const queuesRef = useRef(queues);
   queuesRef.current = queues;
@@ -901,7 +908,7 @@ function Home() {
         // central de atividade: um trabalho por vídeo, com etapas cronometradas
         startJob({
           id,
-          tool: runMode,
+          tool: runMode as any,
           name: item.file.name,
           stage: "preparando",
           meta: { seguro: safe, plataformas: platforms.join(", ") },
@@ -1299,9 +1306,14 @@ function Home() {
   return (
     <AppShell
       mode={mode}
-      onMode={setMode}
+      onMode={(m) => setMode(m as Mode)}
       count={items.length}
-      counts={{ lote: queues.lote.length, clip: queues.clip.length, limpar: queues.limpar.length }}
+      counts={{ 
+        lote: queues.lote.length, 
+        clip: queues.clip.length, 
+        limpar: queues.limpar.length,
+        "limpar-ia": queues["limpar-ia"].length 
+      }}
       onLibrary={() => setLibraryOpen(true)}
       onCloud={() => setCloudOpen(true)}
     >
@@ -1409,6 +1421,21 @@ function Home() {
               </select>
             </div>
           </section>
+        ) : mode === "limpar-ia" ? (
+          <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
+            <div>
+              <p className="mono-label">AI Video Cleaner</p>
+              <p className="text-lg font-semibold">Remoção Profissional com ProPainter (GPU)</p>
+              <p className="font-mono text-[11px] text-muted-foreground">
+                reconstrução temporal avançada utilizando frames vizinhos para restaurar o fundo original
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+               <span className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-mono text-[11px] text-primary">
+                 <Sparkles className="size-3" /> motor gpu
+               </span>
+            </div>
+          </section>
         ) : (
           <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
             <div>
@@ -1491,7 +1518,20 @@ function Home() {
                   Reposicione o enquadramento quando o corte automático errar.
                 </p>
               </div>
-              {selected ? (
+              {mode === "limpar-ia" && selected ? (
+                <CleanerIAStudio 
+                  item={{
+                    id: selected.id,
+                    file: selected.file,
+                    poster: selected.poster,
+                    w: selected.w,
+                    h: selected.h
+                  }}
+                  onComplete={(url) => {
+                    setItems(prev => prev.map(x => x.id === selected.id ? { ...x, result_url: url, status: "pronto" as any } : x));
+                  }}
+                />
+              ) : selected ? (
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="space-y-2">
                     <p className="mono-label">Original</p>

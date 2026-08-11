@@ -97,6 +97,15 @@
   --ring: oklch(0.78 0.16 62);
 }
 
+.theme-limpar-ia {
+  --primary: oklch(0.7 0.18 210);
+  --primary-glow: oklch(0.8 0.15 220);
+  --primary-foreground: oklch(0.16 0.03 210);
+  --accent: oklch(0.29 0.04 210);
+  --accent-foreground: oklch(0.88 0.12 210);
+  --ring: oklch(0.7 0.18 210);
+}
+
 @layer base {
   * {
     border-color: var(--color-border);
