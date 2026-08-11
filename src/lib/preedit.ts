@@ -50,6 +50,12 @@ export interface PreEdit {
   segments: Segment[];
   /** layout do quadro final */
   layout: LayoutKind;
+  /** fundo dos layouts com preenchimento: desfoque do próprio vídeo ou cor fixa */
+  bgMode: "blur" | "color";
+  /** intensidade do desfoque do fundo (0..2, 1 = padrão) */
+  bgBlur: number;
+  /** cor usada quando bgMode = "color" */
+  bgColor: string;
   /** transição de abertura */
   transIn: Transition;
   /** transição de saída */
@@ -77,6 +83,9 @@ export function defaultPreEdit(): PreEdit {
     keys: [],
     segments: [],
     layout: "auto",
+    bgMode: "blur",
+    bgBlur: 1,
+    bgColor: "#000000",
     transIn: { kind: "none", dur: 0.5 },
     transOut: { kind: "none", dur: 0.5 },
     rotate: 0,
@@ -169,6 +178,8 @@ export function hasPreEdit(p?: PreEdit | null) {
     (p.keys?.length ?? 0) > 0 ||
     (p.segments?.length ?? 0) > 1 ||
     (p.layout ?? "auto") !== "auto" ||
+    (p.bgMode ?? "blur") !== "blur" ||
+    (p.bgBlur ?? 1) !== 1 ||
     (p.transIn?.kind ?? "none") !== "none" ||
 
     (p.transOut?.kind ?? "none") !== "none" ||
