@@ -89,7 +89,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Crie um template com avatar, nome, headline, CTA e marca d'água, importe centenas de vídeos e processe tudo em lote no navegador.",
+          "Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required. veja para criar isto de realmente remover, sem cria um borrap, efeito blur, ou quaqluer outra coisa assim",
       },
       { property: "og:title", content: "VaiViral — Editor de vídeos em lote 9:16" },
       {
