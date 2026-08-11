@@ -24,7 +24,16 @@ export interface FrameKey {
 }
 
 /** Layout do clipe vertical (estilo Clipzi). */
-export type LayoutKind = "auto" | "fill" | "fit" | "blur" | "split";
+export type LayoutKind =
+  | "auto"
+  | "fill"
+  | "fit"
+  | "blur"
+  | "split"
+  | "trio"
+  | "spotlight"
+  | "centered"
+  | "horizontal";
 
 /** Trecho mantido do vídeo original (corte multi-segmento). */
 export interface Segment {
