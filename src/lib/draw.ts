@@ -696,8 +696,30 @@ function drawVideoLayer(
     };
     const box = { x: v.x, y: v.y, w: v.w, h: v.h };
 
+    /** Fundo dos layouts com preenchimento: desfoque do vídeo ou cor fixa. */
+    const bgMode = pre?.bgMode ?? "blur";
+    const bgIntensity = Math.max(0, pre?.bgBlur ?? 1);
+    const paintBackdrop = (
+      target: { x: number; y: number; w: number; h: number },
+      baseBlur: number,
+      dim: number,
+    ) => {
+      if (bgMode === "color") {
+        ctx.save();
+        ctx.fillStyle = pre?.bgColor || "#000000";
+        ctx.fillRect(target.x, target.y, target.w, target.h);
+        ctx.restore();
+        return;
+      }
+      paint(target, "cover", full, {
+        blur: Math.max(0, baseBlur * bgIntensity),
+        dim: dim * Math.min(1, bgIntensity),
+        useOffset: false,
+      });
+    };
+
     if (layout === "blur") {
-      paint(box, "cover", full, { blur: 34, dim: 0.35, useOffset: false });
+      paintBackdrop(box, 34, 0.35);
       dest = paint(box, "contain");
     } else if (layout === "fit") {
       ctx.save();
@@ -733,7 +755,7 @@ function drawVideoLayer(
       const topH = v.h * 0.68;
       const top = { x: v.x, y: v.y, w: v.w, h: topH };
       const bottom = { x: v.x, y: v.y + topH, w: v.w, h: v.h - topH };
-      paint(box, "cover", full, { blur: 40, dim: 0.45, useOffset: false });
+      paintBackdrop(box, 40, 0.45);
       dest = paint(top, "cover");
       paint(bottom, "contain", full, { useOffset: false });
       ctx.save();
@@ -741,7 +763,7 @@ function drawVideoLayer(
       ctx.fillRect(v.x, v.y + topH - 1, v.w, 2);
       ctx.restore();
     } else if (layout === "centered") {
-      paint(box, "cover", full, { blur: 60, dim: 0.55, useOffset: false });
+      paintBackdrop(box, 60, 0.55);
       dest = paint(box, "contain", full, { useOffset: false });
     } else if (layout === "horizontal") {
       ctx.save();
