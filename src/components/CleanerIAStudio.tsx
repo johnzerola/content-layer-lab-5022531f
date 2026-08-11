@@ -250,7 +250,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           >
             <span className="block text-sm font-display font-bold">{MODE_LABEL[m]}</span>
             <span className="block text-[10px] leading-tight text-muted-foreground">
-              {MODE_HINT[m]}
+              {m === "smart" ? "Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required. veja para criar isto de realmente remover, sem cria um borrap, efeito blur, ou quaqluer outra coisa assim" : MODE_HINT[m]}
             </span>
           </button>
         ))}
