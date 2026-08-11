@@ -540,6 +540,12 @@ function drawVideoLayer(
       eh: quarter % 2 ? source.width : source.height,
     };
     const box = { x: v.x, y: v.y, w: v.w, h: v.h };
+    /** segunda região: no enquadramento dinâmico cada metade aponta pra um
+     *  lugar diferente do vídeo original; sem plano, mostra o quadro inteiro */
+    const sec = fr?.secondary
+      ? rectForCrop(fr.secondary, source.width, source.height, pre?.rotate ?? 0)
+      : full;
+
 
     /** Fundo dos layouts com preenchimento: desfoque do vídeo ou cor fixa. */
     const bgMode = pre?.bgMode ?? "blur";
