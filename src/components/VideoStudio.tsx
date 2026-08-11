@@ -39,6 +39,7 @@ import {
 } from "@/lib/preedit";
 import { translateWords } from "@/lib/translate.functions";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
+import { LayoutPreview } from "@/components/LayoutPreview";
 import { EditorTimeline } from "@/components/EditorTimeline";
 import type { CaptionCue } from "@/lib/captions";
 
@@ -78,6 +79,49 @@ type Drag = { mode: "move" | Handle; x: number; y: number; crop: NonNullable<Pre
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
 type Tab = "trim" | "layout" | "crop" | "keys" | "trans" | "color" | "caps" | "text";
+
+/** Miniatura esquemática de cada layout (9:16). */
+function LayoutGlyph({ id }: { id: LayoutKind }) {
+  const box = "absolute rounded-[2px] bg-primary/60";
+  return (
+    <span className="relative block h-10 w-[22px] shrink-0 overflow-hidden rounded border border-border bg-muted">
+      {id === "fill" && <span className={`${box} inset-0`} />}
+      {(id === "fit" || id === "horizontal") && <span className={`${box} inset-x-0 top-1/2 h-3 -translate-y-1/2`} />}
+      {id === "auto" && <span className={`${box} inset-x-0 top-1/2 h-6 -translate-y-1/2`} />}
+      {id === "blur" && (
+        <>
+          <span className="absolute inset-0 bg-primary/20 blur-[2px]" />
+          <span className={`${box} inset-x-0 top-1/2 h-4 -translate-y-1/2`} />
+        </>
+      )}
+      {id === "centered" && (
+        <>
+          <span className="absolute inset-0 bg-primary/15" />
+          <span className={`${box} inset-x-[2px] top-1/2 h-3 -translate-y-1/2`} />
+        </>
+      )}
+      {id === "split" && (
+        <>
+          <span className={`${box} inset-x-0 top-0 h-[19px]`} />
+          <span className={`${box} inset-x-0 bottom-0 h-[19px] opacity-60`} />
+        </>
+      )}
+      {id === "trio" && (
+        <>
+          <span className={`${box} inset-x-0 top-0 h-[12px]`} />
+          <span className={`${box} inset-x-0 top-[13px] h-[12px] opacity-80`} />
+          <span className={`${box} inset-x-0 bottom-0 h-[12px] opacity-60`} />
+        </>
+      )}
+      {id === "spotlight" && (
+        <>
+          <span className={`${box} inset-x-0 top-0 h-[26px]`} />
+          <span className={`${box} inset-x-0 bottom-0 h-[12px] opacity-50`} />
+        </>
+      )}
+    </span>
+  );
+}
 
 const LANGS = [
   { id: "inglês", label: "Inglês" },
@@ -561,19 +605,26 @@ export function VideoStudio({
 
             {tab === "layout" && (
               <div className="space-y-3">
+                <LayoutPreview videoRef={videoRef} pre={pre} clip={{ start, end }} />
+                <p className="text-center font-mono text-[10px] text-muted-foreground">
+                  saída 9:16 real — o mesmo desenho usado na exportação
+                </p>
                 <div className="grid grid-cols-2 gap-2">
                   {LAYOUTS.map((l) => (
                     <button
                       key={l.id}
                       onClick={() => set({ layout: l.id as LayoutKind })}
-                      className={`rounded-lg border p-2 text-left transition ${
+                      className={`flex gap-2 rounded-lg border p-2 text-left transition ${
                         (pre.layout ?? "auto") === l.id
                           ? "border-primary bg-primary/10"
                           : "border-border hover:border-primary/50"
                       }`}
                     >
-                      <span className="block font-mono text-[11px] text-foreground">{l.label}</span>
-                      <span className="block font-mono text-[10px] text-muted-foreground">{l.hint}</span>
+                      <LayoutGlyph id={l.id} />
+                      <span className="min-w-0">
+                        <span className="block font-mono text-[11px] text-foreground">{l.label}</span>
+                        <span className="block font-mono text-[10px] text-muted-foreground">{l.hint}</span>
+                      </span>
                     </button>
                   ))}
                 </div>
