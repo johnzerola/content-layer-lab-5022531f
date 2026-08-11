@@ -106,7 +106,8 @@ async def start_process(job_id: str, req: ProcessRequest, background_tasks: Back
     if USE_CELERY:
         from .workers.tasks import process_video_task
 
-        task = process_video_task.delay(job_id, req.mode, req.preset, req.masks, req.callbackUrl)
+        task = process_video_task.delay(job_id, req.mode, req.preset, req.masks, req.callbackUrl,
+                                        req.options)
         return {"status": "queued", "job_id": job_id, "task_id": task.id}
 
     from .workers.tasks import run_pipeline
@@ -117,7 +118,7 @@ async def start_process(job_id: str, req: ProcessRequest, background_tasks: Back
     def run() -> None:
         try:
             result = run_pipeline(job_id, req.mode, req.preset, req.masks,
-                                  req.callbackUrl, progress_cb)
+                                  req.callbackUrl, progress_cb, req.options)
             JOBS[job_id] = result
         except Exception as exc:
             JOBS[job_id] = {"status": "failed", "progress": 0, "error": str(exc)}

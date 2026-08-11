@@ -338,8 +338,8 @@ def run_pipeline(
 
 @celery_app.task(name="process_video_task", bind=True)
 def process_video_task(self, job_id: str, mode: str, preset: str,
-                       masks_data: list, callback_url: str):
+                       masks_data: list, callback_url: str, options: dict | None = None):
     def progress_cb(progress: float, stage: str) -> None:
         self.update_state(state="PROGRESS", meta={"progress": progress, "stage": stage})
 
-    return run_pipeline(job_id, mode, preset, masks_data, callback_url, progress_cb)
+    return run_pipeline(job_id, mode, preset, masks_data, callback_url, progress_cb, options)
