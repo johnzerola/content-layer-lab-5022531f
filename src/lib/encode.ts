@@ -298,8 +298,24 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       averageFrameMs = averageFrameMs * 0.85 + elapsed * 0.15;
     };
 
-    const seekTo = (time: number) =>
+    /** Espera o navegador realmente apresentar um quadro novo após a busca. */
+    const awaitPresented = (ms: number) =>
       new Promise<void>((res) => {
+        if (!video.requestVideoFrameCallback) return void setTimeout(res, Math.min(ms, 30));
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          res();
+        };
+        video.requestVideoFrameCallback(() => finish());
+        setTimeout(finish, ms);
+      });
+
+    const seekTo = async (time: number) => {
+      const target = Math.min(Math.max(0, time), Math.max(0, video.duration - 1 / 1000));
+      if (Math.abs(video.currentTime - target) < 1e-4 && video.readyState >= 2) return;
+      await new Promise<void>((res) => {
         let done = false;
         const finish = () => {
           if (done) return;
@@ -308,17 +324,14 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
           res();
         };
         video.onseeked = finish;
-        video.currentTime = Math.min(Math.max(0, time), Math.max(0, video.duration - 1 / 1000));
+        video.currentTime = target;
         // segurança: se o navegador não disparar seeked, segue em frente
-        setTimeout(finish, 150);
+        setTimeout(finish, 400);
       });
-
-    // Buscar quadro a quadro é preciso, mas cada seek custa 50–300 ms. Em
-    // trechos longos usamos leitura contínua na velocidade final do vídeo. Não
-    // aceleramos o elemento de vídeo para exportar: isso faz o decodificador
-    // pular quadros e produz um MP4 com movimento visivelmente travado.
-    const hasCleanup = (t.cleanup?.length ?? 0) > 0;
-    const heavy = outDur <= 20 && (hasCleanup || outDur <= 8);
+      // sem isto o canvas pode capturar o quadro anterior, o que aparece como
+      // travadas/repetições no arquivo final
+      await awaitPresented(120);
+    };
 
     // garante que há um quadro decodificado antes de desenhar (evita
     // primeiros frames pretos/embaralhados no início da exportação)
@@ -330,144 +343,18 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
       });
     }
     await seekTo(trimStart);
-    await new Promise<void>((res) => {
-      if (video.requestVideoFrameCallback) {
-        let settled = false;
-        video.requestVideoFrameCallback(() => {
-          if (!settled) {
-            settled = true;
-            res();
-          }
-        });
-        setTimeout(() => {
-          if (!settled) {
-            settled = true;
-            res();
-          }
-        }, 300);
-      } else setTimeout(res, 120);
-    });
+    await awaitPresented(300);
 
-
-    if (heavy) {
-      while (frameIndex < totalFrames) {
-        if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
-        await seekTo(trimStart + (frameIndex / fps) * v.speed);
-        await emit();
-        if (frameIndex % 5 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
-      }
-    } else {
-      // Os primeiros quadros são os que mais travam: o navegador ainda está
-      // inicializando a decodificação. Renderizamos ~0,8 s por busca precisa e
-      // só então entramos na leitura contínua.
-      const warmupFrames = Math.min(totalFrames, Math.round(fps * 0.8));
-      while (frameIndex < warmupFrames) {
-        if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
-        await seekTo(trimStart + (frameIndex / fps) * v.speed);
-        await emit();
-      }
-
-      const endAt = trimStart + effDur;
+    // Exportação determinística: cada quadro de saída vem do instante exato do
+    // vídeo fonte. É mais lento que a leitura contínua, mas elimina os saltos e
+    // repetições que faziam o MP4 baixado parecer travando.
+    while (frameIndex < totalFrames) {
+      if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
       await seekTo(trimStart + (frameIndex / fps) * v.speed);
-      // O elemento fonte deve avançar apenas na velocidade que canvas +
-      // encoder conseguem consumir. Os timestamps de saída continuam em FPS
-      // constante, portanto isto muda somente o tempo de processamento, não a
-      // duração nem a velocidade do arquivo final.
-      const safePlaybackRate = () => {
-        const capacity = (1000 / fps) / Math.max(1, averageFrameMs);
-        return Math.max(0.1, Math.min(4, v.speed * capacity * 0.8));
-      };
-      video.playbackRate = safePlaybackRate();
-      await video.play();
-
-      await new Promise<void>((resolve, reject) => {
-        let stopped = false;
-        let stepping = false;
-        let lastAdvanceAt = performance.now();
-        let lastFrameIndex = frameIndex;
-        let pulse = 0;
-        const stop = () => {
-          if (stopped) return;
-          stopped = true;
-          window.clearInterval(pulse);
-          video.pause();
-          resolve();
-        };
-        // requestVideoFrameCallback pode ser suspenso em abas inativas. Este
-        // pulso mantém a exportação viva e também encerra a leitura contínua se
-        // o decoder parar; a etapa seguinte completa com buscas precisas.
-        pulse = window.setInterval(() => {
-          if (stopped) return;
-          if (frameIndex > lastFrameIndex) {
-            lastFrameIndex = frameIndex;
-            lastAdvanceAt = performance.now();
-          } else if (performance.now() - lastAdvanceAt > 8_000) {
-            stop();
-            return;
-          }
-          if (!stepping) void step();
-        }, 250);
-        const step = async (_now?: number, metadata?: { mediaTime: number; presentedFrames: number }) => {
-          if (stopped || stepping) return;
-          stepping = true;
-          if (opts.signal?.aborted) {
-            stopped = true;
-            window.clearInterval(pulse);
-            video.pause();
-            reject(new DOMException("cancelado", "AbortError"));
-            return;
-          }
-          try {
-            const mediaTime = metadata?.mediaTime ?? video.currentTime;
-            const outT = (mediaTime - trimStart) / v.speed;
-            const dueFrame = Math.min(totalFrames - 1, Math.floor(Math.max(0, outT) * fps + 0.001));
-
-            // Normalmente há um quadro devido por callback. Se o navegador
-            // ainda assim saltar dois ou mais, recuperamos os instantes
-            // ausentes com seeks precisos em vez de duplicar o quadro atual.
-            if (dueFrame - frameIndex > 1) {
-              video.pause();
-              while (frameIndex <= dueFrame && frameIndex < totalFrames) {
-                await seekTo(trimStart + (frameIndex / fps) * v.speed);
-                await emit();
-              }
-              if (frameIndex < totalFrames && !stopped) await video.play();
-            } else {
-              // A repetição ocasional aqui é apenas a conversão normal de uma
-              // fonte 24 fps para uma saída 30 fps (pulldown), não um catch-up.
-              while (frameIndex <= dueFrame && frameIndex < totalFrames) await emit();
-            }
-
-            video.playbackRate = safePlaybackRate();
-            opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
-            if (mediaTime >= endAt || video.ended || frameIndex >= totalFrames) return stop();
-          } catch (error) {
-            stopped = true;
-            window.clearInterval(pulse);
-            video.pause();
-            reject(error);
-            return;
-          } finally {
-            stepping = false;
-          }
-          if (video.requestVideoFrameCallback) video.requestVideoFrameCallback((now, next) => void step(now, next));
-          else setTimeout(() => void step(), 0);
-        };
-        video.onended = () => void step();
-        if (video.requestVideoFrameCallback) video.requestVideoFrameCallback((now, metadata) => void step(now, metadata));
-        else void step();
-      });
-
-      // Completa cada quadro faltante buscando o instante correto. Repetir o
-      // último canvas aqui deixava o arquivo menor/rápido, porém criava pausas
-      // perceptíveis durante a reprodução do vídeo baixado.
-      while (frameIndex < totalFrames) {
-        if (opts.signal?.aborted) throw new DOMException("cancelado", "AbortError");
-        await seekTo(trimStart + (frameIndex / fps) * v.speed);
-        await emit();
-        if (frameIndex % 5 === 0) opts.onProgress?.(Math.min(0.99, frameIndex / totalFrames));
-      }
+      await emit();
+      if (frameIndex % 3 === 0) opts.onProgress?.(Math.min(0.97, frameIndex / totalFrames));
     }
+
 
 
 
