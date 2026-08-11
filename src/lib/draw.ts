@@ -713,7 +713,7 @@ export function applyCleanup(
 
 
     if (r.mode === "inpaint") {
-      inpaintArea(ctx, x, y, w, h, k, hq);
+      inpaintArea(ctx, x, y, w, h);
     } else if (r.mode === "solid") {
       ctx.fillStyle = r.color ?? "#000000";
       ctx.fillRect(x, y, w, h);
