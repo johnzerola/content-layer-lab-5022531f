@@ -78,7 +78,7 @@ export const PRESET_LABEL: Record<CleanerPreset, string> = {
 export const PRESET_HINT: Record<CleanerPreset, string> = {
   fast: "STTN / contexto temporal curto — prévia rápida",
   quality: "ProPainter, contexto padrão — equilíbrio recomendado",
-  max: "ProPainter + segundo passe de refino e validação (ou DiffuEraser)",
+  max: "ProPainter + segundo passe de refino e validação temporal",
 };
 
 /** Retângulo/polígono normalizado (0..1) desenhado pelo usuário ou detectado. */
@@ -123,13 +123,16 @@ export interface CleanerProbe {
 }
 
 export interface CleanerMetrics {
-  mask_coverage?: number;
-  edge_residue_score?: number;
-  temporal_flicker_score?: number;
-  temporal_consistency_score?: number;
-  reconstruction_confidence?: number;
-  passes?: number;
+  /** 0..1 — quanto a área reconstruída muda suavemente entre frames */
+  temporal_consistency?: number;
+  /** nome do device usado (ex: "NVIDIA RTX 4090" ou "cpu") */
+  device?: string;
+  /** número de frames processados */
+  frames?: number;
+  /** engine que efetivamente processou (propainter, sttn, lama, temporal-fill) */
   engine?: string;
+  /** número de passes executados */
+  passes?: number;
 }
 
 export interface CleanerJob {

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as ArmazenamentoRouteImport } from './routes/armazenamento'
+import { Route as LimparIaRouteImport } from './routes/limpar-ia'
 import { Route as LiveRouteImport } from './routes/live'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as VendasRouteImport } from './routes/vendas'
@@ -37,6 +38,11 @@ const AgendaRoute = AgendaRouteImport.update({
 const ArmazenamentoRoute = ArmazenamentoRouteImport.update({
   id: '/armazenamento',
   path: '/armazenamento',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LimparIaRoute = LimparIaRouteImport.update({
+  id: '/limpar-ia',
+  path: '/limpar-ia',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LiveRoute = LiveRouteImport.update({
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
+  '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
   '/vendas': typeof VendasRoute
@@ -120,6 +127,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
+  '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
   '/vendas': typeof VendasRoute
@@ -137,6 +145,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
+  '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
   '/vendas': typeof VendasRoute
@@ -155,6 +164,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/armazenamento'
+    | '/limpar-ia'
     | '/live'
     | '/mcp'
     | '/vendas'
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/armazenamento'
+    | '/limpar-ia'
     | '/live'
     | '/mcp'
     | '/vendas'
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/armazenamento'
+    | '/limpar-ia'
     | '/live'
     | '/mcp'
     | '/vendas'
@@ -204,6 +216,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgendaRoute: typeof AgendaRoute
   ArmazenamentoRoute: typeof ArmazenamentoRoute
+  LimparIaRoute: typeof LimparIaRoute
   LiveRoute: typeof LiveRoute
   McpRoute: typeof McpRoute
   VendasRoute: typeof VendasRoute
@@ -238,6 +251,13 @@ declare module '@tanstack/react-router' {
       path: '/armazenamento'
       fullPath: '/armazenamento'
       preLoaderRoute: typeof ArmazenamentoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/limpar-ia': {
+      id: '/limpar-ia'
+      path: '/limpar-ia'
+      fullPath: '/limpar-ia'
+      preLoaderRoute: typeof LimparIaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/live': {
@@ -324,6 +344,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgendaRoute: AgendaRoute,
   ArmazenamentoRoute: ArmazenamentoRoute,
+  LimparIaRoute: LimparIaRoute,
   LiveRoute: LiveRoute,
   McpRoute: McpRoute,
   VendasRoute: VendasRoute,

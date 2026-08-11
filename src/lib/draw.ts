@@ -3,13 +3,11 @@ import {
   CANVAS_W,
   type CaptionStyle,
   type CleanupRegion,
-
   type ImageLayer,
   type Template,
   type TextLayer,
 } from "./template";
 import type { CaptionCue } from "./captions";
-import { exemplarDetail, inpaintTelea, resetInpaintCache } from "./inpaint";
 import { cropRect, cropAt, isFullCrop, preEditFilter, transitionAt, type PreEdit } from "./preedit";
 
 /**
