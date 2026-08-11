@@ -1,5 +1,5 @@
 import { CANVAS_H, CANVAS_W, type Template } from "./template";
-import { drawFrame, resetPatchCache } from "./draw";
+import { drawFrame } from "./draw";
 import { encodeMp4, webCodecsSupported } from "./encode";
 import type { Variation } from "./variation";
 import type { CaptionCue } from "./captions";
