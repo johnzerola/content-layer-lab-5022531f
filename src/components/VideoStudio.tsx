@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   Crop,
   FlipHorizontal,
   FlipVertical,
+  Languages,
+  LayoutTemplate,
   Pause,
   Play,
   RotateCw,
@@ -23,15 +26,22 @@ import {
   cropForRatio,
   defaultPreEdit,
   isFullCrop,
+  keptSegments,
+  LAYOUTS,
   preEditFilter,
+  segmentsDuration,
+  splitAt,
   TRANSITIONS,
   type FrameKey,
+  type LayoutKind,
   type PreEdit,
   type TransitionKind,
 } from "@/lib/preedit";
+import { translateWords } from "@/lib/translate.functions";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { EditorTimeline } from "@/components/EditorTimeline";
 import type { CaptionCue } from "@/lib/captions";
+
 
 
 export interface PreEditResult {
@@ -67,7 +77,18 @@ type Drag = { mode: "move" | Handle; x: number; y: number; crop: NonNullable<Pre
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-type Tab = "trim" | "crop" | "keys" | "trans" | "color" | "caps" | "text";
+type Tab = "trim" | "layout" | "crop" | "keys" | "trans" | "color" | "caps" | "text";
+
+const LANGS = [
+  { id: "inglês", label: "Inglês" },
+  { id: "espanhol", label: "Espanhol" },
+  { id: "português do Brasil", label: "Português" },
+  { id: "francês", label: "Francês" },
+  { id: "alemão", label: "Alemão" },
+  { id: "italiano", label: "Italiano" },
+  { id: "japonês", label: "Japonês" },
+  { id: "hindi", label: "Hindi" },
+];
 
 /** Estúdio de pré-edição: corte de tempo, recorte de quadro, keyframes, transições, legendas e textos. */
 export function VideoStudio({
@@ -90,8 +111,11 @@ export function VideoStudio({
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(value.clip?.start ?? 0);
   const [draft, setDraft] = useState(texts ?? { headline: "", name: "", handle: "", cta: "" });
+  const [lang, setLang] = useState(LANGS[0]!.id);
+  const [translating, setTranslating] = useState(false);
   /** proporção travada do recorte (largura/altura em pixels da fonte) */
   const [lock, setLock] = useState<number | null>(null);
+
 
 
   const [url, setUrl] = useState("");
@@ -242,6 +266,52 @@ export function VideoStudio({
       return { ...v, keys };
     });
 
+  /** trechos mantidos na sequência final */
+  const segs = keptSegments(pre, { start, end }, duration);
+  const outDur = segmentsDuration(segs);
+
+  /** divide o trecho no playhead (tesoura) */
+  const split = () =>
+    setPre((v) => {
+      const base = keptSegments(v, { start, end }, duration);
+      const next = splitAt(base, Number(time.toFixed(2)));
+      if (next.length === base.length) {
+        toast.info("Leve o playhead para dentro de um trecho para dividir.");
+        return v;
+      }
+      return { ...v, segments: next };
+    });
+
+  const deleteSegment = (i: number) =>
+    setPre((v) => {
+      const base = keptSegments(v, { start, end }, duration);
+      if (base.length < 2) {
+        toast.info("Divida o vídeo antes de remover um trecho.");
+        return v;
+      }
+      return { ...v, segments: base.filter((_, idx) => idx !== i) };
+    });
+
+  /** traduz a legenda mantendo os tempos por palavra */
+  const translate = async () => {
+    if (!captions?.length || !onCaptionsChange) return;
+    setTranslating(true);
+    try {
+      const words = captions.flatMap((c) => c.words.map((w) => w.text));
+      const { words: out } = await translateWords({ data: { words, language: lang } });
+      let i = 0;
+      const next: CaptionCue[] = captions.map((c) => ({
+        ...c,
+        words: c.words.map((w) => ({ ...w, text: out[i++] ?? w.text })),
+      }));
+      onCaptionsChange(next);
+      toast.success(`Legenda traduzida para ${lang}.`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível traduzir a legenda.");
+    } finally {
+      setTranslating(false);
+    }
+  };
 
   const cropPx = {
     w: Math.round((crop.w || 1) * (width || 0)),
@@ -257,6 +327,7 @@ export function VideoStudio({
       pre,
       clip: start > 0.02 || end < duration - 0.02 ? { start, end } : null,
     });
+
 
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-background/95 p-2 sm:items-center sm:p-3">
@@ -373,6 +444,10 @@ export function VideoStudio({
               }}
               onKeysChange={(keys) => set({ keys })}
               onAddKey={addKey}
+              segments={segs}
+              onSplit={split}
+              onDeleteSegment={deleteSegment}
+
             />
 
           </div>
@@ -382,6 +457,7 @@ export function VideoStudio({
             <div className="flex flex-wrap gap-1 rounded-lg border border-border p-1">
               {([
                 { id: "trim", label: "Cortar", icon: Scissors },
+                { id: "layout", label: "Layout", icon: LayoutTemplate },
                 { id: "crop", label: "Enquadrar", icon: Crop },
                 { id: "keys", label: "Keyframes", icon: Sparkles },
                 { id: "trans", label: "Transições", icon: SlidersHorizontal },
@@ -389,6 +465,7 @@ export function VideoStudio({
                 { id: "caps", label: "Legenda", icon: Subtitles },
                 { id: "text", label: "Textos", icon: Type },
               ] as const).map((t) => (
+
                 <button
                   key={t.id}
                   onClick={() => setTab(t.id)}
@@ -441,13 +518,74 @@ export function VideoStudio({
                     Vídeo inteiro
                   </Button>
                 </div>
+                <div className="space-y-2 rounded-lg border border-border p-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="secondary" onClick={split}>
+                      <Scissors className="mr-1 size-3.5" /> Dividir aqui (S)
+                    </Button>
+                    {pre.segments.length > 0 && (
+                      <Button size="sm" variant="ghost" onClick={() => set({ segments: [] })}>
+                        Juntar tudo
+                      </Button>
+                    )}
+                  </div>
+                  {segs.length > 1 ? (
+                    <ul className="space-y-1">
+                      {segs.map((s, i) => (
+                        <li
+                          key={`${i}-${s.start}`}
+                          className="flex items-center justify-between rounded-md border border-border px-2 py-1 font-mono text-[11px]"
+                        >
+                          <button className="text-primary" onClick={() => seek(s.start)}>
+                            {i + 1}. {fmt(s.start)} → {fmt(s.end)}
+                          </button>
+                          <span className="text-muted-foreground">{fmt(s.end - s.start)}</span>
+                          <button className="text-destructive" onClick={() => deleteSegment(i)}>
+                            remover
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      Divida o vídeo para remover partes do meio e exportar só os trechos bons.
+                    </p>
+                  )}
+                </div>
                 <p className="font-mono text-[11px] text-muted-foreground">
-                  Duração final: {fmt(Math.max(0, end - start))}
+                  Duração final: {fmt(Math.max(0, outDur))}
+                  {segs.length > 1 ? ` · ${segs.length} trechos` : ""}
+                </p>
+              </div>
+            )}
+
+            {tab === "layout" && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  {LAYOUTS.map((l) => (
+                    <button
+                      key={l.id}
+                      onClick={() => set({ layout: l.id as LayoutKind })}
+                      className={`rounded-lg border p-2 text-left transition ${
+                        (pre.layout ?? "auto") === l.id
+                          ? "border-primary bg-primary/10"
+                          : "border-border hover:border-primary/50"
+                      }`}
+                    >
+                      <span className="block font-mono text-[11px] text-foreground">{l.label}</span>
+                      <span className="block font-mono text-[10px] text-muted-foreground">{l.hint}</span>
+                    </button>
+                  ))}
+                </div>
+                <p className="font-mono text-[11px] text-muted-foreground">
+                  O layout vale para o preview e para a exportação — troque o enquadramento por keyframes
+                  para acompanhar o rosto dentro do layout escolhido.
                 </p>
               </div>
             )}
 
             {tab === "crop" && (
+
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-1.5">
                   {CROP_PRESETS.map((p) => {

@@ -11,7 +11,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
-import type { FrameKey, Transition } from "@/lib/preedit";
+import type { FrameKey, Segment, Transition } from "@/lib/preedit";
 import type { CaptionCue } from "@/lib/captions";
 
 interface Props {
@@ -28,13 +28,20 @@ interface Props {
   transIn: Transition;
   transOut: Transition;
   cues?: CaptionCue[] | undefined;
+  /** trechos mantidos (corte multi-segmento) */
+  segments?: Segment[] | undefined;
   onSeek: (t: number) => void;
   onTogglePlay: () => void;
   onTrim: (start: number, end: number) => void;
   onKeysChange: (keys: FrameKey[]) => void;
   /** grava um keyframe no tempo atual usando o recorte corrente */
   onAddKey: () => void;
+  /** divide o trecho no playhead (tesoura / tecla S) */
+  onSplit?: (() => void) | undefined;
+  /** remove um trecho da sequência final */
+  onDeleteSegment?: ((index: number) => void) | undefined;
 }
+
 
 const FPS = 30;
 
@@ -64,12 +71,16 @@ export function EditorTimeline({
   transIn,
   transOut,
   cues,
+  segments,
   onSeek,
   onTogglePlay,
   onTrim,
   onKeysChange,
   onAddKey,
+  onSplit,
+  onDeleteSegment,
 }: Props) {
+
   const [pps, setPps] = useState(60);
   const [thumbs, setThumbs] = useState<string[]>([]);
   const [peaks, setPeaks] = useState<number[] | null>(null);
@@ -308,6 +319,10 @@ export function EditorTimeline({
         case "m":
           onAddKey();
           break;
+        case "s":
+          e.preventDefault();
+          onSplit?.();
+          break;
         case "home":
           onSeek(start);
           break;
@@ -318,7 +333,8 @@ export function EditorTimeline({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [time, start, end, total, onSeek, onTrim, onTogglePlay, onAddKey]);
+  }, [time, start, end, total, onSeek, onTrim, onTogglePlay, onAddKey, onSplit]);
+
 
   /** mantém o playhead visível ao rodar */
   useEffect(() => {
@@ -379,6 +395,15 @@ export function EditorTimeline({
         </span>
 
         <div className="ml-auto flex items-center gap-2">
+          {onSplit && (
+            <button
+              onClick={onSplit}
+              className="rounded-md border border-border px-2 py-1 font-mono text-[11px] text-muted-foreground transition hover:border-primary hover:text-foreground"
+              title="S — dividir no playhead"
+            >
+              <Scissors className="mr-1 inline size-3" /> dividir
+            </button>
+          )}
           <button
             onClick={onAddKey}
             className="rounded-md border border-border px-2 py-1 font-mono text-[11px] text-muted-foreground transition hover:border-primary hover:text-foreground"
@@ -386,6 +411,7 @@ export function EditorTimeline({
           >
             <Diamond className="mr-1 inline size-3" /> keyframe
           </button>
+
           <button
             onClick={() => setSnap((s) => !s)}
             className={`rounded-md border p-1.5 transition ${
@@ -542,7 +568,44 @@ export function EditorTimeline({
             />
           </div>
 
+          {/* trechos (corte multi-segmento) */}
+          {!!segments?.length && segments.length > 1 && (
+            <div className="relative mt-1 h-7 rounded-md border border-border bg-background">
+              {segments.map((s, i) => (
+                <span
+                  key={`${i}-${s.start}`}
+                  className="absolute top-1 flex h-5 items-center justify-between gap-1 overflow-hidden rounded border border-primary/60 bg-primary/15 px-1 font-mono text-[9px] text-foreground"
+                  style={{ left: s.start * pps, width: Math.max(16, (s.end - s.start) * pps) }}
+                  title={`trecho ${i + 1} · ${fmt(s.end - s.start)}`}
+                >
+                  <button
+                    onPointerDown={(e) => {
+                      e.stopPropagation();
+                      onSeek(s.start);
+                    }}
+                    className="truncate"
+                  >
+                    {i + 1} · {fmt(s.end - s.start)}
+                  </button>
+                  {onDeleteSegment && (
+                    <button
+                      onPointerDown={(e) => {
+                        e.stopPropagation();
+                        onDeleteSegment(i);
+                      }}
+                      className="shrink-0 text-destructive"
+                      aria-label={`remover trecho ${i + 1}`}
+                    >
+                      ×
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+
           {/* keyframes */}
+
           <div className="relative mt-1 h-6 rounded-md border border-border bg-background">
             <span className="pointer-events-none absolute left-1 top-1 font-mono text-[9px] text-muted-foreground">
               enquadramento
@@ -612,7 +675,7 @@ export function EditorTimeline({
       </div>
 
       <p className="px-1 font-mono text-[9px] text-muted-foreground">
-        espaço play · J/L ±1s · ←/→ frame · I/O marcar corte · M keyframe · roda = zoom
+        espaço play · J/L ±1s · ←/→ frame · I/O marcar corte · S dividir · M keyframe · roda = zoom
       </p>
     </div>
   );

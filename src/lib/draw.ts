@@ -631,40 +631,98 @@ function drawVideoLayer(
     // recorte manual: o que o usuário selecionou tem que aparecer inteiro,
     // senão o "cover" reenquadra e o corte vira só um zoom
     const manualCrop = !isFullCrop(cropAt(pre, opts?.time));
-    // "auto": só recorta quando a orientação bate com a do quadro; senão mostra inteiro
-    const useContain =
-      v.fit === "contain" ||
-      ((v.fit === "auto" || manualCrop) && Math.abs(srcAR - boxAR) / boxAR > 0.02);
-    const fitScale = useContain
-      ? Math.min(v.w / cr.ew, v.h / cr.eh)
-      : Math.max(v.w / cr.ew, v.h / cr.eh);
-
-    const scale = fitScale * zoom;
-    const dw = cr.ew * scale;
-    const dh = cr.eh * scale;
-    const ox = (opts?.offsetX ?? v.offsetX) * (dw - v.w) * 0.5;
-    const oy = (opts?.offsetY ?? v.offsetY) * (dh - v.h) * 0.5;
-    const dx = v.x + (v.w - dw) / 2 + ox;
-    const dy = v.y + (v.h - dh) / 2 + oy;
+    const layout = pre?.layout ?? "auto";
     const mirror = Boolean(opts?.mirror ?? t.mirror);
-    dest = { dx, dy, dw, dh, mirror };
     if (mirror) {
       ctx.translate(v.x * 2 + v.w, 0);
       ctx.scale(-1, 1);
     }
-    ctx.filter = preEditFilter(pre, {
+    const baseFilter = preEditFilter(pre, {
       brightness: opts?.brightness ?? 1,
       saturation: opts?.saturation ?? 1,
     });
-    ctx.save();
-    ctx.translate(dx + dw / 2, dy + dh / 2);
-    if (cr.quarter) ctx.rotate((cr.quarter * Math.PI) / 2);
-    if (pre?.flipH) ctx.scale(-1, 1);
-    if (pre?.flipV) ctx.scale(1, -1);
-    const rw = cr.quarter % 2 ? dh : dw;
-    const rh = cr.quarter % 2 ? dw : dh;
-    ctx.drawImage(source.el, cr.sx, cr.sy, cr.sw, cr.sh, -rw / 2, -rh / 2, rw, rh);
-    ctx.restore();
+
+    /** Desenha a fonte dentro de uma caixa, no modo pedido. */
+    const paint = (
+      box: { x: number; y: number; w: number; h: number },
+      mode: "cover" | "contain",
+      rect: typeof cr = cr,
+      style?: { blur?: number; dim?: number; useOffset?: boolean },
+    ) => {
+      const fitScale =
+        mode === "contain"
+          ? Math.min(box.w / rect.ew, box.h / rect.eh)
+          : Math.max(box.w / rect.ew, box.h / rect.eh);
+      const scale = fitScale * zoom;
+      const dw = rect.ew * scale;
+      const dh = rect.eh * scale;
+      const useOffset = style?.useOffset !== false;
+      const ox = useOffset ? (opts?.offsetX ?? v.offsetX) * (dw - box.w) * 0.5 : 0;
+      const oy = useOffset ? (opts?.offsetY ?? v.offsetY) * (dh - box.h) * 0.5 : 0;
+      const dx = box.x + (box.w - dw) / 2 + ox;
+      const dy = box.y + (box.h - dh) / 2 + oy;
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(box.x, box.y, box.w, box.h);
+      ctx.clip();
+      const extraBlur = style?.blur ? ` blur(${style.blur}px)` : "";
+      ctx.filter = (baseFilter === "none" ? "" : baseFilter) + extraBlur || "none";
+      ctx.translate(dx + dw / 2, dy + dh / 2);
+      if (rect.quarter) ctx.rotate((rect.quarter * Math.PI) / 2);
+      if (pre?.flipH) ctx.scale(-1, 1);
+      if (pre?.flipV) ctx.scale(1, -1);
+      const rw = rect.quarter % 2 ? dh : dw;
+      const rh = rect.quarter % 2 ? dw : dh;
+      ctx.drawImage(source.el, rect.sx, rect.sy, rect.sw, rect.sh, -rw / 2, -rh / 2, rw, rh);
+      ctx.restore();
+      if (style?.dim) {
+        ctx.save();
+        ctx.fillStyle = `rgba(0,0,0,${style.dim})`;
+        ctx.fillRect(box.x, box.y, box.w, box.h);
+        ctx.restore();
+      }
+      return { dx, dy, dw, dh, mirror };
+    };
+
+    const quarter = cr.quarter;
+    const full = {
+      sx: 0,
+      sy: 0,
+      sw: source.width,
+      sh: source.height,
+      quarter,
+      ew: quarter % 2 ? source.height : source.width,
+      eh: quarter % 2 ? source.width : source.height,
+    };
+    const box = { x: v.x, y: v.y, w: v.w, h: v.h };
+
+    if (layout === "blur") {
+      paint(box, "cover", full, { blur: 34, dim: 0.35, useOffset: false });
+      dest = paint(box, "contain");
+    } else if (layout === "fit") {
+      ctx.save();
+      ctx.fillStyle = "#000";
+      ctx.fillRect(v.x, v.y, v.w, v.h);
+      ctx.restore();
+      dest = paint(box, "contain");
+    } else if (layout === "fill") {
+      dest = paint(box, "cover");
+    } else if (layout === "split") {
+      const top = { x: v.x, y: v.y, w: v.w, h: v.h / 2 };
+      const bottom = { x: v.x, y: v.y + v.h / 2, w: v.w, h: v.h / 2 };
+      dest = paint(top, "cover");
+      paint(bottom, "cover", full, { useOffset: false });
+      ctx.save();
+      ctx.fillStyle = "rgba(0,0,0,0.5)";
+      ctx.fillRect(v.x, v.y + v.h / 2 - 1, v.w, 2);
+      ctx.restore();
+    } else {
+      // "auto": só recorta quando a orientação bate com a do quadro; senão mostra inteiro
+      const useContain =
+        v.fit === "contain" ||
+        ((v.fit === "auto" || manualCrop) && Math.abs(srcAR - boxAR) / boxAR > 0.02);
+      dest = paint(box, useContain ? "contain" : "cover");
+    }
     ctx.filter = "none";
 
     if (opts?.noise) {
@@ -682,6 +740,7 @@ function drawVideoLayer(
     ctx.fillStyle = "rgba(255,255,255,0.06)";
     ctx.fillRect(v.x, v.y, v.w, v.h);
   }
+
   ctx.restore();
   applyCleanup(ctx, v, t.cleanup, opts?.quality === "hq", {
     ...(opts?.time !== undefined ? { time: opts.time } : {}),
