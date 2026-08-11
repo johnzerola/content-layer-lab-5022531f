@@ -28,6 +28,8 @@ import {
   type TextLayer,
 } from "@/lib/template";
 import { BUILTIN_FONTS, fileToFont, registerFonts } from "@/lib/fonts";
+import { defaultAntiDup, makeVariation, describeVariation } from "@/lib/variation";
+
 
 const KEY_OF: Record<LayerId, keyof Template> = {
   video: "video",
