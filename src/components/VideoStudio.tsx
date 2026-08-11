@@ -158,6 +158,9 @@ export function VideoStudio({
   const [draft, setDraft] = useState(texts ?? { headline: "", name: "", handle: "", cta: "" });
   const [lang, setLang] = useState(LANGS[0]!.id);
   const [translating, setTranslating] = useState(false);
+  const [sens, setSens] = useState(0.5);
+  const [minSil, setMinSil] = useState(0.35);
+  const [cutting, setCutting] = useState(false);
   /** proporção travada do recorte (largura/altura em pixels da fonte) */
   const [lock, setLock] = useState<number | null>(null);
 
