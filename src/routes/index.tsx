@@ -33,6 +33,7 @@ import { CloudPanel } from "@/components/CloudPanel";
 import { autoSyncTemplates, enableCloudQuotaFallback, logBatch, logExports, type ProjectSnapshot } from "@/lib/cloud";
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
+import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
 import { failJob, finishJob, setJobCancel, setJobRetry, startJob, updateJob } from "@/lib/jobs";
 import { undoable } from "@/lib/undo";
@@ -1502,7 +1503,20 @@ function Home() {
                   Reposicione o enquadramento quando o corte automático errar.
                 </p>
               </div>
-              {selected ? (
+              {mode === "limpar-ia" && selected ? (
+                <CleanerIAStudio 
+                  item={{
+                    id: selected.id,
+                    file: selected.file,
+                    poster: selected.poster,
+                    w: selected.w,
+                    h: selected.h
+                  }}
+                  onComplete={(url) => {
+                    setItems(prev => prev.map(x => x.id === selected.id ? { ...x, result_url: url, status: "pronto" as any } : x));
+                  }}
+                />
+              ) : selected ? (
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="space-y-2">
                     <p className="mono-label">Original</p>
