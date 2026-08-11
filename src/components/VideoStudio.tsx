@@ -39,6 +39,7 @@ import {
 } from "@/lib/preedit";
 import { translateWords } from "@/lib/translate.functions";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
+import { LayoutPreview } from "@/components/LayoutPreview";
 import { EditorTimeline } from "@/components/EditorTimeline";
 import type { CaptionCue } from "@/lib/captions";
 
