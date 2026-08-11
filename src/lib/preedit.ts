@@ -46,6 +46,9 @@ export interface PreEdit {
   crop: PreCrop | null;
   /** keyframes de enquadramento (vazio = recorte fixo acima) */
   keys: FrameKey[];
+  /** câmera virtual por trecho (enquadramento dinâmico) */
+  framing?: import("./framing").FramingPlan | null;
+
   /** trechos mantidos (vazio = usa a janela de corte simples) */
   segments: Segment[];
   /** layout do quadro final */
