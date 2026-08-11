@@ -1,42 +1,102 @@
-# AI Video Cleaner - Worker GPU
+# AI Video Cleaner — worker GPU
 
-Este é o motor de processamento pesado do SaaS. Ele recebe vídeos, detecta objetos/legendas e reconstrói o fundo usando IA (ProPainter).
+Backend Python que remove legendas, textos, logos e marcas d'água **reconstruindo
+o fundo** com inpainting temporal. Nunca usa blur, mosaico, overlay ou crop.
 
-## Estrutura
+## Pipeline
 
-- `app/main.py`: API FastAPI para comunicação com o frontend Lovable.
-- `app/engines/`: Implementações dos modelos de IA (ProPainter, STTN).
-- `app/workers/`: Fila de processamento assíncrono com Celery.
-- `models/`: Pasta para os pesos dos modelos (.pth).
+```
+vídeo → scene detection → text detection (DBNet/PaddleOCR)
+     → mask generation → mask refinement → temporal tracking (optical flow)
+     → video inpainting (ProPainter / STTN / LaMa) em janelas com overlap
+     → validação de consistência temporal → encoding FFmpeg → resultado
+```
 
-## Como Executar (Local/Servidor GPU)
+## Arquivos
 
-### 1. Requisitos
-- Python 3.10+
-- NVIDIA GPU + CUDA (Opcional, mas recomendado para ProPainter)
-- Redis (para a fila Celery)
+| Arquivo | Função |
+| --- | --- |
+| `app/main.py` | API FastAPI (upload, detect, process, status, cancel, result) |
+| `app/workers/tasks.py` | Pipeline completa + task Celery + detecção automática |
+| `app/engines/inpainting.py` | `InpaintingEngine`, ProPainter, STTN, LaMa, TemporalFill, janelas + OOM |
+| `app/services/scene.py` | Cortes de cena por histograma |
+| `app/services/text_detect.py` | Caixas de texto + máscara de pixel (letra, stroke, sombra, glow) |
+| `app/services/mask.py` | Regiões → máscara binária, `protect`, refino, limite por cena |
+| `app/services/tracking.py` | Propagação por optical flow, estabilização, regiões estáticas |
+| `app/services/watermark.py` | Watermark fixa/móvel, logo, username |
+| `app/utils/video.py` | ffprobe, leitura de frames, encoder raw→x264, mux de áudio |
 
-### 2. Instalação
+## Instalação
+
 ```bash
 cd backend
-python -m venv venv
-source venv/bin/activate  # ou venv\Scripts\activate no Windows
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
+# ffmpeg e ffprobe precisam estar no PATH
 ```
 
-### 4. Executar API
+## Pesos dos modelos
+
+Baixe para `backend/models/`:
+
+- **ProPainter** — `ProPainter.pth` do repositório oficial `sczhou/ProPainter`
+  (release "weights"). Também é preciso o pacote `model/` do ProPainter no
+  `PYTHONPATH` para o import `model.propainter`.
+- **STTN** — `sttn.pth` do repositório `researchmm/STTN`.
+- **LaMa** — `big-lama.pt` (TorchScript) do `advimman/lama`.
+
+Sem pesos, o motor cai em `TemporalFillEngine`: reconstrução real do fundo
+buscando o pixel em frames vizinhos com alinhamento por optical flow (sem blur).
+
+## Variáveis de ambiente
+
+| Variável | Descrição |
+| --- | --- |
+| `CLEANER_WORKER_SECRET` | Mesmo segredo configurado no app Lovable (HMAC) |
+| `CLEANER_STORAGE` | Pasta de armazenamento (padrão `storage`) |
+| `REDIS_URL` | Broker/backend Celery (`redis://localhost:6379/0`) |
+| `USE_CELERY` | `1` para usar a fila Celery; `0` roda em background do FastAPI |
+| `PROPAINTER_WEIGHTS` / `STTN_WEIGHTS` / `LAMA_WEIGHTS` | Caminhos dos pesos |
+| `CORS_ORIGINS` | Origens permitidas (padrão `*`) |
+
+## Executar
+
 ```bash
+# 1) Redis
+docker run -p 6379:6379 redis:7-alpine
+
+# 2) API
 uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+# 3) Worker Celery (com USE_CELERY=1)
+celery -A app.workers.tasks.celery_app worker --loglevel=info --concurrency=1
 ```
 
-### 5. Executar Worker (em outro terminal)
-```bash
-celery -A app.workers.tasks worker --loglevel=info
+CUDA: `torch.cuda.is_available()` é checado em runtime; FP16 é ligado
+automaticamente na GPU e OOM reduz o chunk pela metade e tenta novamente.
+
+## Conectar ao app
+
+No projeto Lovable defina:
+
+- `CLEANER_WORKER_URL` = `https://seu-worker:8000`
+- `CLEANER_WORKER_SECRET` = mesmo segredo do worker
+- `VITE_VIDEO_CLEANER_API_URL` = mesma URL (chamadas diretas do browser)
+
+O worker envia progresso para `POST {PUBLIC_SITE_URL}/api/public/cleaner-callback`
+assinado com HMAC-SHA256 no header `x-signature`.
+
+## Endpoints
+
+```
+GET  /v1/health
+POST /v1/jobs/{id}/upload     (multipart, header x-job-token)
+POST /v1/jobs/{id}/detect     { mode, roi }
+POST /v1/jobs/{id}/process    { mode, preset, masks, options, callbackUrl }
+GET  /v1/jobs/{id}
+POST /v1/jobs/{id}/cancel
+GET  /v1/jobs/{id}/result     (MP4 final)
 ```
 
-## Integração com Lovable
-
-No seu projeto Lovable, configure a variável de ambiente:
-`VITE_VIDEO_CLEANER_API_URL="http://ip-do-servidor:8000"`
-
-A chave `CLEANER_WORKER_SECRET` deve ser a mesma no Lovable (Secrets) e no Worker.
+Presets: `fast` (STTN) · `quality` (ProPainter) · `max` (ProPainter contexto
+maior + segundo passe).

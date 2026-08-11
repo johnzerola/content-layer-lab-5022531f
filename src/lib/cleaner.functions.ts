@@ -54,7 +54,7 @@ export const createCleanerJob = createServerFn({ method: "POST" })
       .object({
         filename: z.string().min(1),
         size: z.number().nonnegative().default(0),
-        mode: z.enum(["subtitle", "text", "watermark", "logo", "object"]).default("subtitle"),
+        mode: z.enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"]).default("subtitle"),
         preset: z.enum(["fast", "quality", "max"]).default("quality"),
       })
       .parse(d),
@@ -111,7 +111,7 @@ export const detectCleanerJob = createServerFn({ method: "POST" })
     z
       .object({
         id: z.string().uuid(),
-        mode: z.enum(["subtitle", "text", "watermark", "logo", "object"]),
+        mode: z.enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"]),
         roi: region.nullable().optional(),
       })
       .parse(d),
@@ -159,7 +159,7 @@ export const processCleanerJob = createServerFn({ method: "POST" })
     z
       .object({
         id: z.string().uuid(),
-        mode: z.enum(["subtitle", "text", "watermark", "logo", "object"]),
+        mode: z.enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"]),
         preset: z.enum(["fast", "quality", "max"]),
         masks: z.array(region),
         options: z.record(z.string(), z.any()).default({}),
