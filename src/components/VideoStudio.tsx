@@ -517,7 +517,11 @@ export function VideoStudio({
                   </div>
                   <span className="pointer-events-none absolute -top-6 left-0 rounded bg-background/90 px-1.5 py-0.5 font-mono text-[10px] text-foreground">
                     {cropPx.w}×{cropPx.h}
+                    {pre.keys.length > 0
+                      ? ` · ${nearKey ? `ajustando ${fmt(nearKey.t)}` : `nova posição em ${fmt(time)}`}`
+                      : ""}
                   </span>
+
                   {HANDLES.map((h) => {
                     const cursor =
                       h === "n" || h === "s"
