@@ -473,16 +473,25 @@ export function VideoStudio({
         </header>
 
         {tab === "camera" && (
-          <FramingStudio
-            url={url}
-            file={file}
-            width={width}
-            height={height}
-            duration={duration}
-            pre={pre}
-            onChange={setPre}
-          />
+          <>
+            <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+              <span className="font-mono text-[11px] text-foreground">Câmera virtual · enquadramento dinâmico</span>
+              <Button className="ml-auto" size="sm" variant="ghost" onClick={() => setTab("layout")}>
+                Voltar aos ajustes
+              </Button>
+            </div>
+            <FramingStudio
+              url={url}
+              file={file}
+              width={width}
+              height={height}
+              duration={duration}
+              pre={pre}
+              onChange={setPre}
+            />
+          </>
         )}
+
 
         <div
           className={`grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 md:grid-cols-[1.1fr_1fr] md:overflow-hidden ${
