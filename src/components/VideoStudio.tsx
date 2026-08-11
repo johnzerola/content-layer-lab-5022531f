@@ -247,11 +247,13 @@ export function VideoStudio({
         x: (e.clientX - b.left) / b.width,
         y: (e.clientY - b.top) / b.height,
         crop: { ...crop },
+        t: videoRef.current?.currentTime ?? time,
       };
       (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     },
-    [crop],
+    [crop, time],
   );
+
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
