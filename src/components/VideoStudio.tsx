@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AudioLines,
+  Camera,
   Crop,
   FlipHorizontal,
   FlipVertical,
@@ -611,6 +612,7 @@ export function VideoStudio({
                 { id: "trim", label: "Cortar", icon: Scissors },
                 { id: "layout", label: "Layout", icon: LayoutTemplate },
                 { id: "crop", label: "Enquadrar", icon: Crop },
+                { id: "camera", label: "Câmera", icon: Camera },
                 { id: "keys", label: "Keyframes", icon: Sparkles },
                 { id: "trans", label: "Transições", icon: SlidersHorizontal },
                 { id: "color", label: "Cor", icon: SlidersHorizontal },
