@@ -162,7 +162,7 @@ export const processCleanerJob = createServerFn({ method: "POST" })
         mode: z.enum(["subtitle", "text", "watermark", "logo", "object"]),
         preset: z.enum(["fast", "quality", "max"]),
         masks: z.array(region),
-        options: z.record(z.string(), z.unknown()).default({}),
+        options: z.record(z.string(), z.any()).default({}),
       })
       .parse(d),
   )
@@ -201,9 +201,9 @@ export const refreshCleanerJob = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    let patch: Record<string, unknown> = {};
+    let patch: Record<string, any> = {};
     try {
-      const s = (await workerStatus(data.id)) as Record<string, unknown>;
+      const s = (await workerStatus(data.id)) as Record<string, any>;
       patch = {
         status: s["status"],
         stage: s["stage"],

@@ -8,6 +8,8 @@
  * validação e FFmpeg) roda no worker.
  */
 
+export type JsonValue = string | number | boolean | null | JsonValue[] | { [k: string]: JsonValue };
+
 export type CleanerMode = "subtitle" | "text" | "watermark" | "logo" | "object";
 export type CleanerPreset = "fast" | "quality" | "max";
 
@@ -132,7 +134,7 @@ export interface CleanerJob {
   size_bytes: number | null;
   mode: CleanerMode;
   preset: CleanerPreset;
-  options: Record<string, unknown>;
+  options: Record<string, JsonValue>;
   probe: CleanerProbe | null;
   detections: CleanerRegion[];
   masks: CleanerRegion[];
