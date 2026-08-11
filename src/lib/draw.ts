@@ -8,7 +8,9 @@ import {
   type TextLayer,
 } from "./template";
 import type { CaptionCue } from "./captions";
-import { cropRect, cropAt, isFullCrop, preEditFilter, transitionAt, type PreEdit } from "./preedit";
+import { cropRect, cropAt, isFullCrop, preEditFilter, rectForCrop, transitionAt, type PreEdit } from "./preedit";
+import { resolveFraming } from "./framing";
+
 
 /** Fallback local para regiões de limpeza quando o motor IA não está disponível.
  *  O processamento profissional agora acontece no backend Python (CleanerIA).
