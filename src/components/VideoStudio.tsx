@@ -76,7 +76,15 @@ const fmt = (s: number) => {
 };
 
 type Handle = "nw" | "ne" | "sw" | "se" | "n" | "s" | "w" | "e";
-type Drag = { mode: "move" | Handle; x: number; y: number; crop: NonNullable<PreEdit["crop"]> };
+type Drag = {
+  mode: "move" | Handle;
+  x: number;
+  y: number;
+  crop: NonNullable<PreEdit["crop"]>;
+  /** instante do vídeo quando o arraste começou (para gravar o keyframe certo) */
+  t: number;
+};
+
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
