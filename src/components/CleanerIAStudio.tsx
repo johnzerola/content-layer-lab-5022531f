@@ -463,10 +463,15 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
   const handleProcess = async () => {
     if (!job?.id) return;
+    if (!inputReady) {
+      toast.error("Envie o vídeo para o motor antes de remover.");
+      return;
+    }
     if (!masks.length) {
       toast.error("Marque ao menos uma área ou use Detectar.");
       return;
     }
+
     try {
       const headers = await cloudAuthHeaders();
       await processJob({
