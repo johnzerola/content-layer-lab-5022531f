@@ -493,9 +493,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       setJob((prev) => (prev ? { ...prev, status: "inpainting", progress: 1 } : prev));
       toast.success("Reconstrução iniciada na GPU.");
     } catch (e) {
-      toast.error(`Erro ao iniciar: ${e instanceof Error ? e.message : "desconhecido"}`);
+      const msg = errMsg(e);
+      if (/não está no motor/.test(msg)) setInputReady(false);
+      toast.error(`Erro ao iniciar: ${msg}`);
     }
   };
+
 
   const running = !!job && job.status !== "completed" && job.status !== "queued" && polling;
   const sel = masks.find((m) => m.id === selected) || null;
