@@ -90,6 +90,22 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const src = useMemo(() => URL.createObjectURL(item.file), [item.file]);
   useEffect(() => () => URL.revokeObjectURL(src), [src]);
 
+  /**
+   * Alguns codecs não disparam onLoadedMetadata no navegador. Em vez de travar o
+   * palco em "carregando", liberamos a marcação após um tempo curto — as máscaras
+   * são normalizadas (0..1), então funcionam mesmo sem metadados do player.
+   */
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setVideoReady((prev) => {
+        if (!prev) toast.message("Pré-visualização lenta — a marcação já está liberada.");
+        return true;
+      });
+    }, 3500);
+    return () => window.clearTimeout(t);
+  }, [src]);
+
+
   useEffect(() => {
     let alive = true;
     const check = () =>
@@ -258,10 +274,15 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       setMasks((prev) => [...prev, draft]);
       setSelected(draft.id);
     }
-    if (draft?.kind === "rect" && (draft.w ?? 0) > 0.01 && (draft.h ?? 0) > 0.01) {
-      setMasks((prev) => [...prev, draft]);
-      setSelected(draft.id);
+    if (draft?.kind === "rect") {
+      if ((draft.w ?? 0) > 0.01 && (draft.h ?? 0) > 0.01) {
+        setMasks((prev) => [...prev, draft]);
+        setSelected(draft.id);
+      } else if ((draft.w ?? 0) > 0.0005 || (draft.h ?? 0) > 0.0005) {
+        toast.message("Área muito pequena — arraste para criar uma área maior.");
+      }
     }
+
     setDraft(null);
     dragStart.current = null;
   };
@@ -289,6 +310,26 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     polyPoints.current = [];
     setDraft(null);
   };
+
+  /** Máscaras típicas em um clique: legenda no rodapé, marca d'água no topo. */
+  const addPresetMask = (where: "bottom" | "top") => {
+    const region: CleanerRegion = {
+      id: rid(),
+      kind: "rect",
+      role: "remove",
+      x: 0.06,
+      y: where === "bottom" ? 0.72 : 0.03,
+      w: 0.88,
+      h: 0.22,
+      grow: 0.008,
+      track: true,
+      enabled: true,
+      label: where === "bottom" ? "Rodapé (legenda)" : "Topo (marca d'água)",
+    };
+    setMasks((prev) => [...prev, region]);
+    setSelected(region.id);
+  };
+
 
   const errMsg = (e: unknown) => {
     const raw = e instanceof Error ? e.message : String(e ?? "");
@@ -432,8 +473,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
   const handleDetect = async () => {
     if (!job?.id) return;
-    if (!inputReady) {
-      toast.error("Envie o vídeo para o motor antes de detectar.");
+    // Revalida no motor antes de tentar: evita o 500 genérico quando o arquivo sumiu.
+    const check = await confirmInput(job.id);
+    if (!check.ok) {
+      toast.error(`O motor não tem este vídeo (${check.error || "arquivo ausente"}). Use "Reenviar vídeo".`);
       return;
     }
     // Primeiro salva as máscaras atuais para garantir persistência antes da detecção
@@ -449,9 +492,13 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       const found = (res.detections || []) as CleanerRegion[];
       setMasks((prev) => [...prev, ...found]);
       setJob({ ...res, status: "queued" });
-      toast[found.length ? "success" : "warning"](
-        found.length ? `${found.length} área(s) encontrada(s).` : "Nada detectado — marque à mão.",
-      );
+      if (found.length) {
+        toast.success(`${found.length} área(s) encontrada(s).`);
+      } else {
+        addPresetMask("bottom");
+        toast.warning("Nada detectado — sugeri a área do rodapé. Ajuste ou apague se não servir.");
+      }
+
     } catch (e) {
       setJob((prev) => (prev ? { ...prev, status: "queued" } : prev));
       const msg = errMsg(e);
@@ -504,7 +551,14 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const sel = masks.find((m) => m.id === selected) || null;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[200px_1fr_300px]">
+    <div className="space-y-4">
+      {health?.online && health.cuda === false && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[11px] font-semibold text-amber-500">
+          Modo CPU — processamento lento. O motor está sem GPU; funciona, mas demora bem mais.
+        </div>
+      )}
+
+      <div className="grid items-start gap-6 lg:grid-cols-[200px_minmax(0,1fr)_320px]">
       {/* Modos */}
       <aside className="space-y-2">
         <p className="mono-label px-1">Ferramentas de IA</p>
@@ -526,8 +580,49 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       </aside>
 
       {/* Player + máscaras */}
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4">
+        {/* Ferramentas de marcação — sempre visíveis acima do vídeo */}
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-surface/40 p-2">
+          {([
+            ["rect", "Retângulo", Square],
+            ["poly", "Polígono", Pentagon],
+            ["brush", "Pincel", PenTool],
+            ["protect", "Proteger", Shield],
+            ["erase", "Apagar", Eraser],
+            ["select", "Selecionar", MousePointer2],
+          ] as const).map(([id, label, Icon]) => (
+            <button
+              key={id}
+              onClick={() => setTool(id)}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                tool === id
+                  ? "border-primary bg-primary/15 text-primary shadow-glow"
+                  : "border-border/60 bg-background/40 hover:border-border"
+              }`}
+            >
+              <Icon className="size-3.5" /> {label}
+            </button>
+          ))}
+          <span className="mx-1 h-5 w-px bg-border/60" />
+          <button
+            onClick={() => addPresetMask("bottom")}
+            className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-xs font-semibold hover:border-primary"
+          >
+            Cobrir rodapé
+          </button>
+          <button
+            onClick={() => addPresetMask("top")}
+            className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-xs font-semibold hover:border-primary"
+          >
+            Cobrir topo
+          </button>
+          <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+            {time.toFixed(2)}s / {duration.toFixed(2)}s
+          </span>
+        </div>
+
         <div
+
           ref={stageRef}
           onPointerDown={videoReady ? onDown : undefined}
           onPointerMove={videoReady ? onMove : undefined}
@@ -654,30 +749,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           )}
         </div>
 
-        {/* Ferramentas */}
-        <div className="flex flex-wrap items-center gap-2">
-          {([
-            ["rect", "Retângulo", Square],
-            ["poly", "Polígono", Pentagon],
-            ["brush", "Pincel", PenTool],
-            ["protect", "Proteger", Shield],
-            ["erase", "Apagar", Eraser],
-            ["select", "Selecionar", MousePointer2],
-          ] as const).map(([id, label, Icon]) => (
-            <button
-              key={id}
-              onClick={() => setTool(id)}
-              className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                tool === id ? "border-primary bg-primary/15 text-primary" : "border-border/60 bg-surface/40"
-              }`}
-            >
-              <Icon className="size-3.5" /> {label}
-            </button>
-          ))}
-          <span className="ml-auto font-mono text-[10px] text-muted-foreground">
-            {time.toFixed(2)}s / {duration.toFixed(2)}s
-          </span>
-        </div>
+
+
 
         {tool === "poly" && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs">
@@ -775,7 +848,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       </div>
 
       {/* Configurações */}
-      <div className="space-y-5">
+      <div className="space-y-5 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-1">
+
         <section className="space-y-4 rounded-2xl border border-border/70 bg-surface/50 p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <h3 className="font-display font-bold">Configurações</h3>
@@ -807,12 +881,6 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
           </div>
 
-          {health?.online && health.cuda === false && (
-            <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] leading-snug text-amber-500">
-              Modo CPU — o motor está sem GPU disponível. O processamento funciona, mas é bem mais
-              lento; não parece travado, só demora.
-            </p>
-          )}
 
 
           <div className="space-y-2">
@@ -924,9 +992,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           </h3>
           {masks.length === 0 ? (
             <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Arraste sobre o vídeo para marcar o que remover, ou clique em Detectar. O fundo é
+              Escolha <strong>Retângulo</strong> na barra acima do vídeo e arraste sobre o que quer
+              remover — ou use <strong>Cobrir rodapé</strong> / <strong>Detectar</strong>. O fundo é
               reconstruído com contexto temporal — nunca borrado.
             </p>
+
           ) : (
             <div className="max-h-[220px] space-y-2 overflow-y-auto pr-1">
               {masks.map((m) => (
@@ -1039,6 +1109,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           </div>
         )}
       </div>
+      </div>
     </div>
   );
+
 }

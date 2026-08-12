@@ -80,7 +80,11 @@ function friendly(status: number, raw: string): string {
   if (status === 409) return "o vídeo não está no motor — reenvie o arquivo";
   if (status === 401 || status === 403) return "sessão do job expirada — reenvie o vídeo";
   if (status === 404) return "job não encontrado no motor — reenvie o vídeo";
+  if (status === 413) return "vídeo grande demais para o motor";
+  if (status === 422) return `o motor recusou os dados enviados (${detail?.slice(0, 120) || "formato inválido"})`;
+  if (status >= 500) return `falha interna do motor (${detail?.slice(0, 160) || "sem detalhe"}) — tente novamente`;
   return detail?.slice(0, 300) || `motor respondeu ${status}`;
+
 }
 
 async function call<T>(path: string, init: RequestInit & { jobId?: string } = {}): Promise<T> {
