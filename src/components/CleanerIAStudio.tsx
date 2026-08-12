@@ -848,7 +848,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       </div>
 
       {/* Configurações */}
-      <div className="space-y-5">
+      <div className="space-y-5 lg:max-h-[calc(100vh-8rem)] lg:overflow-y-auto lg:pr-1">
+
         <section className="space-y-4 rounded-2xl border border-border/70 bg-surface/50 p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <h3 className="font-display font-bold">Configurações</h3>
