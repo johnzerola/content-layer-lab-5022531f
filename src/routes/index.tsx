@@ -1599,10 +1599,8 @@ function Home() {
             fsAccess={fsAccessSupported()}
             selectedId={selectedId}
             onSelect={setSelectedId}
-            onEdit={(id) => {
-              setSelectedId(id);
-              setStudioId(id);
-            }}
+            onEdit={(id) => void openStudio(id)}
+
             onProcess={(ids) => void processAll(ids)}
             onTogglePause={togglePause}
             onCancel={cancelAll}
@@ -2161,7 +2159,7 @@ function Home() {
 
                     <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
                       <p className="mono-label text-primary">Edite cores, legendas e variações no Estúdio</p>
-                      <Button size="sm" onClick={() => setStudioId(selected.id)}>
+                      <Button size="sm" onClick={() => void openStudio(selected.id)}>
                         <Pencil className="mr-1 size-3.5" /> Abrir Estúdio
                       </Button>
                     </div>
@@ -2397,9 +2395,9 @@ function Home() {
                       title="Editar vídeo (cortar, enquadrar, cor)"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedId(it.id);
-                        setStudioId(it.id);
+                        void openStudio(it.id);
                       }}
+
                       className={`rounded-md border p-1.5 hover:border-primary ${
                         hasPreEdit(it.preEdit) || it.clip ? "border-primary text-primary" : "border-border text-muted-foreground"
                       }`}
