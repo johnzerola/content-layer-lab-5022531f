@@ -146,6 +146,8 @@ interface Item {
   /** estado da análise automática de legenda/marca d'água */
   detectStatus?: "analisando" | "ok" | "vazio" | "erro" | undefined;
   detectMsg?: string | undefined;
+  /** URL do vídeo já limpo pela GPU (CleanerIA) — vira a fonte do render */
+  result_url?: string | null | undefined;
 
   error?: string | undefined;
 }
