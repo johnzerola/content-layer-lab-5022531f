@@ -511,15 +511,18 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
     try {
       setJob((prev) => (prev ? { ...prev, status: "detecting", stage: "detectando áreas" } : prev));
+      pushLog("info", `detectando (${mode})`);
       const headers = await cloudAuthHeaders();
       const res = (await detectJob({ data: { id: job.id, mode }, headers })) as CleanerJob;
       const found = (res.detections || []) as CleanerRegion[];
       setMasks((prev) => [...prev, ...found]);
       setJob({ ...res, status: "queued" });
       if (found.length) {
+        pushLog("info", `${found.length} área(s) detectada(s)`);
         toast.success(`${found.length} área(s) encontrada(s).`);
       } else {
         addPresetMask("bottom");
+        pushLog("warn", "detecção não encontrou nada — máscara de rodapé sugerida");
         toast.warning("Nada detectado — sugeri a área do rodapé. Ajuste ou apague se não servir.");
       }
 
@@ -527,8 +530,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       setJob((prev) => (prev ? { ...prev, status: "queued" } : prev));
       const msg = errMsg(e);
       if (/não está no motor/.test(msg)) setInputReady(false);
+      pushLog("error", `detecção falhou: ${msg}`);
       toast.error(`Erro na detecção: ${msg}`);
     }
+
   };
 
 
