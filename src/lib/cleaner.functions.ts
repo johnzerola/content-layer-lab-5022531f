@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { CleanerJob, CleanerRegion } from "@/lib/cleaner";
 import {
   jobToken,
-  workerBase,
+  workerPublicBase,
   workerCancel,
   workerDetect,
   workerHealth,
@@ -75,7 +75,7 @@ export const createCleanerJob = createServerFn({ method: "POST" })
       .single();
     if (error) throw new Error(error.message);
 
-    const base = workerBase();
+    const base = workerPublicBase();
     return {
       job: row as unknown as CleanerJob,
       upload: base ? { url: `${base}/v1/jobs/${row.id}/upload`, token: jobToken(row.id) } : null,
