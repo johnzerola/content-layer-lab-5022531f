@@ -281,6 +281,202 @@ function Home() {
     [],
   );
 
+  /* --------------------------------------------------------------- */
+  /* Autosave da sessão (IndexedDB) — o lote sobrevive a F5 e reload   */
+  /* --------------------------------------------------------------- */
+  const ALL_MODES = useMemo<Mode[]>(() => ["lote", "clip", "limpar", "limpar-ia"], []);
+  const [pendingSessions, setPendingSessions] = useState<Partial<Record<Mode, SessionSnap>>>({});
+  const [restoring, setRestoring] = useState(false);
+  const savedBlobs = useRef<Set<string>>(new Set());
+  const savedResults = useRef<Set<string>>(new Set());
+  const skipSave = useRef(true);
+
+  useEffect(() => {
+    void (async () => {
+      void pruneSessions();
+      const found: Partial<Record<Mode, SessionSnap>> = {};
+      for (const m of ALL_MODES) {
+        const snap = await loadSession(m);
+        if (snap?.items?.length) found[m] = snap;
+      }
+      setPendingSessions(found);
+      skipSave.current = false;
+    })();
+  }, [ALL_MODES]);
+
+  const persistSessions = useCallback(async () => {
+    for (const m of ALL_MODES) {
+      const list = queuesRef.current[m] ?? [];
+      if (!list.length) {
+        continue;
+      }
+      const snapItems: SessionItem[] = [];
+      for (const it of list) {
+        const fileKey = `f:${m}:${it.id}`;
+        if (!savedBlobs.current.has(fileKey) && it.file) {
+          try {
+            await putBlob(fileKey, it.file);
+            savedBlobs.current.add(fileKey);
+          } catch {
+            /* quota cheia: segue sem o binário */
+          }
+        }
+        const outputs: SessionOutput[] = [];
+        const outs = it.outputs ?? (it.blob ? [{ blob: it.blob, ext: it.ext ?? "mp4", label: "" }] : []);
+        for (let k = 0; k < outs.length; k++) {
+          const o = outs[k]!;
+          const key = `o:${m}:${it.id}:${k}`;
+          if (!savedBlobs.current.has(key)) {
+            try {
+              await putBlob(key, o.blob);
+              savedBlobs.current.add(key);
+            } catch {
+              continue;
+            }
+          }
+          outputs.push({ key, ext: o.ext, label: o.label, bytes: o.blob.size });
+
+          // registra na Biblioteca de resultados (uma única vez)
+          if (!savedResults.current.has(key)) {
+            savedResults.current.add(key);
+            const base = it.file.name.replace(/\.[^.]+$/, "");
+            void addResult({
+              name: `${base}${o.label ? `-${o.label}` : ""}.${o.ext}`,
+              mode: m,
+              blobKey: key,
+              poster: it.poster,
+              bytes: o.blob.size,
+              seconds: it.duration,
+              sourceName: it.file.name,
+              variant: o.label || null,
+            }).catch(() => {});
+          }
+        }
+        snapItems.push({
+          id: it.id,
+          fileKey,
+          fileName: it.file?.name ?? "video.mp4",
+          fileType: it.file?.type ?? "video/mp4",
+          posterKey: null,
+          w: it.w,
+          h: it.h,
+          duration: it.duration,
+          headline: it.headline,
+          offsetX: it.offsetX,
+          offsetY: it.offsetY,
+          status: it.status,
+          progress: it.progress,
+          sourceUrl: it.sourceUrl ?? null,
+          clip: it.clip ?? null,
+          score: it.score ?? null,
+          clipTitle: it.clipTitle ?? null,
+          clipReason: it.clipReason ?? null,
+          clipTags: it.clipTags ?? null,
+          preEdit: it.preEdit ?? null,
+          captions: it.captions ?? null,
+          regions: it.regions ?? null,
+          result_url: it.result_url ?? null,
+          ext: it.ext ?? null,
+          outputs,
+        });
+      }
+      try {
+        await saveSession({ mode: m, updatedAt: Date.now(), items: snapItems });
+      } catch {
+        /* sem espaço: ignora silenciosamente */
+      }
+    }
+  }, [ALL_MODES]);
+
+  useEffect(() => {
+    if (skipSave.current || restoring) return;
+    const t = setTimeout(() => void persistSessions(), 1500);
+    return () => clearTimeout(t);
+  }, [queues, restoring, persistSessions]);
+
+  // grava também ao trocar de aba / minimizar
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden" && !skipSave.current) void persistSessions();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    return () => document.removeEventListener("visibilitychange", onHide);
+  }, [persistSessions]);
+
+  const restoreSession = useCallback(
+    async (m: Mode) => {
+      const snap = pendingSessions[m];
+      if (!snap) return;
+      setRestoring(true);
+      try {
+        const restored: Item[] = [];
+        for (const s of snap.items) {
+          const blob = await getBlob(s.fileKey);
+          if (!blob) continue;
+          const file = new File([blob], s.fileName, { type: s.fileType || "video/mp4" });
+          const outputs: { blob: Blob; ext: string; label: string }[] = [];
+          for (const o of s.outputs ?? []) {
+            const b = await getBlob(o.key);
+            if (b) outputs.push({ blob: b, ext: o.ext, label: o.label });
+            savedBlobs.current.add(o.key);
+            savedResults.current.add(o.key);
+          }
+          savedBlobs.current.add(s.fileKey);
+          restored.push({
+            id: s.id,
+            file,
+            poster: null,
+            w: s.w,
+            h: s.h,
+            duration: s.duration,
+            headline: s.headline ?? "",
+            offsetX: s.offsetX ?? 0,
+            offsetY: s.offsetY ?? 0,
+            status: (s.status as Status) ?? "pendente",
+            progress: s.status === "pronto" ? 1 : 0,
+            ...(s.sourceUrl ? { sourceUrl: s.sourceUrl } : {}),
+            ...(s.clip ? { clip: s.clip } : {}),
+            ...(s.score != null ? { score: s.score } : {}),
+            ...(s.clipTitle ? { clipTitle: s.clipTitle } : {}),
+            ...(s.clipReason ? { clipReason: s.clipReason } : {}),
+            ...(s.clipTags ? { clipTags: s.clipTags } : {}),
+            ...(s.preEdit ? { preEdit: s.preEdit as PreEdit } : {}),
+            ...(s.captions ? { captions: s.captions as CaptionCue[] } : {}),
+            ...(s.regions ? { regions: s.regions as CleanupRegion[] } : {}),
+            ...(s.result_url ? { result_url: s.result_url } : {}),
+            ...(outputs.length
+              ? { outputs, blob: outputs[0]!.blob, ext: outputs[0]!.ext }
+              : s.ext
+                ? { ext: s.ext }
+                : {}),
+          });
+        }
+        if (!restored.length) {
+          toast.error("Não consegui retomar", { description: "os arquivos do lote não estão mais no navegador" });
+          await clearSession(m);
+        } else {
+          setItemsIn(m, restored);
+          setSelectedIds((prev) => ({ ...prev, [m]: restored[0]!.id }));
+          toast.success(`Lote retomado — ${restored.length} vídeo(s)`);
+        }
+        setPendingSessions((p) => ({ ...p, [m]: undefined }));
+      } catch (err) {
+        toast.error("Falha ao retomar a sessão", { description: String((err as Error)?.message ?? err) });
+      } finally {
+        setRestoring(false);
+      }
+    },
+    [pendingSessions, setItemsIn],
+  );
+
+  const discardSession = useCallback(async (m: Mode) => {
+    await clearSession(m);
+    setPendingSessions((p) => ({ ...p, [m]: undefined }));
+    toast.success("Sessão anterior descartada");
+  }, []);
+
+
+
 
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
