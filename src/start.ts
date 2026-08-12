@@ -11,15 +11,12 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
       throw error;
     }
     console.error("Server Error:", error);
-    return new Response(
-      JSON.stringify({
+    return json(
+      {
         error: error instanceof Error ? error.message : "Unknown error",
         timestamp: Date.now(),
-      }),
-      {
-        status: 500,
-        headers: { "content-type": "application/json" },
       },
+      { status: 500 },
     );
   }
 });
