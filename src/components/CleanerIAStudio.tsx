@@ -84,6 +84,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const processJob = useServerFn(processCleanerJob);
   const refreshJob = useServerFn(refreshCleanerJob);
   const saveMasks = useServerFn(saveCleanerMasks);
+  const checkInput = useServerFn(checkCleanerInput);
+
 
   const src = useMemo(() => URL.createObjectURL(item.file), [item.file]);
   useEffect(() => () => URL.revokeObjectURL(src), [src]);
