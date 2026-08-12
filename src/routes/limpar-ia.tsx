@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Eraser, Sparkles, Upload, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
+import { AuthGate } from "@/components/AuthGate";
 import { listCleanerJobs } from "@/lib/cleaner.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { STAGE_LABEL, type CleanerJob } from "@/lib/cleaner";
