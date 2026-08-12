@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { deleteResult, formatBytes, getBlob, listResults, storageUsage, type ResultRow } from "@/lib/session";
 import { listExports, type ExportRow } from "@/lib/cloud";
-import { zipStream } from "@/lib/zip";
+import { downloadAsZip } from "@/lib/zip";
 
 export const Route = createFileRoute("/biblioteca")({
   head: () => ({
@@ -117,8 +117,7 @@ function LibraryPage() {
         toast.error("Nenhum arquivo disponível para baixar");
         return;
       }
-      const zip = await zipStream(files);
-      downloadBlob(zip, `vaiviral-biblioteca-${Date.now()}.zip`);
+      await downloadAsZip(files, `vaiviral-biblioteca-${Date.now()}.zip`);
     } catch (err) {
       toast.error("Não consegui montar o ZIP", { description: String((err as Error)?.message ?? err) });
     } finally {
