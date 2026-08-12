@@ -23,6 +23,7 @@ import {
   detectCleanerJob,
   processCleanerJob,
   refreshCleanerJob,
+  saveCleanerMasks,
 } from "@/lib/cleaner.functions";
 import {
   MODE_HINT,
@@ -77,6 +78,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const detectJob = useServerFn(detectCleanerJob);
   const processJob = useServerFn(processCleanerJob);
   const refreshJob = useServerFn(refreshCleanerJob);
+  const saveMasks = useServerFn(saveCleanerMasks);
 
   const src = useMemo(() => URL.createObjectURL(item.file), [item.file]);
   useEffect(() => () => URL.revokeObjectURL(src), [src]);
@@ -352,6 +354,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
 
   const handleDetect = async () => {
+    // Primeiro salva as máscaras atuais para garantir persistência antes da detecção
+    if (masks.length > 0 && job?.id) {
+      const headers = await cloudAuthHeaders();
+      await saveMasks({ data: { id: job.id, masks }, headers }).catch(() => null);
+    }
+
     if (!job?.id) return;
     try {
       setJob((prev) => (prev ? { ...prev, status: "detecting", stage: "detectando áreas" } : prev));
@@ -407,7 +415,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     <div className="grid gap-6 lg:grid-cols-[200px_1fr_300px]">
       {/* Modos */}
       <aside className="space-y-2">
-        <p className="mono-label px-1">Modo</p>
+        <p className="mono-label px-1">1 primeiro não deixa mostra aonde tem as legendas para eu ja msotra a rea</p>
         {MODES.map((m) => (
           <button
             key={m}
