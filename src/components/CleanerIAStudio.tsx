@@ -407,7 +407,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     <div className="grid gap-6 lg:grid-cols-[200px_1fr_300px]">
       {/* Modos */}
       <aside className="space-y-2">
-        <p className="mono-label px-1">Modo</p>
+        <p className="mono-label px-1">1 primeiro não deixa mostra aonde tem as legendas para eu ja msotra a rea</p>
         {MODES.map((m) => (
           <button
             key={m}
