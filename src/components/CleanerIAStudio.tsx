@@ -296,20 +296,50 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       setJob(newJob);
 
       if (upload) {
-        const formData = new FormData();
-        formData.append("file", item.file);
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open("POST", upload.url);
-          xhr.setRequestHeader("x-job-token", upload.token);
-          xhr.upload.onprogress = (ev) => {
-            if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
-          };
-          xhr.onload = () =>
-            xhr.status >= 200 && xhr.status < 300 ? resolve() : reject(new Error(xhr.responseText));
-          xhr.onerror = () => reject(new Error("erro de conexão"));
-          xhr.send(formData);
-        });
+        // Navegador bloqueia http:// dentro de página https (conteúdo misto):
+        // reescreve para o proxy HTTPS do worker antes de enviar.
+        const secureUrl =
+          typeof window !== "undefined" &&
+          window.location.protocol === "https:" &&
+          upload.url.startsWith("http://")
+            ? upload.url.replace(
+                /^http:\/\/(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?::\d+)?/,
+                (_m, a, b, c, d) => `https://cleaner-${a}-${b}-${c}-${d}.nip.io`,
+              )
+            : upload.url;
+
+        const send = () =>
+          new Promise<void>((resolve, reject) => {
+            const formData = new FormData();
+            formData.append("file", item.file);
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", secureUrl);
+            xhr.timeout = 15 * 60 * 1000;
+            xhr.setRequestHeader("x-job-token", upload.token);
+            xhr.upload.onprogress = (ev) => {
+              if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
+            };
+            xhr.onload = () =>
+              xhr.status >= 200 && xhr.status < 300
+                ? resolve()
+                : reject(new Error(`${xhr.status} ${xhr.responseText || "falha no envio"}`));
+            xhr.onerror = () =>
+              reject(new Error(`não foi possível alcançar ${new URL(secureUrl).host}`));
+            xhr.ontimeout = () => reject(new Error("tempo esgotado no envio"));
+            xhr.send(formData);
+          });
+
+        try {
+          await send();
+        } catch (first) {
+          setUploadProgress(0);
+          await new Promise((r) => setTimeout(r, 1200));
+          try {
+            await send();
+          } catch {
+            throw first;
+          }
+        }
       }
       setJob((prev) => (prev ? { ...prev, status: "queued", progress: 0 } : prev));
       toast.success("Vídeo enviado. Detecte as áreas ou marque à mão.");
@@ -319,6 +349,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       setUploading(false);
     }
   };
+
 
   const handleDetect = async () => {
     if (!job?.id) return;
