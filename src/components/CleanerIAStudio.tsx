@@ -130,7 +130,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   }, [tool]);
 
   const visible = masks.filter(
-    (m) => (m.from ?? 0) <= time && time <= (m.to ?? (duration || Infinity)),
+    (m) => (m.from ?? 0) <= time + 0.1 && time <= (m.to ?? (duration || Infinity)) + 0.1,
   );
 
   const pointAt = useCallback((e: React.PointerEvent) => {
@@ -423,7 +423,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     <div className="grid gap-6 lg:grid-cols-[200px_1fr_300px]">
       {/* Modos */}
       <aside className="space-y-2">
-        <p className="mono-label px-1">Modo</p>
+        <p className="mono-label px-1">Ferramentas de IA</p>
         {MODES.map((m) => (
           <button
             key={m}
@@ -449,7 +449,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           onPointerMove={onMove}
           onPointerUp={onUp}
           onDoubleClick={() => tool === "poly" && finishPolygon()}
-          className={`panel relative aspect-video overflow-hidden rounded-2xl border border-border/60 bg-black ${
+          className={`panel relative aspect-video overflow-hidden rounded-2xl border border-border/60 bg-black touch-none ${
             tool === "select" ? "cursor-default" : tool === "erase" ? "cursor-pointer" : "cursor-crosshair"
           }`}
         >
