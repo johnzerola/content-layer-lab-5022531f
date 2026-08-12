@@ -1,19 +1,29 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AudioLines,
   Camera,
+  ChevronFirst,
+  ChevronLast,
   Crop,
+  Eye,
   FlipHorizontal,
   FlipVertical,
+  Grid3X3,
   Languages,
   LayoutTemplate,
   Pause,
   Play,
+  Redo2,
+  Repeat,
+  RotateCcw,
   RotateCw,
   Scissors,
+  Shield,
   SlidersHorizontal,
   Sparkles,
+  StepBack,
+  StepForward,
   Subtitles,
   Type,
   Undo2,
@@ -42,12 +52,11 @@ import {
 import { translateWords } from "@/lib/translate.functions";
 import { detectSpeechSegments } from "@/lib/silence";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
-import { LayoutPreview } from "@/components/LayoutPreview";
 import { FramingStudio } from "@/components/FramingStudio";
 import { EditorTimeline } from "@/components/EditorTimeline";
+import { StagePreview } from "@/components/editor/StagePreview";
+import { useEditorHistory } from "@/components/editor/useEditorHistory";
 import type { CaptionCue } from "@/lib/captions";
-
-
 
 export interface PreEditResult {
   pre: PreEdit;
@@ -87,10 +96,38 @@ type Drag = {
   t: number;
 };
 
-
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
 type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text";
+
+const TOOL_GROUPS: { group: string; items: { id: Tab; label: string; icon: typeof Scissors }[] }[] = [
+  {
+    group: "Tempo",
+    items: [
+      { id: "trim", label: "Cortar", icon: Scissors },
+      { id: "trans", label: "Transições", icon: SlidersHorizontal },
+    ],
+  },
+  {
+    group: "Imagem",
+    items: [
+      { id: "layout", label: "Layout", icon: LayoutTemplate },
+      { id: "crop", label: "Enquadrar", icon: Crop },
+      { id: "camera", label: "Câmera", icon: Camera },
+      { id: "keys", label: "Keyframes", icon: Sparkles },
+      { id: "color", label: "Cor", icon: SlidersHorizontal },
+    ],
+  },
+  {
+    group: "Conteúdo",
+    items: [
+      { id: "caps", label: "Legenda", icon: Subtitles },
+      { id: "text", label: "Textos", icon: Type },
+    ],
+  },
+];
+
+const TOOL_ORDER: Tab[] = TOOL_GROUPS.flatMap((g) => g.items.map((i) => i.id));
 
 /** Miniatura esquemática de cada layout (9:16). */
 function LayoutGlyph({ id }: { id: LayoutKind }) {
@@ -146,7 +183,15 @@ const LANGS = [
   { id: "hindi", label: "Hindi" },
 ];
 
-/** Estúdio de pré-edição: corte de tempo, recorte de quadro, keyframes, transições, legendas e textos. */
+const SPEEDS = [0.25, 0.5, 1, 1.5, 2];
+
+interface Doc {
+  pre: PreEdit;
+  start: number;
+  end: number;
+}
+
+/** Estúdio de edição: palco com preview real, trilha de ferramentas, inspetor e timeline. */
 export function VideoStudio({
   file,
   width,
@@ -160,12 +205,31 @@ export function VideoStudio({
   onClose,
   onSave,
 }: Props) {
-  const [pre, setPre] = useState<PreEdit>(value.pre ?? defaultPreEdit());
-  const [start, setStart] = useState(value.clip?.start ?? 0);
-  const [end, setEnd] = useState(value.clip?.end ?? duration);
+  const hist = useEditorHistory<Doc>({
+    pre: value.pre ?? defaultPreEdit(),
+    start: value.clip?.start ?? 0,
+    end: value.clip?.end ?? duration,
+  });
+  const { pre, start, end } = hist.state;
+
+  const setPre = useCallback(
+    (next: PreEdit | ((v: PreEdit) => PreEdit), label = "edição") =>
+      hist.set((d) => ({ ...d, pre: typeof next === "function" ? next(d.pre) : next }), label),
+    [hist],
+  );
+  const set = (p: Partial<PreEdit>, label = "ajuste") => setPre((v) => ({ ...v, ...p }), label);
+  const setStart = (s: number) => hist.set((d) => ({ ...d, start: s }), "entrada");
+  const setEnd = (e: number) => hist.set((d) => ({ ...d, end: e }), "saída");
+
   const [tab, setTab] = useState<Tab>("trim");
+  const [view, setView] = useState<"out" | "src">("out");
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(value.clip?.start ?? 0);
+  const [speed, setSpeed] = useState(1);
+  const [loop, setLoop] = useState(true);
+  const [compare, setCompare] = useState(false);
+  const [thirds, setThirds] = useState(false);
+  const [safe, setSafe] = useState(false);
   const [draft, setDraft] = useState(texts ?? { headline: "", name: "", handle: "", cta: "" });
   const [lang, setLang] = useState(LANGS[0]!.id);
   const [translating, setTranslating] = useState(false);
@@ -174,8 +238,6 @@ export function VideoStudio({
   const [cutting, setCutting] = useState(false);
   /** proporção travada do recorte (largura/altura em pixels da fonte) */
   const [lock, setLock] = useState<number | null>(null);
-
-
 
   const [url, setUrl] = useState("");
   useEffect(() => {
@@ -193,7 +255,6 @@ export function VideoStudio({
 
   /** recorte mostrado agora: segue os keyframes quando existirem */
   const crop = cropAt(pre, time) ?? pre.crop ?? { x: 0, y: 0, w: 1, h: 1 };
-  const set = (p: Partial<PreEdit>) => setPre((v) => ({ ...v, ...p }));
 
   /** tolerância para considerar que o playhead está "em cima" de um keyframe */
   const SNAP = 0.2;
@@ -210,8 +271,7 @@ export function VideoStudio({
           ? v.keys.map((k, j) => (j === i ? { t: k.t, crop: next } : k))
           : [...v.keys, { t, crop: next }].sort((a, b) => a.t - b.t);
       return { ...v, keys };
-    });
-
+    }, "recorte");
 
   // loop de reprodução dentro da janela de corte
   useEffect(() => {
@@ -219,22 +279,32 @@ export function VideoStudio({
     if (!v) return;
     let raf = 0;
     const tick = () => {
-      if (v.currentTime >= end - 0.03) v.currentTime = start;
+      if (v.currentTime >= end - 0.03) {
+        if (loop) v.currentTime = start;
+        else if (!v.paused) v.pause();
+      }
       setTime(v.currentTime);
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [start, end]);
+  }, [start, end, loop]);
 
-  const seek = (t: number) => {
-    const v = videoRef.current;
-    if (!v) return;
-    v.currentTime = Math.min(Math.max(t, 0), Math.max(0, duration - 0.05));
-    setTime(t);
-  };
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.playbackRate = speed;
+  }, [speed]);
 
-  const toggle = () => {
+  const seek = useCallback(
+    (t: number) => {
+      const v = videoRef.current;
+      if (!v) return;
+      v.currentTime = Math.min(Math.max(t, 0), Math.max(0, duration - 0.05));
+      setTime(t);
+    },
+    [duration],
+  );
+
+  const toggle = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
     if (v.paused) {
@@ -245,7 +315,9 @@ export function VideoStudio({
       v.pause();
       setPlaying(false);
     }
-  };
+  }, [start, end]);
+
+  const step = (frames: number) => seek(Math.min(end, Math.max(start, time + frames / 30)));
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent, mode: Drag["mode"]) => {
@@ -263,7 +335,6 @@ export function VideoStudio({
     },
     [crop, time],
   );
-
 
   const onPointerMove = useCallback(
     (e: React.PointerEvent) => {
@@ -302,7 +373,6 @@ export function VideoStudio({
         // mantém a proporção escolhida (9:16, 1:1, …) enquanto redimensiona
         if (lock && width && height) {
           const boxAR = width / height;
-          // altura normalizada equivalente à proporção travada
           const hFromW = (next.w * boxAR) / lock;
           const wFromH = (next.h * lock) / boxAR;
           const drivenByWidth = m.includes("w") || m.includes("e");
@@ -329,49 +399,54 @@ export function VideoStudio({
             ? v.keys.map((k, j) => (j === i ? { t: k.t, crop: next } : k))
             : [...v.keys, { t, crop: next }].sort((a, b) => a.t - b.t);
         return { ...v, keys };
-      });
+      }, "recorte");
     },
-    [lock, width, height],
-
+    [lock, width, height, setPre],
   );
 
   /** aplica uma proporção (ou libera) centralizando o recorte */
   const applyRatio = (ratio: number | null) => {
     setLock(ratio);
-    setPre((v) => ({ ...v, crop: ratio ? cropForRatio(ratio, width || 1080, height || 1920) : null }));
+    setPre((v) => ({ ...v, crop: ratio ? cropForRatio(ratio, width || 1080, height || 1920) : null }), "proporção");
   };
 
   const centerCrop = () =>
     setPre((v) => {
       const c = v.crop ?? { x: 0, y: 0, w: 1, h: 1 };
       return { ...v, crop: { ...c, x: (1 - c.w) / 2, y: (1 - c.h) / 2 } };
-    });
+    }, "centralizar");
 
   /** grava o recorte atual como keyframe no instante do playhead */
-  const addKey = () =>
-    setPre((v) => {
-      const c = cropAt(v, time) ?? v.crop ?? { x: 0, y: 0, w: 1, h: 1 };
-      const t = Number(time.toFixed(2));
-      const key: FrameKey = { t, crop: { ...c } };
-      const keys = [...v.keys.filter((k) => Math.abs(k.t - t) > 0.05), key].sort((a, b) => a.t - b.t);
-      return { ...v, keys };
-    });
+  const addKey = useCallback(
+    () =>
+      setPre((v) => {
+        const c = cropAt(v, time) ?? v.crop ?? { x: 0, y: 0, w: 1, h: 1 };
+        const t = Number(time.toFixed(2));
+        const key: FrameKey = { t, crop: { ...c } };
+        const keys = [...v.keys.filter((k) => Math.abs(k.t - t) > 0.05), key].sort((a, b) => a.t - b.t);
+        return { ...v, keys };
+      }, "keyframe"),
+    [setPre, time],
+  );
 
   /** trechos mantidos na sequência final */
   const segs = keptSegments(pre, { start, end }, duration);
   const outDur = segmentsDuration(segs);
 
   /** divide o trecho no playhead (tesoura) */
-  const split = () =>
-    setPre((v) => {
-      const base = keptSegments(v, { start, end }, duration);
-      const next = splitAt(base, Number(time.toFixed(2)));
-      if (next.length === base.length) {
-        toast.info("Leve o playhead para dentro de um trecho para dividir.");
-        return v;
-      }
-      return { ...v, segments: next };
-    });
+  const split = useCallback(
+    () =>
+      setPre((v) => {
+        const base = keptSegments(v, { start, end }, duration);
+        const next = splitAt(base, Number(time.toFixed(2)));
+        if (next.length === base.length) {
+          toast.info("Leve o playhead para dentro de um trecho para dividir.");
+          return v;
+        }
+        return { ...v, segments: next };
+      }, "dividir"),
+    [setPre, start, end, duration, time],
+  );
 
   const deleteSegment = (i: number) =>
     setPre((v) => {
@@ -381,14 +456,13 @@ export function VideoStudio({
         return v;
       }
       const next = base.filter((_, idx) => idx !== i);
-      // preserva o tempo: se o playhead estava no trecho removido, vai pro próximo
       const gone = base[i];
       if (gone && time >= gone.start && time <= gone.end) {
         const target = next[Math.min(i, next.length - 1)];
         if (target) seek(target.start);
       }
       return { ...v, segments: next };
-    });
+    }, "remover trecho");
 
   /** remove as pausas automaticamente analisando o áudio */
   const cutSilence = async () => {
@@ -403,7 +477,7 @@ export function VideoStudio({
         toast.error("Não achei fala suficiente — baixe a sensibilidade.");
         return;
       }
-      setPre((v) => ({ ...v, segments }));
+      setPre((v) => ({ ...v, segments }), "cortar pausas");
       const first = segments[0];
       if (first && (time < first.start || time > (segments[segments.length - 1]?.end ?? 0))) seek(first.start);
       toast.success(`${segments.length} trechos com fala · ${removed.toFixed(1)}s de silêncio removidos`);
@@ -413,7 +487,6 @@ export function VideoStudio({
       setCutting(false);
     }
   };
-
 
   /** traduz a legenda mantendo os tempos por palavra */
   const translate = async () => {
@@ -436,6 +509,71 @@ export function VideoStudio({
     }
   };
 
+  const undo = useCallback(() => {
+    const label = hist.undo();
+    if (label) toast(`Desfeito: ${label}`);
+  }, [hist]);
+  const redo = useCallback(() => {
+    const label = hist.redo();
+    if (label) toast(`Refeito: ${label}`);
+  }, [hist]);
+
+  // atalhos de teclado estilo NLE
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+      if (el?.isContentEditable) return;
+      const meta = e.metaKey || e.ctrlKey;
+      if (meta && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
+      switch (e.key) {
+        case " ":
+          e.preventDefault();
+          toggle();
+          break;
+        case "ArrowLeft":
+          e.preventDefault();
+          seek(Math.max(start, time - (e.shiftKey ? 1 : 1 / 30)));
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          seek(Math.min(end, time + (e.shiftKey ? 1 : 1 / 30)));
+          break;
+        case "i":
+        case "I":
+          setStart(Math.min(time, end - 0.3));
+          break;
+        case "o":
+        case "O":
+          setEnd(Math.max(time, start + 0.3));
+          break;
+        case "s":
+        case "S":
+          split();
+          break;
+        case "k":
+        case "K":
+          addKey();
+          break;
+        case "Escape":
+          onClose();
+          break;
+        default:
+          if (/^[1-9]$/.test(e.key)) {
+            const t = TOOL_ORDER[Number(e.key) - 1];
+            if (t) setTab(t);
+          }
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggle, seek, time, start, end, split, addKey, undo, redo, onClose]);
+
   const cropPx = {
     w: Math.round((crop.w || 1) * (width || 0)),
     h: Math.round((crop.h || 1) * (height || 0)),
@@ -445,138 +583,265 @@ export function VideoStudio({
   const srcAR = width && height ? width / height : 9 / 16;
   const quarter = ((pre.rotate / 90) | 0) % 4;
 
+  const clipWindow = useMemo(() => ({ start, end }), [start, end]);
+
   const save = () =>
     onSave({
       pre,
       clip: start > 0.02 || end < duration - 0.02 ? { start, end } : null,
     });
 
+  const toolLabel = TOOL_ORDER.includes(tab)
+    ? TOOL_GROUPS.flatMap((g) => g.items).find((i) => i.id === tab)?.label
+    : "";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-background/95 p-2 sm:items-center sm:p-3">
-      <div className="flex h-full max-h-[96vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-        <header className="flex items-center justify-between border-b border-border px-4 py-3">
-          <div>
-            <h2 className="font-display text-base text-foreground">Estúdio de edição</h2>
-            <p className="font-mono text-[11px] text-muted-foreground">
-              {file.name} · {width}×{height} · {fmt(duration)}
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-background/95 p-1 sm:p-3">
+      <div className="flex h-full w-full max-w-[1500px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
+        {/* barra superior */}
+        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-3 py-2">
+          <div className="min-w-0">
+            <h2 className="truncate font-display text-sm text-foreground">Estúdio de edição</h2>
+            <p className="truncate font-mono text-[11px] text-muted-foreground">
+              {file.name} · {width}×{height} · {fmt(duration)} · saída {fmt(Math.max(0, outDur))}
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => { setPre(defaultPreEdit()); setStart(0); setEnd(duration); }}>
-              <Undo2 className="mr-1 size-3.5" /> Resetar
+          <div className="flex items-center gap-1.5">
+            <Button variant="ghost" size="icon" disabled={!hist.canUndo} onClick={undo} aria-label="Desfazer">
+              <Undo2 className="size-4" />
             </Button>
-            <Button size="sm" onClick={save}>Aplicar edição</Button>
+            <Button variant="ghost" size="icon" disabled={!hist.canRedo} onClick={redo} aria-label="Refazer">
+              <Redo2 className="size-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => hist.reset({ pre: defaultPreEdit(), start: 0, end: duration }, "resetar tudo")}
+            >
+              <RotateCcw className="mr-1 size-3.5" /> Resetar
+            </Button>
+            <Button size="sm" onClick={save}>
+              Aplicar edição
+            </Button>
             <Button variant="ghost" size="icon" onClick={onClose} aria-label="Fechar">
               <X className="size-4" />
             </Button>
           </div>
         </header>
 
-        {tab === "camera" && (
-          <>
-            <div className="flex items-center gap-2 border-b border-border px-4 py-2">
-              <span className="font-mono text-[11px] text-foreground">Câmera virtual · enquadramento dinâmico</span>
-              <Button className="ml-auto" size="sm" variant="ghost" onClick={() => setTab("layout")}>
-                Voltar aos ajustes
-              </Button>
-            </div>
-            <FramingStudio
-              url={url}
-              file={file}
-              width={width}
-              height={height}
-              duration={duration}
-              pre={pre}
-              onChange={setPre}
-            />
-          </>
-        )}
-
-
-        <div
-          className={`grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 md:grid-cols-[1.1fr_1fr] md:overflow-hidden ${
-            tab === "camera" ? "hidden" : ""
-          }`}
-        >
+        {/* corpo: trilha · palco · inspetor */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[132px_minmax(0,1fr)_340px] md:overflow-hidden">
+          {/* trilha de ferramentas */}
+          <nav className="flex gap-2 overflow-x-auto border-b border-border p-2 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r">
+            {TOOL_GROUPS.map((g) => (
+              <div key={g.group} className="flex shrink-0 gap-1 md:block md:space-y-1">
+                <span className="hidden px-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground md:block">
+                  {g.group}
+                </span>
+                {g.items.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTab(t.id)}
+                    className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 font-mono text-[11px] transition ${
+                      tab === t.id
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <t.icon className="size-3.5 shrink-0" /> {t.label}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </nav>
 
           {/* palco */}
-          <div className="flex min-h-0 flex-col gap-3 md:overflow-y-auto">
-            <div
-              ref={boxRef}
-              className="relative mx-auto overflow-hidden rounded-xl border border-border bg-black"
-              style={{ aspectRatio: String(srcAR), height: "46vh", maxWidth: "100%", width: "auto" }}
-              onPointerMove={onPointerMove}
-              onPointerUp={() => (dragRef.current = null)}
-              onPointerCancel={() => (dragRef.current = null)}
-            >
-              <video
-                ref={videoRef}
-                src={url}
-                playsInline
-                muted
-                preload="auto"
-                className="absolute inset-0 size-full object-contain"
-                style={{
-                  filter,
-                  transform: `translateZ(0) rotate(${pre.rotate}deg) scaleX(${pre.flipH ? -1 : 1}) scaleY(${pre.flipV ? -1 : 1})`,
-                }}
-                onLoadedMetadata={() => seek(start)}
-                onPause={() => setPlaying(false)}
-              />
-              {tab === "crop" && (
-                <div
-                  className="absolute cursor-move border-2 border-primary"
-                  style={{
-                    left: `${crop.x * 100}%`,
-                    top: `${crop.y * 100}%`,
-                    width: `${crop.w * 100}%`,
-                    height: `${crop.h * 100}%`,
-                    boxShadow: "0 0 0 9999px rgba(0,0,0,0.6)",
-                  }}
-                  onPointerDown={(e) => onPointerDown(e, "move")}
-                >
-                  {/* guias de terços */}
-                  <div className="pointer-events-none absolute inset-0 opacity-60">
-                    <div className="absolute inset-y-0 left-1/3 w-px bg-primary/40" />
-                    <div className="absolute inset-y-0 left-2/3 w-px bg-primary/40" />
-                    <div className="absolute inset-x-0 top-1/3 h-px bg-primary/40" />
-                    <div className="absolute inset-x-0 top-2/3 h-px bg-primary/40" />
+          <section className="flex min-h-0 flex-col gap-2 p-3 md:overflow-hidden">
+            {tab === "camera" ? (
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <FramingStudio
+                  url={url}
+                  file={file}
+                  width={width}
+                  height={height}
+                  duration={duration}
+                  pre={pre}
+                  onChange={(p) => setPre(p, "câmera")}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex rounded-md border border-border p-0.5">
+                    {(
+                      [
+                        ["out", "Saída 9:16"],
+                        ["src", "Fonte"],
+                      ] as const
+                    ).map(([id, label]) => (
+                      <button
+                        key={id}
+                        onClick={() => setView(id)}
+                        className={`rounded px-2 py-1 font-mono text-[11px] transition ${
+                          view === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
                   </div>
-                  <span className="pointer-events-none absolute -top-6 left-0 rounded bg-background/90 px-1.5 py-0.5 font-mono text-[10px] text-foreground">
-                    {cropPx.w}×{cropPx.h}
-                    {pre.keys.length > 0
-                      ? ` · ${nearKey ? `ajustando ${fmt(nearKey.t)}` : `nova posição em ${fmt(time)}`}`
-                      : ""}
-                  </span>
-
-                  {HANDLES.map((h) => {
-                    const cursor =
-                      h === "n" || h === "s"
-                        ? "cursor-ns-resize"
-                        : h === "e" || h === "w"
-                          ? "cursor-ew-resize"
-                          : h === "nw" || h === "se"
-                            ? "cursor-nwse-resize"
-                            : "cursor-nesw-resize";
-                    const mid = h.length === 1;
-                    return (
-                      <span
-                        key={h}
-                        onPointerDown={(e) => onPointerDown(e, h)}
-                        className={`absolute size-3.5 rounded-sm border border-primary bg-background ${cursor}`}
-                        style={{
-                          left: h.includes("w") ? -7 : mid && (h === "n" || h === "s") ? "calc(50% - 7px)" : undefined,
-                          right: h.includes("e") ? -7 : undefined,
-                          top: h.startsWith("n") ? -7 : mid && (h === "e" || h === "w") ? "calc(50% - 7px)" : undefined,
-                          bottom: h.startsWith("s") ? -7 : undefined,
-                        }}
-                      />
-                    );
-                  })}
+                  <ToggleChip on={thirds} onClick={() => setThirds((v) => !v)} icon={Grid3X3} label="Terços" />
+                  <ToggleChip on={safe} onClick={() => setSafe((v) => !v)} icon={Shield} label="Área segura" />
+                  <button
+                    onMouseDown={() => setCompare(true)}
+                    onMouseUp={() => setCompare(false)}
+                    onMouseLeave={() => setCompare(false)}
+                    onTouchStart={() => setCompare(true)}
+                    onTouchEnd={() => setCompare(false)}
+                    className="flex items-center gap-1 rounded-md border border-border px-2 py-1 font-mono text-[11px] text-muted-foreground transition hover:text-foreground"
+                  >
+                    <Eye className="size-3.5" /> Comparar
+                  </button>
                 </div>
-              )}
-            </div>
+
+                <div className="relative flex min-h-0 flex-1 items-center justify-center">
+                  {/* fonte (sempre montada: alimenta o canvas de saída) */}
+                  <div
+                    ref={boxRef}
+                    className={`relative overflow-hidden rounded-xl border border-border bg-black ${
+                      view === "out" ? "pointer-events-none invisible absolute size-px opacity-0" : "h-full max-h-full"
+                    }`}
+                    style={view === "out" ? undefined : { aspectRatio: String(srcAR), maxWidth: "100%" }}
+                    onPointerMove={onPointerMove}
+                    onPointerUp={() => (dragRef.current = null)}
+                    onPointerCancel={() => (dragRef.current = null)}
+                  >
+                    <video
+                      ref={videoRef}
+                      src={url}
+                      playsInline
+                      muted
+                      preload="auto"
+                      className="absolute inset-0 size-full object-contain"
+                      style={{
+                        filter,
+                        transform: `translateZ(0) rotate(${pre.rotate}deg) scaleX(${pre.flipH ? -1 : 1}) scaleY(${
+                          pre.flipV ? -1 : 1
+                        })`,
+                      }}
+                      onLoadedMetadata={() => seek(start)}
+                      onPause={() => setPlaying(false)}
+                    />
+                    {view === "src" && (
+                      <div
+                        className="absolute cursor-move border-2 border-primary"
+                        style={{
+                          left: `${crop.x * 100}%`,
+                          top: `${crop.y * 100}%`,
+                          width: `${crop.w * 100}%`,
+                          height: `${crop.h * 100}%`,
+                          boxShadow: "0 0 0 9999px rgba(0,0,0,0.6)",
+                        }}
+                        onPointerDown={(e) => onPointerDown(e, "move")}
+                      >
+                        <div className="pointer-events-none absolute inset-0 opacity-60">
+                          <div className="absolute inset-y-0 left-1/3 w-px bg-primary/40" />
+                          <div className="absolute inset-y-0 left-2/3 w-px bg-primary/40" />
+                          <div className="absolute inset-x-0 top-1/3 h-px bg-primary/40" />
+                          <div className="absolute inset-x-0 top-2/3 h-px bg-primary/40" />
+                        </div>
+                        <span className="pointer-events-none absolute -top-6 left-0 rounded bg-background/90 px-1.5 py-0.5 font-mono text-[10px] text-foreground">
+                          {cropPx.w}×{cropPx.h}
+                          {pre.keys.length > 0
+                            ? ` · ${nearKey ? `ajustando ${fmt(nearKey.t)}` : `nova posição em ${fmt(time)}`}`
+                            : ""}
+                        </span>
+                        {HANDLES.map((h) => {
+                          const cursor =
+                            h === "n" || h === "s"
+                              ? "cursor-ns-resize"
+                              : h === "e" || h === "w"
+                                ? "cursor-ew-resize"
+                                : h === "nw" || h === "se"
+                                  ? "cursor-nwse-resize"
+                                  : "cursor-nesw-resize";
+                          const mid = h.length === 1;
+                          return (
+                            <span
+                              key={h}
+                              onPointerDown={(e) => onPointerDown(e, h)}
+                              className={`absolute size-3.5 rounded-sm border border-primary bg-background ${cursor}`}
+                              style={{
+                                left: h.includes("w")
+                                  ? -7
+                                  : mid && (h === "n" || h === "s")
+                                    ? "calc(50% - 7px)"
+                                    : undefined,
+                                right: h.includes("e") ? -7 : undefined,
+                                top: h.startsWith("n")
+                                  ? -7
+                                  : mid && (h === "e" || h === "w")
+                                    ? "calc(50% - 7px)"
+                                    : undefined,
+                                bottom: h.startsWith("s") ? -7 : undefined,
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {view === "out" && (
+                    <StagePreview
+                      videoRef={videoRef}
+                      pre={pre}
+                      clip={clipWindow}
+                      captions={captions}
+                      bypass={compare}
+                      thirds={thirds}
+                      safeArea={safe}
+                      className="h-full max-h-full"
+                    />
+                  )}
+                </div>
+
+                {/* transporte */}
+                <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-lg border border-border px-2 py-1.5">
+                  <Button variant="ghost" size="icon" onClick={() => seek(start)} aria-label="Início">
+                    <ChevronFirst className="size-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => step(-1)} aria-label="Quadro anterior">
+                    <StepBack className="size-4" />
+                  </Button>
+                  <Button size="icon" onClick={toggle} aria-label={playing ? "Pausar" : "Reproduzir"}>
+                    {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => step(1)} aria-label="Próximo quadro">
+                    <StepForward className="size-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => seek(Math.max(start, end - 0.1))} aria-label="Fim">
+                    <ChevronLast className="size-4" />
+                  </Button>
+                  <span className="px-1 font-mono text-[11px] text-foreground">
+                    {fmt(time)} <span className="text-muted-foreground">/ {fmt(end)}</span>
+                  </span>
+                  <select
+                    value={speed}
+                    onChange={(e) => setSpeed(Number(e.target.value))}
+                    aria-label="Velocidade"
+                    className="rounded-md border border-border bg-background px-1.5 py-1 font-mono text-[11px] text-foreground"
+                  >
+                    {SPEEDS.map((s) => (
+                      <option key={s} value={s}>
+                        {s}x
+                      </option>
+                    ))}
+                  </select>
+                  <ToggleChip on={loop} onClick={() => setLoop((v) => !v)} icon={Repeat} label="Loop" />
+                </div>
+              </>
+            )}
 
             <EditorTimeline
               url={url}
@@ -591,47 +856,34 @@ export function VideoStudio({
               cues={captions}
               onSeek={seek}
               onTogglePlay={toggle}
-              onTrim={(s, e) => {
-                setStart(s);
-                setEnd(e);
-              }}
-              onKeysChange={(keys) => set({ keys })}
+              onTrim={(s, e) => hist.set((d) => ({ ...d, start: s, end: e }), "corte")}
+              onKeysChange={(keys) => set({ keys }, "keyframes")}
               onAddKey={addKey}
               segments={segs}
               onSplit={split}
               onDeleteSegment={deleteSegment}
-
             />
+          </section>
 
-          </div>
-
-          {/* controles */}
-          <div className="min-h-0 space-y-4 md:overflow-y-auto md:pr-1">
-            <div className="flex flex-wrap gap-1 rounded-lg border border-border p-1">
-              {([
-                { id: "trim", label: "Cortar", icon: Scissors },
-                { id: "layout", label: "Layout", icon: LayoutTemplate },
-                { id: "crop", label: "Enquadrar", icon: Crop },
-                { id: "camera", label: "Câmera", icon: Camera },
-                { id: "keys", label: "Keyframes", icon: Sparkles },
-                { id: "trans", label: "Transições", icon: SlidersHorizontal },
-                { id: "color", label: "Cor", icon: SlidersHorizontal },
-                { id: "caps", label: "Legenda", icon: Subtitles },
-                { id: "text", label: "Textos", icon: Type },
-              ] as const).map((t) => (
-
-                <button
-                  key={t.id}
-                  onClick={() => setTab(t.id)}
-                  className={`flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 font-mono text-[11px] transition ${
-                    tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  <t.icon className="size-3.5" /> {t.label}
-                </button>
-              ))}
+          {/* inspetor */}
+          <aside
+            className={`min-h-0 space-y-4 border-t border-border p-3 md:overflow-y-auto md:border-l md:border-t-0 ${
+              tab === "camera" ? "hidden md:block" : ""
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-sm text-foreground">{toolLabel}</h3>
+              <span className="font-mono text-[10px] text-muted-foreground">
+                {TOOL_ORDER.indexOf(tab) + 1} · atalho
+              </span>
             </div>
 
+            {tab === "camera" && (
+              <p className="font-mono text-[11px] text-muted-foreground">
+                A câmera virtual usa o palco à esquerda. Escolha pessoas, pontos de enquadramento e transições
+                direto lá.
+              </p>
+            )}
 
             {tab === "trim" && (
               <div className="space-y-4">
@@ -662,13 +914,17 @@ export function VideoStudio({
                   />
                 </Field>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => setStart(time)}>
-                    Início aqui
+                  <Button variant="secondary" size="sm" onClick={() => setStart(Math.min(time, end - 0.3))}>
+                    Início aqui (I)
                   </Button>
                   <Button variant="secondary" size="sm" onClick={() => setEnd(Math.max(start + 0.3, time))}>
-                    Fim aqui
+                    Fim aqui (O)
                   </Button>
-                  <Button variant="ghost" size="sm" onClick={() => { setStart(0); setEnd(duration); }}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => hist.set((d) => ({ ...d, start: 0, end: duration }), "vídeo inteiro")}
+                  >
                     Vídeo inteiro
                   </Button>
                 </div>
@@ -678,7 +934,7 @@ export function VideoStudio({
                       <Scissors className="mr-1 size-3.5" /> Dividir aqui (S)
                     </Button>
                     {pre.segments.length > 0 && (
-                      <Button size="sm" variant="ghost" onClick={() => set({ segments: [] })}>
+                      <Button size="sm" variant="ghost" onClick={() => set({ segments: [] }, "juntar trechos")}>
                         Juntar tudo
                       </Button>
                     )}
@@ -710,13 +966,7 @@ export function VideoStudio({
                 <div className="space-y-2 rounded-lg border border-border p-2">
                   <p className="font-mono text-[11px] text-foreground">Remover silêncio automaticamente</p>
                   <Field label={`Sensibilidade · ${Math.round(sens * 100)}%`}>
-                    <Slider
-                      value={[sens]}
-                      min={0.1}
-                      max={0.95}
-                      step={0.05}
-                      onValueChange={([v]) => setSens(v ?? 0.5)}
-                    />
+                    <Slider value={[sens]} min={0.1} max={0.95} step={0.05} onValueChange={([v]) => setSens(v ?? 0.5)} />
                   </Field>
                   <Field label={`Pausa mínima · ${minSil.toFixed(2)}s`}>
                     <Slider
@@ -744,15 +994,11 @@ export function VideoStudio({
 
             {tab === "layout" && (
               <div className="space-y-3">
-                <LayoutPreview videoRef={videoRef} pre={pre} clip={{ start, end }} />
-                <p className="text-center font-mono text-[10px] text-muted-foreground">
-                  saída 9:16 real — o mesmo desenho usado na exportação
-                </p>
                 <div className="grid grid-cols-2 gap-2">
                   {LAYOUTS.map((l) => (
                     <button
                       key={l.id}
-                      onClick={() => set({ layout: l.id as LayoutKind })}
+                      onClick={() => set({ layout: l.id as LayoutKind }, "layout")}
                       className={`flex gap-2 rounded-lg border p-2 text-left transition ${
                         (pre.layout ?? "auto") === l.id
                           ? "border-primary bg-primary/10"
@@ -774,7 +1020,7 @@ export function VideoStudio({
                       {(["blur", "color"] as const).map((m) => (
                         <button
                           key={m}
-                          onClick={() => set({ bgMode: m })}
+                          onClick={() => set({ bgMode: m }, "fundo")}
                           className={`flex-1 rounded-md border px-2 py-1.5 font-mono text-[11px] transition ${
                             (pre.bgMode ?? "blur") === m
                               ? "border-primary bg-primary/10 text-foreground"
@@ -795,7 +1041,7 @@ export function VideoStudio({
                           min={0}
                           max={2}
                           step={0.05}
-                          onValueChange={([v]) => set({ bgBlur: v ?? 1 })}
+                          onValueChange={([v]) => set({ bgBlur: v ?? 1 }, "desfoque do fundo")}
                         />
                       </div>
                     ) : (
@@ -803,7 +1049,7 @@ export function VideoStudio({
                         <input
                           type="color"
                           value={pre.bgColor ?? "#000000"}
-                          onChange={(e) => set({ bgColor: e.target.value })}
+                          onChange={(e) => set({ bgColor: e.target.value }, "cor do fundo")}
                           className="h-8 w-12 cursor-pointer rounded border border-border bg-transparent"
                           aria-label="Cor do fundo"
                         />
@@ -812,21 +1058,16 @@ export function VideoStudio({
                         </span>
                       </div>
                     )}
-                    <p className="font-mono text-[10px] text-muted-foreground">
-                      O mesmo valor é usado na prévia e na exportação.
-                    </p>
                   </div>
                 )}
 
                 <p className="font-mono text-[11px] text-muted-foreground">
-                  O layout vale para o preview e para a exportação — troque o enquadramento por keyframes
-                  para acompanhar o rosto dentro do layout escolhido.
+                  O palco já mostra a saída real 9:16 — o mesmo desenho usado na exportação.
                 </p>
               </div>
             )}
 
             {tab === "crop" && (
-
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-1.5">
                   {CROP_PRESETS.map((p) => {
@@ -847,7 +1088,8 @@ export function VideoStudio({
                   })}
                 </div>
                 <p className="font-mono text-[11px] text-muted-foreground">
-                  Arraste o retângulo (ou as alças das bordas) para escolher a área que fica no vídeo.
+                  Use a visão <strong className="text-foreground">Fonte</strong> no palco para arrastar o
+                  retângulo de recorte.
                   {lock ? " Proporção travada — o recorte mantém o formato." : ""}
                 </p>
                 <div className="rounded-lg border border-border p-2.5">
@@ -857,10 +1099,10 @@ export function VideoStudio({
                     </span>
                     <div className="flex gap-1.5">
                       <Button size="sm" onClick={addKey}>
-                        {nearKey ? `Ajustar em ${fmt(time)}` : `Nova posição em ${fmt(time)}`}
+                        {nearKey ? `Ajustar em ${fmt(time)}` : `Nova em ${fmt(time)}`}
                       </Button>
                       {pre.keys.length > 0 && (
-                        <Button variant="secondary" size="sm" onClick={() => set({ keys: [] })}>
+                        <Button variant="secondary" size="sm" onClick={() => set({ keys: [] }, "limpar keyframes")}>
                           Limpar
                         </Button>
                       )}
@@ -868,8 +1110,8 @@ export function VideoStudio({
                   </div>
                   {pre.keys.length === 0 ? (
                     <p className="font-mono text-[11px] text-muted-foreground">
-                      Sem posições — o recorte vale para o vídeo todo. Crie posições para a câmera
-                      acompanhar quem está falando.
+                      Sem posições — o recorte vale para o vídeo todo. Crie posições para a câmera acompanhar
+                      quem está falando.
                     </p>
                   ) : (
                     <ul className="space-y-1">
@@ -894,7 +1136,7 @@ export function VideoStudio({
                               </span>
                               <button
                                 className="text-destructive"
-                                onClick={() => set({ keys: pre.keys.filter((x) => x.t !== k.t) })}
+                                onClick={() => set({ keys: pre.keys.filter((x) => x.t !== k.t) }, "remover keyframe")}
                               >
                                 remover
                               </button>
@@ -918,22 +1160,38 @@ export function VideoStudio({
                 <div className="grid grid-cols-2 gap-3">
                   <Num label="X %" value={crop.x} onChange={(n) => applyCrop({ ...crop, x: Math.min(n, 1 - crop.w) }, time)} />
                   <Num label="Y %" value={crop.y} onChange={(n) => applyCrop({ ...crop, y: Math.min(n, 1 - crop.h) }, time)} />
-                  <Num label="Larg. %" value={crop.w} onChange={(n) => applyCrop({ ...crop, w: Math.min(Math.max(n, 0.06), 1 - crop.x) }, time)} />
-                  <Num label="Alt. %" value={crop.h} onChange={(n) => applyCrop({ ...crop, h: Math.min(Math.max(n, 0.06), 1 - crop.y) }, time)} />
+                  <Num
+                    label="Larg. %"
+                    value={crop.w}
+                    onChange={(n) => applyCrop({ ...crop, w: Math.min(Math.max(n, 0.06), 1 - crop.x) }, time)}
+                  />
+                  <Num
+                    label="Alt. %"
+                    value={crop.h}
+                    onChange={(n) => applyCrop({ ...crop, h: Math.min(Math.max(n, 0.06), 1 - crop.y) }, time)}
+                  />
                 </div>
 
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => set({ rotate: (((quarter + 1) % 4) * 90) as PreEdit["rotate"] })}
+                    onClick={() => set({ rotate: (((quarter + 1) % 4) * 90) as PreEdit["rotate"] }, "girar")}
                   >
                     <RotateCw className="mr-1 size-3.5" /> Girar 90°
                   </Button>
-                  <Button variant={pre.flipH ? "default" : "secondary"} size="sm" onClick={() => set({ flipH: !pre.flipH })}>
+                  <Button
+                    variant={pre.flipH ? "default" : "secondary"}
+                    size="sm"
+                    onClick={() => set({ flipH: !pre.flipH }, "espelhar")}
+                  >
                     <FlipHorizontal className="mr-1 size-3.5" /> Espelhar
                   </Button>
-                  <Button variant={pre.flipV ? "default" : "secondary"} size="sm" onClick={() => set({ flipV: !pre.flipV })}>
+                  <Button
+                    variant={pre.flipV ? "default" : "secondary"}
+                    size="sm"
+                    onClick={() => set({ flipV: !pre.flipV }, "inverter")}
+                  >
                     <FlipVertical className="mr-1 size-3.5" /> Inverter
                   </Button>
                 </div>
@@ -943,14 +1201,14 @@ export function VideoStudio({
             {tab === "keys" && (
               <div className="space-y-4">
                 <p className="font-mono text-[11px] text-muted-foreground">
-                  Keyframes movem o enquadramento ao longo do vídeo: leve o tempo até o ponto, ajuste o
-                  recorte na aba “Enquadrar” e grave o keyframe. O corte passa a acompanhar o rosto.
+                  Keyframes movem o enquadramento ao longo do vídeo: leve o playhead até o ponto, ajuste o
+                  recorte na ferramenta “Enquadrar” e grave (tecla K).
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" onClick={addKey}>
                     Gravar keyframe em {fmt(time)}
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={() => set({ keys: [] })}>
+                  <Button variant="secondary" size="sm" onClick={() => set({ keys: [] }, "limpar keyframes")}>
                     Limpar todos
                   </Button>
                 </div>
@@ -973,7 +1231,7 @@ export function VideoStudio({
                           </span>
                           <button
                             className="text-destructive"
-                            onClick={() => set({ keys: pre.keys.filter((x) => x.t !== k.t) })}
+                            onClick={() => set({ keys: pre.keys.filter((x) => x.t !== k.t) }, "remover keyframe")}
                           >
                             remover
                           </button>
@@ -995,7 +1253,9 @@ export function VideoStudio({
                       {TRANSITIONS.map((tr) => (
                         <button
                           key={tr.id}
-                          onClick={() => set({ [key]: { ...pre[key], kind: tr.id as TransitionKind } } as Partial<PreEdit>)}
+                          onClick={() =>
+                            set({ [key]: { ...pre[key], kind: tr.id as TransitionKind } } as Partial<PreEdit>, "transição")
+                          }
                           className={`rounded-md border px-2.5 py-1 font-mono text-[11px] transition ${
                             pre[key].kind === tr.id
                               ? "border-primary text-primary"
@@ -1012,13 +1272,13 @@ export function VideoStudio({
                         min={0.1}
                         max={2}
                         step={0.05}
-                        onValueChange={([v]) => set({ [key]: { ...pre[key], dur: v ?? 0.5 } } as Partial<PreEdit>)}
+                        onValueChange={([v]) => set({ [key]: { ...pre[key], dur: v ?? 0.5 } } as Partial<PreEdit>, "transição")}
                       />
                     </Field>
                   </div>
                 ))}
                 <p className="font-mono text-[11px] text-muted-foreground">
-                  As transições aparecem no preview do painel e na exportação.
+                  As transições aparecem no palco e na exportação.
                 </p>
               </div>
             )}
@@ -1044,11 +1304,7 @@ export function VideoStudio({
                         {translating ? "Traduzindo…" : "Traduzir legenda"}
                       </Button>
                     </div>
-                    <CaptionTimeline
-                      file={file}
-                      cues={captions}
-                      onChange={(cues) => onCaptionsChange?.(cues)}
-                    />
+                    <CaptionTimeline file={file} cues={captions} onChange={(cues) => onCaptionsChange?.(cues)} />
                   </>
                 ) : (
                   <p className="font-mono text-[11px] text-muted-foreground">
@@ -1059,17 +1315,18 @@ export function VideoStudio({
               </div>
             )}
 
-
             {tab === "text" && (
               <div className="space-y-3">
                 {texts ? (
                   <>
-                    {([
-                      ["headline", "Headline"],
-                      ["name", "Nome"],
-                      ["handle", "Arroba"],
-                      ["cta", "CTA"],
-                    ] as const).map(([k, label]) => (
+                    {(
+                      [
+                        ["headline", "Headline"],
+                        ["name", "Nome"],
+                        ["handle", "Arroba"],
+                        ["cta", "CTA"],
+                      ] as const
+                    ).map(([k, label]) => (
                       <label key={k} className="block space-y-1">
                         <span className="font-mono text-[11px] text-muted-foreground">{label}</span>
                         <input
@@ -1093,14 +1350,13 @@ export function VideoStudio({
               </div>
             )}
 
-
             {tab === "color" && (
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-1.5">
                   {COLOR_PRESETS.map((p) => (
                     <button
                       key={p.id}
-                      onClick={() => set(p.v)}
+                      onClick={() => set(p.v, "cor")}
                       className="rounded-md border border-border px-2.5 py-1 font-mono text-[11px] text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
                     >
                       {p.label}
@@ -1108,32 +1364,84 @@ export function VideoStudio({
                   ))}
                 </div>
                 <Field label={`Brilho · ${pre.brightness.toFixed(2)}`}>
-                  <Slider value={[pre.brightness]} min={0.4} max={1.8} step={0.01} onValueChange={([v]) => set({ brightness: v ?? 1 })} />
+                  <Slider
+                    value={[pre.brightness]}
+                    min={0.4}
+                    max={1.8}
+                    step={0.01}
+                    onValueChange={([v]) => set({ brightness: v ?? 1 }, "cor")}
+                  />
                 </Field>
                 <Field label={`Contraste · ${pre.contrast.toFixed(2)}`}>
-                  <Slider value={[pre.contrast]} min={0.4} max={2} step={0.01} onValueChange={([v]) => set({ contrast: v ?? 1 })} />
+                  <Slider
+                    value={[pre.contrast]}
+                    min={0.4}
+                    max={2}
+                    step={0.01}
+                    onValueChange={([v]) => set({ contrast: v ?? 1 }, "cor")}
+                  />
                 </Field>
                 <Field label={`Saturação · ${pre.saturation.toFixed(2)}`}>
-                  <Slider value={[pre.saturation]} min={0} max={2.5} step={0.01} onValueChange={([v]) => set({ saturation: v ?? 1 })} />
+                  <Slider
+                    value={[pre.saturation]}
+                    min={0}
+                    max={2.5}
+                    step={0.01}
+                    onValueChange={([v]) => set({ saturation: v ?? 1 }, "cor")}
+                  />
                 </Field>
                 <Field label={`Matiz · ${Math.round(pre.hue)}°`}>
-                  <Slider value={[pre.hue]} min={-180} max={180} step={1} onValueChange={([v]) => set({ hue: v ?? 0 })} />
+                  <Slider value={[pre.hue]} min={-180} max={180} step={1} onValueChange={([v]) => set({ hue: v ?? 0 }, "cor")} />
                 </Field>
                 <Field label={`Sépia · ${Math.round(pre.sepia * 100)}%`}>
-                  <Slider value={[pre.sepia]} min={0} max={1} step={0.01} onValueChange={([v]) => set({ sepia: v ?? 0 })} />
+                  <Slider value={[pre.sepia]} min={0} max={1} step={0.01} onValueChange={([v]) => set({ sepia: v ?? 0 }, "cor")} />
                 </Field>
                 <Field label={`P&B · ${Math.round(pre.grayscale * 100)}%`}>
-                  <Slider value={[pre.grayscale]} min={0} max={1} step={0.01} onValueChange={([v]) => set({ grayscale: v ?? 0 })} />
+                  <Slider
+                    value={[pre.grayscale]}
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    onValueChange={([v]) => set({ grayscale: v ?? 0 }, "cor")}
+                  />
                 </Field>
                 <Field label={`Desfoque · ${pre.blur.toFixed(1)}px`}>
-                  <Slider value={[pre.blur]} min={0} max={8} step={0.1} onValueChange={([v]) => set({ blur: v ?? 0 })} />
+                  <Slider value={[pre.blur]} min={0} max={8} step={0.1} onValueChange={([v]) => set({ blur: v ?? 0 }, "cor")} />
                 </Field>
               </div>
             )}
-          </div>
+
+            <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+              Atalhos: espaço reproduz · setas andam quadro a quadro · I/O marcam entrada e saída · S divide ·
+              K grava keyframe · Ctrl+Z desfaz.
+            </p>
+          </aside>
         </div>
       </div>
     </div>
+  );
+}
+
+function ToggleChip({
+  on,
+  onClick,
+  icon: Icon,
+  label,
+}: {
+  on: boolean;
+  onClick: () => void;
+  icon: typeof Grid3X3;
+  label: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-1 rounded-md border px-2 py-1 font-mono text-[11px] transition ${
+        on ? "border-primary text-primary" : "border-border text-muted-foreground hover:text-foreground"
+      }`}
+    >
+      <Icon className="size-3.5" /> {label}
+    </button>
   );
 }
 
