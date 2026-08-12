@@ -352,6 +352,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
 
   const handleDetect = async () => {
+    // Primeiro salva as máscaras atuais para garantir persistência antes da detecção
+    if (masks.length > 0 && job?.id) {
+      const headers = await cloudAuthHeaders();
+      await useServerFn(saveCleanerMasks)({ data: { id: job.id, masks }, headers }).catch(() => null);
+    }
+
     if (!job?.id) return;
     try {
       setJob((prev) => (prev ? { ...prev, status: "detecting", stage: "detectando áreas" } : prev));
