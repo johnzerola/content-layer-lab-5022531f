@@ -21,7 +21,7 @@ export function StagePreview({
   videoRef: React.RefObject<HTMLVideoElement | null>;
   pre: PreEdit;
   clip?: { start: number; end: number } | null;
-  captions?: CaptionCue[] | null;
+  captions?: CaptionCue[] | null | undefined;
   variation?: import("@/lib/variation").Variation;
   bypass?: boolean;
   safeArea?: boolean;
