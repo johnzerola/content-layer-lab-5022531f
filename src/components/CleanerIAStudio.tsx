@@ -439,27 +439,34 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     setUploading(true);
     setInputReady(false);
     try {
+      pushLog("info", `criando job · ${item.file.name} · ${(item.file.size / 1e6).toFixed(1)} MB · ${mode}/${preset}`);
       const headers = await cloudAuthHeaders();
       const { job: newJob, upload } = (await createJob({
         data: { filename: item.file.name, size: item.file.size, mode, preset },
         headers,
       })) as { job: CleanerJob; upload?: { url: string; token: string } };
       setJob(newJob);
+      pushLog("info", `job criado · ${newJob.id}`);
 
       if (upload) await uploadToWorker(newJob.id, upload);
+      pushLog("info", "upload concluído — confirmando arquivo no motor");
 
       const info = await confirmInput(newJob.id);
       if (!info.ok) {
+        pushLog("error", `motor sem o arquivo: ${info.error || "arquivo ausente"}`);
         toast.error(`O motor não recebeu o vídeo (${info.error || "arquivo ausente"}). Use "Reenviar vídeo".`);
         return;
       }
       setJob((prev) => (prev ? { ...prev, status: "queued", progress: 0 } : prev));
+      pushLog("info", "arquivo confirmado no motor");
       toast.success("Vídeo enviado. Detecte as áreas ou marque à mão.");
     } catch (e) {
+      pushLog("error", `upload falhou: ${errMsg(e)}`);
       toast.error(`Erro no upload: ${errMsg(e)}`);
     } finally {
       setUploading(false);
     }
+
   };
 
   /** Reenvia o arquivo para um job já existente, sem recriar o job. */
