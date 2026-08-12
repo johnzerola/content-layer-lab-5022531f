@@ -12,7 +12,6 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as ArmazenamentoRouteImport } from './routes/armazenamento'
-import { Route as IndexRebuildTestRouteImport } from './routes/index-rebuild-test'
 import { Route as LimparIaRouteImport } from './routes/limpar-ia'
 import { Route as LiveRouteImport } from './routes/live'
 import { Route as McpRouteImport } from './routes/mcp'
@@ -40,11 +39,6 @@ const AgendaRoute = AgendaRouteImport.update({
 const ArmazenamentoRoute = ArmazenamentoRouteImport.update({
   id: '/armazenamento',
   path: '/armazenamento',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const IndexRebuildTestRoute = IndexRebuildTestRouteImport.update({
-  id: '/index-rebuild-test',
-  path: '/index-rebuild-test',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LimparIaRoute = LimparIaRouteImport.update({
@@ -122,7 +116,6 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
-  '/index-rebuild-test': typeof IndexRebuildTestRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
@@ -141,7 +134,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
-  '/index-rebuild-test': typeof IndexRebuildTestRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
@@ -161,7 +153,6 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
-  '/index-rebuild-test': typeof IndexRebuildTestRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
@@ -182,7 +173,6 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/armazenamento'
-    | '/index-rebuild-test'
     | '/limpar-ia'
     | '/live'
     | '/mcp'
@@ -201,7 +191,6 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/armazenamento'
-    | '/index-rebuild-test'
     | '/limpar-ia'
     | '/live'
     | '/mcp'
@@ -220,7 +209,6 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/armazenamento'
-    | '/index-rebuild-test'
     | '/limpar-ia'
     | '/live'
     | '/mcp'
@@ -240,7 +228,6 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgendaRoute: typeof AgendaRoute
   ArmazenamentoRoute: typeof ArmazenamentoRoute
-  IndexRebuildTestRoute: typeof IndexRebuildTestRoute
   LimparIaRoute: typeof LimparIaRoute
   LiveRoute: typeof LiveRoute
   McpRoute: typeof McpRoute
@@ -277,13 +264,6 @@ declare module '@tanstack/react-router' {
       path: '/armazenamento'
       fullPath: '/armazenamento'
       preLoaderRoute: typeof ArmazenamentoRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/index-rebuild-test': {
-      id: '/index-rebuild-test'
-      path: '/index-rebuild-test'
-      fullPath: '/index-rebuild-test'
-      preLoaderRoute: typeof IndexRebuildTestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/limpar-ia': {
@@ -384,7 +364,6 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgendaRoute: AgendaRoute,
   ArmazenamentoRoute: ArmazenamentoRoute,
-  IndexRebuildTestRoute: IndexRebuildTestRoute,
   LimparIaRoute: LimparIaRoute,
   LiveRoute: LiveRoute,
   McpRoute: McpRoute,
