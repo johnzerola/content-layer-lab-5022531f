@@ -419,7 +419,7 @@ export interface DrawOpts {
   borderColor?: string;
   /** tempo atual do vídeo fonte (segundos) — usado pelas legendas e janelas de limpeza */
   time?: number;
-  captions?: CaptionCue[];
+  captions?: CaptionCue[] | null;
   /** placa de fundo (mediana temporal) para reconstruir áreas com pixels reais */
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null;
   /** pré-edição do vídeo fonte (recorte, giro, cor) aplicada antes do template */
@@ -428,7 +428,10 @@ export interface DrawOpts {
   clip?: { start: number; end: number } | null;
   /** "hq" = reconstrução em resolução total (exportação). Padrão: preview rápido. */
   quality?: "preview" | "hq";
+  variation?: import("./variation").Variation | undefined;
 }
+
+
 
 
 function drawVideoLayer(
@@ -482,10 +485,12 @@ function drawVideoLayer(
       ctx.translate(v.x * 2 + v.w, 0);
       ctx.scale(-1, 1);
     }
+    const vr = opts?.variation;
     const baseFilter = preEditFilter(pre, {
-      brightness: opts?.brightness ?? 1,
-      saturation: opts?.saturation ?? 1,
+      brightness: (opts?.brightness ?? 1) * (vr?.brightness ?? 1),
+      saturation: (opts?.saturation ?? 1) * (vr?.saturation ?? 1),
     });
+
 
     /** Desenha a fonte dentro de uma caixa, no modo pedido. */
     const paint = (
@@ -498,21 +503,36 @@ function drawVideoLayer(
         mode === "contain"
           ? Math.min(box.w / rect.ew, box.h / rect.eh)
           : Math.max(box.w / rect.ew, box.h / rect.eh);
-      const scale = fitScale * zoom;
-      const dw = rect.ew * scale;
-      const dh = rect.eh * scale;
-      const useOffset = style?.useOffset !== false;
-      const ox = useOffset ? (opts?.offsetX ?? v.offsetX) * (dw - box.w) * 0.5 : 0;
-      const oy = useOffset ? (opts?.offsetY ?? v.offsetY) * (dh - box.h) * 0.5 : 0;
+      const zs = (style?.useOffset !== false ? zoom : 1) * (vr?.zoom ?? 1);
+      const s = fitScale * zs;
+      const dw = rect.ew * s;
+      const dh = rect.eh * s;
+      const ox = style?.useOffset !== false ? (opts?.offsetX ?? v.offsetX ?? 0) * box.w : 0;
+      const oy = style?.useOffset !== false ? (opts?.offsetY ?? v.offsetY ?? 0) * box.h : 0;
       const dx = box.x + (box.w - dw) / 2 + ox;
       const dy = box.y + (box.h - dh) / 2 + oy;
+
       ctx.save();
       ctx.beginPath();
       ctx.rect(box.x, box.y, box.w, box.h);
       ctx.clip();
       const extraBlur = style?.blur ? ` blur(${style.blur}px)` : "";
       ctx.filter = (baseFilter === "none" ? "" : baseFilter) + extraBlur || "none";
+
+      // Anti-duplicidade: rotação sutil e espelhamento
+      if (vr && style?.useOffset !== false) {
+        if (vr.mirror) {
+          ctx.translate(dx * 2 + dw, 0);
+          ctx.scale(-1, 1);
+        }
+        if (vr.rotate) {
+          ctx.translate(dx + dw / 2, dy + dh / 2);
+          ctx.rotate((vr.rotate * Math.PI) / 180);
+          ctx.translate(-(dx + dw / 2), -(dy + dh / 2));
+        }
+      }
       ctx.translate(dx + dw / 2, dy + dh / 2);
+
       if (rect.quarter) ctx.rotate((rect.quarter * Math.PI) / 2);
       if (pre?.flipH) ctx.scale(-1, 1);
       if (pre?.flipV) ctx.scale(1, -1);
@@ -811,6 +831,7 @@ export function drawFrame(
   t: Template,
   source?: FrameSource | null,
   opts?: DrawOpts,
+
 ) {
   const W = t.canvasW ?? CANVAS_W;
   const H = t.canvasH ?? CANVAS_H;
@@ -844,11 +865,13 @@ export function drawFrame(
   (t.extras ?? []).forEach((extra, i) =>
     push(extra.z, 100 + i, () => ("src" in extra ? drawImageLayer(ctx, extra) : drawText(ctx, extra))),
   );
-  if (t.captions && opts?.captions?.length) {
-    const cues = opts.captions;
+  if (t.captions && (opts?.captions?.length || opts?.pre?.captionStyle)) {
+    const cues = opts.captions ?? [];
     const time = opts.time ?? 0;
-    push(t.captions.z, 70, () => drawCaptions(ctx, t.captions!, cues, time));
+    const style = { ...t.captions, ...(opts.pre?.captionStyle ?? {}) };
+    push(t.captions.z, 70, () => drawCaptions(ctx, style, cues, time));
   }
+
 
   jobs.sort((a, b) => a.z - b.z || a.i - b.i).forEach((j) => j.run());
   if (animating) ctx.restore();

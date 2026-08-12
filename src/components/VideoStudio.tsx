@@ -56,7 +56,12 @@ import { FramingStudio } from "@/components/FramingStudio";
 import { EditorTimeline } from "@/components/EditorTimeline";
 import { StagePreview } from "@/components/editor/StagePreview";
 import { useEditorHistory } from "@/components/editor/useEditorHistory";
+import { defaultAntiDup, makeVariation, describeVariation, type AntiDupConfig } from "@/lib/variation";
+import { CaptionStudio } from "@/components/CaptionStudio";
+import { defaultCaptions, type CaptionStyle } from "@/lib/template";
 import type { CaptionCue } from "@/lib/captions";
+
+
 
 export interface PreEditResult {
   pre: PreEdit;
@@ -71,7 +76,7 @@ type Props = {
   duration: number;
   value: PreEditResult;
   /** legendas deste vídeo (permite corrigir palavras aqui mesmo) */
-  captions?: CaptionCue[] | undefined;
+  captions?: CaptionCue[] | null | undefined;
   onCaptionsChange?: ((cues: CaptionCue[]) => void) | undefined;
   /** textos do template usados neste vídeo */
   texts?: { headline: string; name: string; handle: string; cta: string } | undefined;
@@ -98,7 +103,7 @@ type Drag = {
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text";
+type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text" | "antidup";
 
 const TOOL_GROUPS: { group: string; items: { id: Tab; label: string; icon: typeof Scissors }[] }[] = [
   {
@@ -119,13 +124,21 @@ const TOOL_GROUPS: { group: string; items: { id: Tab; label: string; icon: typeo
     ],
   },
   {
-    group: "Conteúdo",
+    group: "Estilo & IA",
     items: [
       { id: "caps", label: "Legenda", icon: Subtitles },
+      { id: "antidup", label: "Anti-duplicidade", icon: Repeat },
+      { id: "color", label: "Cores", icon: SlidersHorizontal },
+    ],
+  },
+  {
+    group: "Conteúdo",
+    items: [
       { id: "text", label: "Textos", icon: Type },
     ],
   },
 ];
+
 
 const TOOL_ORDER: Tab[] = TOOL_GROUPS.flatMap((g) => g.items.map((i) => i.id));
 
@@ -236,8 +249,16 @@ export function VideoStudio({
   const [sens, setSens] = useState(0.5);
   const [minSil, setMinSil] = useState(0.35);
   const [cutting, setCutting] = useState(false);
+
+  const [adPreview, setAdPreview] = useState(false);
+  const [adSeed, setAdSeed] = useState(() => pre.antiDupSeed ?? Math.random().toString(36).slice(2, 8));
+
+  const adConfig = useMemo(() => ({ ...defaultAntiDup(), ...pre.antiDup }), [pre.antiDup]);
+  const adVariation = useMemo(() => makeVariation(adConfig, adSeed), [adConfig, adSeed]);
+
   /** proporção travada do recorte (largura/altura em pixels da fonte) */
   const [lock, setLock] = useState<number | null>(null);
+
 
   const [url, setUrl] = useState("");
   useEffect(() => {
@@ -802,7 +823,9 @@ export function VideoStudio({
                       thirds={thirds}
                       safeArea={safe}
                       className="h-full max-h-full"
+                      variation={adPreview ? adVariation : undefined}
                     />
+
                   )}
                 </div>
 
@@ -1066,6 +1089,202 @@ export function VideoStudio({
                 </p>
               </div>
             )}
+
+            {tab === "color" && (
+              <div className="space-y-5">
+                <div>
+                  <p className="mono-label mb-2">Presets de Cor</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {COLOR_PRESETS.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => set(p.v, `filtro ${p.label}`)}
+                        className={`rounded-md border px-2 py-1 font-mono text-[11px] transition ${
+                          pre.grayscale === (p.v.grayscale ?? 0) &&
+                          pre.sepia === (p.v.sepia ?? 0) &&
+                          pre.brightness === (p.v.brightness ?? 1)
+                            ? "border-primary text-primary"
+                            : "border-border text-muted-foreground hover:border-primary/50"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Field label={`Brilho · ${Math.round(pre.brightness * 100)}%`}>
+                    <Slider
+                      value={[pre.brightness]}
+                      min={0.5}
+                      max={1.5}
+                      step={0.01}
+                      onValueChange={([v]) => set({ brightness: v ?? 1 }, "brilho")}
+                    />
+                  </Field>
+                  <Field label={`Contraste · ${Math.round(pre.contrast * 100)}%`}>
+                    <Slider
+                      value={[pre.contrast]}
+                      min={0.5}
+                      max={1.5}
+                      step={0.01}
+                      onValueChange={([v]) => set({ contrast: v ?? 1 }, "contraste")}
+                    />
+                  </Field>
+                  <Field label={`Saturação · ${Math.round(pre.saturation * 100)}%`}>
+                    <Slider
+                      value={[pre.saturation]}
+                      min={0}
+                      max={2}
+                      step={0.01}
+                      onValueChange={([v]) => set({ saturation: v ?? 1 }, "saturação")}
+                    />
+                  </Field>
+                  <Field label={`Matiz (Hue) · ${Math.round(pre.hue)}°`}>
+                    <Slider
+                      value={[pre.hue]}
+                      min={-180}
+                      max={180}
+                      step={1}
+                      onValueChange={([v]) => set({ hue: v ?? 0 }, "matiz")}
+                    />
+                  </Field>
+                  <Field label={`P&B / Grayscale · ${Math.round(pre.grayscale * 100)}%`}>
+                    <Slider
+                      value={[pre.grayscale]}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      onValueChange={([v]) => set({ grayscale: v ?? 0 }, "p&b")}
+                    />
+                  </Field>
+                </div>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full"
+                  onClick={() =>
+                    set(
+                      { brightness: 1, contrast: 1, saturation: 1, hue: 0, sepia: 0, grayscale: 0, blur: 0 },
+                      "resetar cores",
+                    )
+                  }
+                >
+                  Resetar ajustes
+                </Button>
+              </div>
+            )}
+
+            {tab === "antidup" && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[11px] text-muted-foreground">Preview anti-duplicidade</span>
+                  <ToggleChip on={adPreview} onClick={() => setAdPreview((v) => !v)} icon={Eye} label={adPreview ? "Ativo" : "Off"} />
+                </div>
+                {adPreview && (
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-2 font-mono text-[10px] leading-snug text-primary">
+                    Mostrando variação ativa: {describeVariation(adVariation)}
+                    <button
+                      onClick={() => setAdSeed(Math.random().toString(36).slice(2, 8))}
+                      className="ml-2 underline hover:text-white"
+                    >
+                      Nova seed
+                    </button>
+                  </div>
+                )}
+
+                <div className="space-y-4 rounded-xl border border-border p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="mono-label">Modo Automático</span>
+                    <ToggleChip
+                      on={adConfig.auto}
+                      onClick={() => set({ antiDup: { ...adConfig, auto: !adConfig.auto } }, "ia anti-duplicidade")}
+                      icon={Sparkles}
+                      label={adConfig.auto ? "IA Ativa" : "Manual"}
+
+                    />
+                  </div>
+                  <p className="font-mono text-[10px] text-muted-foreground">
+                    {adConfig.auto
+                      ? "A IA escolhe variações aleatórias dentro dos limites abaixo para cada vídeo."
+                      : "Os valores abaixo são aplicados exatamente como configurados."}
+                  </p>
+
+                  <div className="space-y-3 pt-2">
+                    <Field label={`Zoom extra · +${Math.round(adConfig.zoom * 100)}%`}>
+                      <Slider
+                        value={[adConfig.zoom]}
+                        min={0}
+                        max={0.2}
+                        step={0.01}
+                        onValueChange={([v]) => set({ antiDup: { ...adConfig, zoom: v ?? 0 } }, "ajuste zoom")}
+                      />
+                    </Field>
+                    <Field label={`Brilho ±${Math.round(adConfig.brightness * 100)}%`}>
+                      <Slider
+                        value={[adConfig.brightness]}
+                        min={0}
+                        max={0.2}
+                        step={0.01}
+                        onValueChange={([v]) => set({ antiDup: { ...adConfig, brightness: v ?? 0 } }, "ajuste brilho")}
+                      />
+                    </Field>
+                    <Field label={`Saturação ±${Math.round(adConfig.saturation * 100)}%`}>
+                      <Slider
+                        value={[adConfig.saturation]}
+                        min={0}
+                        max={0.2}
+                        step={0.01}
+                        onValueChange={([v]) => set({ antiDup: { ...adConfig, saturation: v ?? 0 } }, "ajuste saturação")}
+                      />
+                    </Field>
+                    <Field label={`Ruído (Grain) · ${Math.round(adConfig.noise * 100)}%`}>
+                      <Slider
+                        value={[adConfig.noise]}
+                        min={0}
+                        max={0.2}
+                        step={0.01}
+                        onValueChange={([v]) => set({ antiDup: { ...adConfig, noise: v ?? 0 } }, "ajuste ruído")}
+                      />
+                    </Field>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 font-mono text-[11px] hover:border-primary">
+                    <input
+                      type="checkbox"
+                      checked={adConfig.mirror}
+                      onChange={(e) => set({ antiDup: { ...adConfig, mirror: e.target.checked } }, "espelhar vídeo")}
+                      className="size-4 accent-[var(--primary)]"
+                    />
+                    <FlipHorizontal className="size-3.5" /> Espelhar
+                  </label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => set({ antiDup: defaultAntiDup() }, "resetar anti-duplicidade")}
+                  >
+                    Resetar tudo
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {tab === "caps" && (
+              <div className="space-y-4">
+                <CaptionStudio
+                  style={{ ...defaultCaptions(), ...(pre.captionStyle ?? {}) }}
+                  onChange={(patch) =>
+                    set({ captionStyle: { ...(pre.captionStyle ?? {}), ...patch } }, "estilo da legenda")
+                  }
+                  cues={captions}
+                />
+              </div>
+            )}
+
 
             {tab === "crop" && (
               <div className="space-y-4">

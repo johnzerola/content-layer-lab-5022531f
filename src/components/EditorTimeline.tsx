@@ -27,7 +27,7 @@ interface Props {
   keys: FrameKey[];
   transIn: Transition;
   transOut: Transition;
-  cues?: CaptionCue[] | undefined;
+  cues?: CaptionCue[] | null | undefined;
   /** trechos mantidos (corte multi-segmento) */
   segments?: Segment[] | undefined;
   onSeek: (t: number) => void;

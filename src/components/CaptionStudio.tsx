@@ -8,7 +8,7 @@ import type { CaptionCue } from "@/lib/captions";
 interface Props {
   style: CaptionStyle;
   onChange: (patch: Partial<CaptionStyle>) => void;
-  cues?: CaptionCue[] | undefined;
+  cues?: CaptionCue[] | null | undefined;
   fonts?: CustomFont[] | undefined;
   onAddFont?: (f: CustomFont) => void;
 }

@@ -1333,6 +1333,8 @@ function Home() {
       }
     : baseTpl;
 
+
+
   return (
     <AppShell
       mode={mode}
@@ -1769,43 +1771,6 @@ function Home() {
                       </div>
 
                     )}
-                    {/* estilo rápido de legenda direto na prévia */}
-                    <div className="flex flex-wrap items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setActive((t) => ({
-                            ...t,
-                            captions: {
-                              ...(t.captions ?? defaultCaptions()),
-                              visible: !(t.captions ?? defaultCaptions()).visible,
-                            },
-                          }))
-                        }
-                        className={`rounded-md border px-2 py-1 font-mono text-[10px] ${
-                          capStyle.visible
-                            ? "border-primary/60 bg-primary/15 text-primary"
-                            : "border-border text-muted-foreground"
-                        }`}
-                      >
-                        legenda {capStyle.visible ? "on" : "off"}
-                      </button>
-                      {CAPTION_PRESETS.slice(0, 6).map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() =>
-                            setActive((t) => ({
-                              ...t,
-                              captions: { ...(t.captions ?? defaultCaptions()), ...p.style, visible: true },
-                            }))
-                          }
-                          className="rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:border-primary/60 hover:text-foreground"
-                        >
-                          {p.label}
-                        </button>
-                      ))}
-                    </div>
                     {previewVariation && (
 
                       <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
@@ -2120,49 +2085,13 @@ function Home() {
 
 
                     <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
-                      <p className="mono-label">Estilo das legendas (CapCut)</p>
-                      <label className="flex items-center gap-2 font-mono text-[11px]">
-                        <input
-                          type="checkbox"
-                          checked={(active.captions ?? defaultCaptions()).visible}
-                          onChange={(e) =>
-                            setActive((t) => ({
-                              ...t,
-                              captions: { ...(t.captions ?? defaultCaptions()), visible: e.target.checked },
-                            }))
-                          }
-                          className="size-4 accent-[var(--primary)]"
-                        />
-                        exibir no vídeo
-                      </label>
-                    </div>
-                    <label className="mt-2 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        checked={autoCap}
-                        onChange={(e) => setAutoCap(e.target.checked)}
-                        className="size-4 accent-[var(--primary)]"
-                      />
-                      transcrever automaticamente ao clicar em Processar
-                    </label>
-
-                    <div className="mt-3">
-                      <CaptionStudio
-                        style={active.captions ?? defaultCaptions()}
-                        cues={selected.captions}
-                        fonts={active.fonts}
-                        onAddFont={(f) =>
-                          setActive((t) => ({ ...t, fonts: [...(t.fonts ?? []), f] }))
-                        }
-                        onChange={(patch) =>
-                          setActive((t) => ({
-                            ...t,
-                            captions: { ...(t.captions ?? defaultCaptions()), ...patch },
-                          }))
-                        }
-                      />
+                      <p className="mono-label text-primary">Edite cores, legendas e variações no Estúdio</p>
+                      <Button size="sm" onClick={() => setStudioId(selected.id)}>
+                        <Pencil className="mr-1 size-3.5" /> Abrir Estúdio
+                      </Button>
                     </div>
                   </div>
+
 
                 )}
 
@@ -2256,79 +2185,30 @@ function Home() {
                     </p>
                   </div>
                 )}
-
-                <div className="rounded-xl border border-border bg-surface-2 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="mono-label">Anti-duplicidade</p>
-                    <label className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        checked={antiDup.auto}
-                        onChange={(e) => setAntiDup({ auto: e.target.checked })}
-                        className="accent-[var(--primary)]"
-                      />
-                      {antiDup.auto ? "randomizar por vídeo" : "manual (valor exato)"}
-                    </label>
+                    <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
+                      <p className="mono-label text-primary">Edite cores, legendas e variações no Estúdio</p>
+                      <Button size="sm" onClick={() => setStudioId(selected.id)}>
+                        <Pencil className="mr-1 size-3.5" /> Abrir Estúdio
+                      </Button>
+                    </div>
                   </div>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                    {(
-                      [
-                        ["brightness", "brilho", 0.15, "pct"],
-                        ["saturation", "saturação", 0.2, "pct"],
-                        ["zoom", "zoom", 0.12, "pct"],
-                        ["trim", "corte início/fim", 1, "s"],
-                        ["noise", "ruído", 0.12, "pct"],
-                        ["rotate", "rotação", 1.5, "deg"],
-                        ["border", "moldura", 40, "px"],
-                        ["pitch", "tom do áudio", 60, "cents"],
-                        ["eq", "equalização", 4, "db"],
-                      ] as const
-                    ).map(([key, label, max, unit]) => (
-                      <label key={key} className="font-mono text-[11px] text-muted-foreground">
-                        {label} ·{" "}
-                        {unit === "pct"
-                          ? `${(antiDup[key] * 100).toFixed(0)}%`
-                          : unit === "s"
-                            ? `${antiDup[key].toFixed(2)}s`
-                            : unit === "deg"
-                              ? `${antiDup[key].toFixed(2)}°`
-                              : unit === "px"
-                                ? `${Math.round(antiDup[key])}px`
-                                : unit === "db"
-                                  ? `${antiDup[key].toFixed(1)}dB`
-                                  : `${Math.round(antiDup[key])} cents`}
-                        <input
-                          type="range"
-                          min={0}
-                          max={max}
-                          step={max / 50}
-                          value={antiDup[key]}
-                          onChange={(e) => setAntiDup({ [key]: Number(e.target.value) })}
-                          className="w-full accent-[var(--primary)]"
-                        />
-                      </label>
-                    ))}
-                  </div>
-                  <label className="mt-2 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      checked={antiDup.cleanMetadata}
-                      onChange={(e) => setAntiDup({ cleanMetadata: e.target.checked })}
-                      className="accent-[var(--primary)]"
-                    />
-                    limpar metadados do MP4 (datas e identificadores)
-                  </label>
-                  {selected && (
-                    <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                      este vídeo: {describeVariation(variationOf(selected))}
-                    </p>
-                  )}
+                ) : (
+                  <p className="text-sm text-muted-foreground">Selecione um vídeo na lista.</p>
+                )}
+              </section>
+            </div>
+          )}
 
-                </div>
 
-              </div>
 
-            </section>
+
+
+
+
+
+
+
+
 
             <section className="panel flex max-h-[70vh] flex-col p-5">
               <div className="mb-3 flex items-center justify-between">
@@ -2414,6 +2294,10 @@ function Home() {
                         </div>
                       )}
                     </div>
+
+
+
+
                     {it.blob && (
                       <span
                         role="button"
@@ -2553,7 +2437,14 @@ function Home() {
             );
             setStudioId(null);
             toast.success("Edição aplicada — vale no preview e na exportação");
+            if (pre.captionStyle) {
+              setActive((t) => ({
+                ...t,
+                captions: { ...(t.captions ?? defaultCaptions()), ...pre.captionStyle },
+              }));
+            }
           }}
+
         />
       )}
 
