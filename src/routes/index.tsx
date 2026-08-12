@@ -34,6 +34,19 @@ import { autoSyncTemplates, enableCloudQuotaFallback, logBatch, logExports, type
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
 import { StudioBoundary } from "@/components/StudioBoundary";
+import { RestoreBanner } from "@/components/RestoreBanner";
+import {
+  addResult,
+  clearSession,
+  getBlob,
+  loadSession,
+  pruneSessions,
+  putBlob,
+  saveSession,
+  type SessionItem,
+  type SessionOutput,
+  type SessionSnap,
+} from "@/lib/session";
 import { AuthGate } from "@/components/AuthGate";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
