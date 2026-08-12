@@ -529,12 +529,18 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       <div className="space-y-4">
         <div
           ref={stageRef}
-          onPointerDown={onDown}
-          onPointerMove={onMove}
-          onPointerUp={onUp}
-          onDoubleClick={() => tool === "poly" && finishPolygon()}
+          onPointerDown={videoReady ? onDown : undefined}
+          onPointerMove={videoReady ? onMove : undefined}
+          onPointerUp={videoReady ? onUp : undefined}
+          onDoubleClick={() => videoReady && tool === "poly" && finishPolygon()}
           className={`panel relative aspect-video overflow-hidden rounded-2xl border border-border/60 bg-black touch-none z-0 ${
-            tool === "select" ? "cursor-default" : tool === "erase" ? "cursor-pointer" : "cursor-crosshair"
+            !videoReady
+              ? "cursor-wait"
+              : tool === "select"
+                ? "cursor-default"
+                : tool === "erase"
+                  ? "cursor-pointer"
+                  : "cursor-crosshair"
           }`}
         >
           <video
@@ -543,9 +549,19 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             controls={job?.status === "completed"}
             playsInline
             className="absolute inset-0 size-full object-contain z-0"
-            onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
+            onLoadedMetadata={(e) => {
+              setDuration(e.currentTarget.duration || 0);
+              setVideoReady(true);
+            }}
             onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
           />
+
+          {!videoReady && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/60 text-center text-xs text-muted-foreground">
+              carregando vídeo… aguarde para marcar as áreas
+            </div>
+          )}
+
 
           {job?.status !== "completed" &&
             [...visible, ...(draft ? [draft] : [])].map((m) => {
