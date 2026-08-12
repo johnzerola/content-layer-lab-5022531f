@@ -784,8 +784,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               onClick={() => {
                 setHealth(null);
                 getHealth()
-                  .then((h) => setHealth(h as { online: boolean; reason?: string }))
+                  .then((h) => setHealth(h as { online: boolean; reason?: string; cuda?: boolean }))
                   .catch((e) => setHealth({ online: false, reason: String(e) }));
+
               }}
               title="verificar novamente"
               className={`flex items-center gap-1.5 text-[10px] font-bold uppercase ${
