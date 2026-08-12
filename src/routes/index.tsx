@@ -2192,9 +2192,11 @@ function Home() {
                       </Button>
                     </div>
                   </div>
+                  </div>
                 ) : (
                   <p className="text-sm text-muted-foreground">Selecione um vídeo na lista.</p>
                 )}
+
               </section>
             </div>
           )}
