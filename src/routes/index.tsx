@@ -2185,10 +2185,8 @@ function Home() {
                     </p>
                   </div>
                 )}
-                  </div>
-                )}
-              </div>
             </section>
+
 
 
             <section className="panel flex max-h-[70vh] flex-col p-5">
