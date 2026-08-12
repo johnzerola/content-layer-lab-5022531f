@@ -356,7 +356,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     // Primeiro salva as máscaras atuais para garantir persistência antes da detecção
     if (masks.length > 0 && job?.id) {
       const headers = await cloudAuthHeaders();
-      await useServerFn(saveCleanerMasks)({ data: { id: job.id, masks }, headers }).catch(() => null);
+      await saveMasks({ data: { id: job.id, masks }, headers }).catch(() => null);
     }
 
     if (!job?.id) return;
