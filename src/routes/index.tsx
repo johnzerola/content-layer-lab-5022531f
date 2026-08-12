@@ -2185,19 +2185,11 @@ function Home() {
                     </p>
                   </div>
                 )}
-
-                    <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
-                      <p className="mono-label text-primary">Edite cores, legendas e variações no Estúdio</p>
-                      <Button size="sm" onClick={() => setStudioId(selected.id)}>
-                        <Pencil className="mr-1 size-3.5" /> Abrir Estúdio
-                      </Button>
-                    </div>
                   </div>
                 )}
               </div>
-
-
             </section>
+
 
             <section className="panel flex max-h-[70vh] flex-col p-5">
               <div className="mb-3 flex items-center justify-between">
