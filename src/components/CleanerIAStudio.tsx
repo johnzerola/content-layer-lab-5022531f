@@ -130,7 +130,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   }, [tool]);
 
   const visible = masks.filter(
-    (m) => (m.from ?? 0) <= time && time <= (m.to ?? (duration || Infinity)),
+    (m) => (m.from ?? 0) <= time + 0.1 && time <= (m.to ?? (duration || Infinity)) + 0.1,
   );
 
   const pointAt = useCallback((e: React.PointerEvent) => {
@@ -423,7 +423,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     <div className="grid gap-6 lg:grid-cols-[200px_1fr_300px]">
       {/* Modos */}
       <aside className="space-y-2">
-        <p className="mono-label px-1">Modo</p>
+        <p className="mono-label px-1">Ferramentas de IA</p>
         {MODES.map((m) => (
           <button
             key={m}
@@ -449,7 +449,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           onPointerMove={onMove}
           onPointerUp={onUp}
           onDoubleClick={() => tool === "poly" && finishPolygon()}
-          className={`panel relative aspect-video overflow-hidden rounded-2xl border border-border/60 bg-black ${
+          className={`panel relative aspect-video overflow-hidden rounded-2xl border border-border/60 bg-black touch-none z-0 ${
             tool === "select" ? "cursor-default" : tool === "erase" ? "cursor-pointer" : "cursor-crosshair"
           }`}
         >
@@ -458,7 +458,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             src={job?.status === "completed" && job.result_url ? job.result_url : src}
             controls={job?.status === "completed"}
             playsInline
-            className="absolute inset-0 size-full object-contain"
+            className="absolute inset-0 size-full object-contain z-0"
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
             onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
           />
@@ -468,8 +468,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               const baseClasses = m.role === "protect"
                 ? "border-emerald-400 bg-emerald-400/10"
                 : selected === m.id
-                  ? "border-primary bg-primary/25"
-                  : "border-primary/70 bg-primary/15";
+                  ? "border-primary bg-primary/30 ring-2 ring-primary ring-offset-1 ring-offset-black z-20"
+                  : "border-primary/80 bg-primary/20 hover:bg-primary/30 z-10";
 
               if (m.kind === "poly" && m.points) {
                 const pts = m.points.map((pt) => `${pt.x * 100}% ${pt.y * 100}%`).join(",");
