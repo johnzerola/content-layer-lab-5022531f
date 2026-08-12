@@ -551,7 +551,14 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const sel = masks.find((m) => m.id === selected) || null;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[200px_1fr_300px]">
+    <div className="space-y-4">
+      {health?.online && health.cuda === false && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-[11px] font-semibold text-amber-500">
+          Modo CPU — processamento lento. O motor está sem GPU; funciona, mas demora bem mais.
+        </div>
+      )}
+
+      <div className="grid items-start gap-6 lg:grid-cols-[200px_minmax(0,1fr)_320px]">
       {/* Modos */}
       <aside className="space-y-2">
         <p className="mono-label px-1">Ferramentas de IA</p>
@@ -573,8 +580,49 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       </aside>
 
       {/* Player + máscaras */}
-      <div className="space-y-4">
+      <div className="min-w-0 space-y-4">
+        {/* Ferramentas de marcação — sempre visíveis acima do vídeo */}
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-surface/40 p-2">
+          {([
+            ["rect", "Retângulo", Square],
+            ["poly", "Polígono", Pentagon],
+            ["brush", "Pincel", PenTool],
+            ["protect", "Proteger", Shield],
+            ["erase", "Apagar", Eraser],
+            ["select", "Selecionar", MousePointer2],
+          ] as const).map(([id, label, Icon]) => (
+            <button
+              key={id}
+              onClick={() => setTool(id)}
+              className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                tool === id
+                  ? "border-primary bg-primary/15 text-primary shadow-glow"
+                  : "border-border/60 bg-background/40 hover:border-border"
+              }`}
+            >
+              <Icon className="size-3.5" /> {label}
+            </button>
+          ))}
+          <span className="mx-1 h-5 w-px bg-border/60" />
+          <button
+            onClick={() => addPresetMask("bottom")}
+            className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-xs font-semibold hover:border-primary"
+          >
+            Cobrir rodapé
+          </button>
+          <button
+            onClick={() => addPresetMask("top")}
+            className="rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-xs font-semibold hover:border-primary"
+          >
+            Cobrir topo
+          </button>
+          <span className="ml-auto font-mono text-[10px] text-muted-foreground">
+            {time.toFixed(2)}s / {duration.toFixed(2)}s
+          </span>
+        </div>
+
         <div
+
           ref={stageRef}
           onPointerDown={videoReady ? onDown : undefined}
           onPointerMove={videoReady ? onMove : undefined}
