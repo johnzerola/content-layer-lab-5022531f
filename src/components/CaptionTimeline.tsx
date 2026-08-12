@@ -4,7 +4,7 @@ import type { CaptionCue, CaptionWord } from "@/lib/captions";
 
 interface Props {
   file: File;
-  cues: CaptionCue[];
+  cues: CaptionCue[] | null | undefined;
   onChange: (cues: CaptionCue[]) => void;
 }
 
@@ -25,7 +25,9 @@ function normalize(cues: CaptionCue[]): CaptionCue[] {
     .sort((a, b) => a.start - b.start);
 }
 
-export function CaptionTimeline({ file, cues, onChange }: Props) {
+export function CaptionTimeline({ file, cues: cuesRaw, onChange }: Props) {
+  const cues = cuesRaw ?? [];
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [time, setTime] = useState(0);
