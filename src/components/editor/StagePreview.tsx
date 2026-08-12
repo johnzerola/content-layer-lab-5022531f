@@ -35,6 +35,9 @@ export function StagePreview({
   capRef.current = captions;
   const bypassRef = useRef(bypass);
   bypassRef.current = bypass;
+  const variationRef = useRef(variation);
+  variationRef.current = variation;
+
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -75,10 +78,12 @@ export function StagePreview({
               : {
                   pre: preRef.current,
                   clip: clipRef.current ?? null,
-                  ...(cues?.length ? { captions: cues } : {}),
+                  ...(cues?.length || preRef.current.captionStyle ? { captions: cues } : {}),
+                  variation: variationRef.current,
                 }),
           },
         );
+
       } else {
         ctx.fillStyle = "#000";
         ctx.fillRect(0, 0, W, H);
