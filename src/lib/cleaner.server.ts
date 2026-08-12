@@ -10,6 +10,15 @@ export function workerBase(): string | null {
   return url ? url.replace(/\/+$/, "") : null;
 }
 
+/**
+ * URL usada pelo navegador (upload direto). Precisa ser HTTPS, senão o browser
+ * bloqueia por conteúdo misto. Cai para a URL interna quando não configurada.
+ */
+export function workerPublicBase(): string | null {
+  const url = process.env["CLEANER_WORKER_PUBLIC_URL"];
+  return url ? url.replace(/\/+$/, "") : workerBase();
+}
+
 function secret(): string {
   return process.env["CLEANER_WORKER_SECRET"] ?? "";
 }
