@@ -10,9 +10,17 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
     if (error != null && typeof error === "object" && "statusCode" in error) {
       throw error;
     }
-    // Don't swallow auth errors or other critical failures in SSR/Functions
     console.error("Server Error:", error);
-    throw error;
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : "Unknown error",
+        timestamp: Date.now(),
+      }),
+      {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      },
+    );
   }
 });
 
