@@ -1632,6 +1632,18 @@ function Home() {
 
       <div className="space-y-5">
 
+        {pendingSessions[mode] && items.length === 0 && (
+          <RestoreBanner
+            count={pendingSessions[mode]!.items.length}
+            updatedAt={pendingSessions[mode]!.updatedAt}
+            busy={restoring}
+            onRestore={() => void restoreSession(mode)}
+            onDiscard={() => void discardSession(mode)}
+          />
+        )}
+
+
+
         {webmWarn && (
           <div className="flex items-start gap-3 rounded-xl border border-warn/50 bg-warn/10 p-4">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" />
