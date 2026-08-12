@@ -78,6 +78,12 @@ export interface PreEdit {
   grayscale: number;
   /** px */
   blur: number;
+  /** configuração de anti-duplicidade para este item */
+  antiDup?: Partial<import("./variation").AntiDupConfig>;
+  /** seed determinística para variações deste vídeo */
+  antiDupSeed?: string;
+  /** legenda específica para este vídeo */
+  captionStyle?: Partial<import("./template").CaptionStyle>;
 }
 
 export function defaultPreEdit(): PreEdit {
