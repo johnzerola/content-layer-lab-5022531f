@@ -718,6 +718,7 @@ export function ClipStudio(props: Props) {
                   setPicked((prev) => (prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id]))
                 }
                 onSelect={() => onSelect(c.id)}
+                onEdit={() => onEdit(c.id)}
                 onRemove={() => onRemove(c.id)}
                 onDownload={() => onDownload(c)}
               />
