@@ -1333,6 +1333,14 @@ function Home() {
       }
     : baseTpl;
 
+  const previewVariation = selected ? variationOf(selected, variantIdx) : undefined;
+  const previewDrawOpts: DrawOpts = {
+    t: previewTime,
+    showSafeZones: true,
+    variation: previewVariation,
+  };
+
+
   return (
     <AppShell
       mode={mode}
