@@ -6,7 +6,6 @@ import type { CleanerJob, CleanerRegion } from "@/lib/cleaner";
 import {
   jobToken,
   workerPublicBase,
-  workerPublicBase,
   workerCancel,
   workerDetect,
   workerHealth,
