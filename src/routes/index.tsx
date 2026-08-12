@@ -2459,7 +2459,9 @@ function Home() {
       )}
 
       {studioItem && (
+        <StudioBoundary onClose={() => setStudioId(null)}>
         <VideoStudio
+
           file={studioItem.file}
           width={studioItem.w}
           height={studioItem.h}
@@ -2508,7 +2510,9 @@ function Home() {
           }}
 
         />
+        </StudioBoundary>
       )}
+
 
       {cloudOpen && (
         <CloudPanel
