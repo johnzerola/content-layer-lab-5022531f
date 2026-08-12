@@ -73,6 +73,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [brushSize, setBrushSize] = useState(0.015);
   const [inputReady, setInputReady] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const [autoMode, setAutoMode] = useState(true);
+  const [autoRunning, setAutoRunning] = useState(false);
+
   const [logs, setLogs] = useState<Array<{ t: number; level: "info" | "warn" | "error"; msg: string }>>([]);
   const [showDebug, setShowDebug] = useState(true);
 
