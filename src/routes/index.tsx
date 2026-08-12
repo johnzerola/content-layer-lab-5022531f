@@ -1548,18 +1548,20 @@ function Home() {
                 </p>
               </div>
               {mode === "limpar-ia" && selected ? (
-                <CleanerIAStudio 
-                  item={{
-                    id: selected.id,
-                    file: selected.file,
-                    poster: selected.poster,
-                    w: selected.w,
-                    h: selected.h
-                  }}
-                  onComplete={(url) => {
-                    setItems(prev => prev.map(x => x.id === selected.id ? { ...x, result_url: url, status: "pronto" as any } : x));
-                  }}
-                />
+                <AuthGate>
+                  <CleanerIAStudio 
+                    item={{
+                      id: selected.id,
+                      file: selected.file,
+                      poster: selected.poster,
+                      w: selected.w,
+                      h: selected.h
+                    }}
+                    onComplete={(url) => {
+                      setItems(prev => prev.map(x => x.id === selected.id ? { ...x, result_url: url, status: "pronto" as any } : x));
+                    }}
+                  />
+                </AuthGate>
               ) : selected ? (
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="space-y-2">
