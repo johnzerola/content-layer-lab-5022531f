@@ -11,6 +11,7 @@ export function StagePreview({
   pre,
   clip,
   captions,
+  variation,
   /** true = ignora a pré-edição (comparar antes/depois) */
   bypass,
   safeArea,
@@ -20,12 +21,14 @@ export function StagePreview({
   videoRef: React.RefObject<HTMLVideoElement | null>;
   pre: PreEdit;
   clip?: { start: number; end: number } | null;
-  captions?: CaptionCue[] | undefined;
+  captions?: CaptionCue[] | null;
+  variation?: import("@/lib/variation").Variation;
   bypass?: boolean;
   safeArea?: boolean;
   thirds?: boolean;
   className?: string;
 }) {
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const preRef = useRef(pre);
   preRef.current = pre;
@@ -37,6 +40,7 @@ export function StagePreview({
   bypassRef.current = bypass;
   const variationRef = useRef(variation);
   variationRef.current = variation;
+
 
 
   useEffect(() => {
@@ -78,8 +82,9 @@ export function StagePreview({
               : {
                   pre: preRef.current,
                   clip: clipRef.current ?? null,
-                  ...(cues?.length || preRef.current.captionStyle ? { captions: cues } : {}),
+                  captions: cues ?? null,
                   variation: variationRef.current,
+
                 }),
           },
         );

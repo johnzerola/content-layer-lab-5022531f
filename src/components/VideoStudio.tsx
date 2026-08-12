@@ -76,7 +76,7 @@ type Props = {
   duration: number;
   value: PreEditResult;
   /** legendas deste vídeo (permite corrigir palavras aqui mesmo) */
-  captions?: CaptionCue[] | undefined;
+  captions?: CaptionCue[] | null;
   onCaptionsChange?: ((cues: CaptionCue[]) => void) | undefined;
   /** textos do template usados neste vídeo */
   texts?: { headline: string; name: string; handle: string; cta: string } | undefined;
