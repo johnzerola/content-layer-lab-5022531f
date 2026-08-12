@@ -14,6 +14,8 @@ import {
   Droplets,
   HardDrive,
   Radio,
+  Film,
+
 } from "lucide-react";
 
 export type AppMode = "lote" | "clip" | "limpar" | "limpar-ia";
