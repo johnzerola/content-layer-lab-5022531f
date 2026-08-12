@@ -2449,7 +2449,14 @@ function Home() {
             );
             setStudioId(null);
             toast.success("Edição aplicada — vale no preview e na exportação");
+            if (pre.captionStyle) {
+              setActive((t) => ({
+                ...t,
+                captions: { ...(t.captions ?? defaultCaptions()), ...pre.captionStyle },
+              }));
+            }
           }}
+
         />
       )}
 
