@@ -311,6 +311,26 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     setDraft(null);
   };
 
+  /** Máscaras típicas em um clique: legenda no rodapé, marca d'água no topo. */
+  const addPresetMask = (where: "bottom" | "top") => {
+    const region: CleanerRegion = {
+      id: rid(),
+      kind: "rect",
+      role: "remove",
+      x: 0.06,
+      y: where === "bottom" ? 0.72 : 0.03,
+      w: 0.88,
+      h: 0.22,
+      grow: 0.008,
+      track: true,
+      enabled: true,
+      label: where === "bottom" ? "Rodapé (legenda)" : "Topo (marca d'água)",
+    };
+    setMasks((prev) => [...prev, region]);
+    setSelected(region.id);
+  };
+
+
   const errMsg = (e: unknown) => {
     const raw = e instanceof Error ? e.message : String(e ?? "");
     if (/409|não está no motor|não recebido/i.test(raw)) return "o vídeo não está no motor — reenvie o arquivo";
