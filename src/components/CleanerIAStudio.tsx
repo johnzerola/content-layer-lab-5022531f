@@ -473,8 +473,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
   const handleDetect = async () => {
     if (!job?.id) return;
-    if (!inputReady) {
-      toast.error("Envie o vídeo para o motor antes de detectar.");
+    // Revalida no motor antes de tentar: evita o 500 genérico quando o arquivo sumiu.
+    const check = await confirmInput(job.id);
+    if (!check.ok) {
+      toast.error(`O motor não tem este vídeo (${check.error || "arquivo ausente"}). Use "Reenviar vídeo".`);
       return;
     }
     // Primeiro salva as máscaras atuais para garantir persistência antes da detecção
@@ -490,9 +492,13 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       const found = (res.detections || []) as CleanerRegion[];
       setMasks((prev) => [...prev, ...found]);
       setJob({ ...res, status: "queued" });
-      toast[found.length ? "success" : "warning"](
-        found.length ? `${found.length} área(s) encontrada(s).` : "Nada detectado — marque à mão.",
-      );
+      if (found.length) {
+        toast.success(`${found.length} área(s) encontrada(s).`);
+      } else {
+        addPresetMask("bottom");
+        toast.warning("Nada detectado — sugeri a área do rodapé. Ajuste ou apague se não servir.");
+      }
+
     } catch (e) {
       setJob((prev) => (prev ? { ...prev, status: "queued" } : prev));
       const msg = errMsg(e);
