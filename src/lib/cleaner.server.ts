@@ -60,20 +60,49 @@ export function verifyCallback(body: string, signature: string | null): boolean 
   return diff === 0;
 }
 
+export class WorkerError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+    this.name = "WorkerError";
+  }
+}
+
+function friendly(status: number, raw: string): string {
+  let detail = raw;
+  try {
+    const parsed = JSON.parse(raw);
+    detail = parsed?.detail ?? parsed?.error ?? raw;
+  } catch {
+    /* texto puro */
+  }
+  if (status === 409) return "o vídeo não está no motor — reenvie o arquivo";
+  if (status === 401 || status === 403) return "sessão do job expirada — reenvie o vídeo";
+  if (status === 404) return "job não encontrado no motor — reenvie o vídeo";
+  return detail?.slice(0, 300) || `motor respondeu ${status}`;
+}
+
 async function call<T>(path: string, init: RequestInit & { jobId?: string } = {}): Promise<T> {
   const base = workerBase();
-  if (!base) throw new Error("worker-offline");
+  if (!base) throw new WorkerError(503, "motor inacessível — worker não configurado");
   const headers = new Headers(init.headers);
   headers.set("content-type", "application/json");
   if (init.jobId) headers.set("x-job-token", jobToken(init.jobId));
-  const res = await fetch(`${base}${path}`, { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, { ...init, headers });
+  } catch (e: any) {
+    throw new WorkerError(503, `motor inacessível (${e?.message || "sem resposta"})`);
+  }
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text.slice(0, 400) || `worker ${res.status}`);
+    throw new WorkerError(res.status, friendly(res.status, text));
   }
   const text = await res.text();
   return (text ? JSON.parse(text) : {}) as T;
 }
+
 
 export async function workerHealth() {
   let base: string | null = null;
