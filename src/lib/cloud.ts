@@ -17,6 +17,26 @@ export function onAuth(cb: (u: CloudUser | null) => void) {
   return () => data.subscription.unsubscribe();
 }
 
+/**
+ * Cabeçalhos para RPCs protegidos. A leitura acontece imediatamente antes da
+ * chamada para evitar a corrida entre a hidratação da sessão e o middleware.
+ */
+export async function cloudAuthHeaders(): Promise<Record<string, string>> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
+
+  let session = data.session;
+  if (session?.expires_at && session.expires_at * 1000 <= Date.now() + 30_000) {
+    const refreshed = await supabase.auth.refreshSession();
+    if (refreshed.error) throw refreshed.error;
+    session = refreshed.data.session;
+  }
+
+  const token = session?.access_token;
+  if (!token) throw new Error("Sua sessão expirou. Entre novamente para continuar.");
+  return { Authorization: `Bearer ${token}` };
+}
+
 export async function signIn(email: string, password: string) {
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;

@@ -36,6 +36,7 @@ import {
   type CleanerPreset,
   type CleanerRegion,
 } from "@/lib/cleaner";
+import { cloudAuthHeaders } from "@/lib/cloud";
 
 type Props = {
   item: { id: string; file: File; poster: string | null; w: number; h: number };
@@ -88,7 +89,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     if (!polling || !job?.id) return;
     const timer = window.setInterval(async () => {
       try {
-        const status = (await refreshJob({ data: { id: job.id } })) as CleanerJob;
+        const headers = await cloudAuthHeaders();
+        const status = (await refreshJob({ data: { id: job.id }, headers })) as CleanerJob;
         setJob((prev) => ({ ...(prev as CleanerJob), ...status }));
         if (status.status === "completed") {
           setPolling(false);
@@ -275,8 +277,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
     setUploading(true);
     try {
+      const headers = await cloudAuthHeaders();
       const { job: newJob, upload } = (await createJob({
         data: { filename: item.file.name, size: item.file.size, mode, preset },
+        headers,
       })) as { job: CleanerJob; upload?: { url: string; token: string } };
       setJob(newJob);
 
@@ -309,7 +313,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     if (!job?.id) return;
     try {
       setJob((prev) => (prev ? { ...prev, status: "detecting", stage: "detectando áreas" } : prev));
-      const res = (await detectJob({ data: { id: job.id, mode } })) as CleanerJob;
+      const headers = await cloudAuthHeaders();
+      const res = (await detectJob({ data: { id: job.id, mode }, headers })) as CleanerJob;
       const found = (res.detections || []) as CleanerRegion[];
       setMasks((prev) => [...prev, ...found]);
       setJob({ ...res, status: "queued" });
@@ -329,6 +334,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       return;
     }
     try {
+      const headers = await cloudAuthHeaders();
       await processJob({
         data: {
           id: job.id,
@@ -342,6 +348,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             key_step: dynamicMask ? 3 : 8,
           },
         },
+        headers,
       });
       setPolling(true);
       setJob((prev) => (prev ? { ...prev, status: "inpainting", progress: 1 } : prev));
