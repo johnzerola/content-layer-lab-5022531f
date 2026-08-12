@@ -2185,7 +2185,8 @@ function Home() {
                     </p>
                   </div>
                 )}
-              </section>
+              </div>
+            </section>
             </div>
           )}
 
