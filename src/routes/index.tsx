@@ -929,12 +929,35 @@ function Home() {
           const total = n * outs.length;
           const outputs: { blob: Blob; ext: string; label: string }[] = [];
           let step = 0;
+
+          // CleanerIA: o render precisa partir do vídeo já reconstruído pela GPU,
+          // senão a legenda original volta a aparecer na exportação.
+          let sourceFile = item.file;
+          if (runMode === "limpar-ia") {
+            if (!item.result_url) {
+              throw new Error(
+                "Este vídeo ainda não foi limpo pela IA. Marque as áreas e clique em “Enviar para GPU” antes de processar.",
+              );
+            }
+            setItems((p) =>
+              p.map((x) => (x.id === id ? { ...x, stage: "baixando vídeo limpo" } : x)),
+            );
+            updateJob(id, { stage: "baixando vídeo limpo" });
+            const res = await fetch(item.result_url, { signal: ac.signal });
+            if (!res.ok) throw new Error("Não consegui baixar o vídeo limpo da GPU.");
+            const cleaned = await res.blob();
+            sourceFile = new File([cleaned], item.file.name, {
+              type: cleaned.type || "video/mp4",
+            });
+          }
+
           const baseTpl =
             runMode === "clip"
               ? stripBranding(active)
-              : runMode === "limpar"
+              : runMode === "limpar" || runMode === "limpar-ia"
                 ? cleanOnly(active)
                 : active;
+
 
           // transcreve na hora do processamento, para queimar a legenda no vídeo
           let cues = item.captions;
