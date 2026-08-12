@@ -90,6 +90,22 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const src = useMemo(() => URL.createObjectURL(item.file), [item.file]);
   useEffect(() => () => URL.revokeObjectURL(src), [src]);
 
+  /**
+   * Alguns codecs não disparam onLoadedMetadata no navegador. Em vez de travar o
+   * palco em "carregando", liberamos a marcação após um tempo curto — as máscaras
+   * são normalizadas (0..1), então funcionam mesmo sem metadados do player.
+   */
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      setVideoReady((prev) => {
+        if (!prev) toast.message("Pré-visualização lenta — a marcação já está liberada.");
+        return true;
+      });
+    }, 3500);
+    return () => window.clearTimeout(t);
+  }, [src]);
+
+
   useEffect(() => {
     let alive = true;
     const check = () =>
