@@ -16,12 +16,7 @@ import {
 } from "@/lib/cleaner.server";
 
 export const cleanerHealth = createServerFn({ method: "GET" }).handler(async () => {
-  try {
-    const health = await workerHealth();
-    return health;
-  } catch (error: any) {
-    return { online: false as const, reason: error?.message || "Internal health check error" };
-  }
+  return { online: false as const, reason: "Manual check" };
 });
 
 export const createCleanerJob = createServerFn({ method: "POST" })
