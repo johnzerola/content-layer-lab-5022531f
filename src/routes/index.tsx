@@ -1771,43 +1771,6 @@ function Home() {
                       </div>
 
                     )}
-                    {/* estilo rápido de legenda direto na prévia */}
-                    <div className="flex flex-wrap items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setActive((t) => ({
-                            ...t,
-                            captions: {
-                              ...(t.captions ?? defaultCaptions()),
-                              visible: !(t.captions ?? defaultCaptions()).visible,
-                            },
-                          }))
-                        }
-                        className={`rounded-md border px-2 py-1 font-mono text-[10px] ${
-                          capStyle.visible
-                            ? "border-primary/60 bg-primary/15 text-primary"
-                            : "border-border text-muted-foreground"
-                        }`}
-                      >
-                        legenda {capStyle.visible ? "on" : "off"}
-                      </button>
-                      {CAPTION_PRESETS.slice(0, 6).map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() =>
-                            setActive((t) => ({
-                              ...t,
-                              captions: { ...(t.captions ?? defaultCaptions()), ...p.style, visible: true },
-                            }))
-                          }
-                          className="rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:border-primary/60 hover:text-foreground"
-                        >
-                          {p.label}
-                        </button>
-                      ))}
-                    </div>
                     {previewVariation && (
 
                       <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
