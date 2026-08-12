@@ -8,6 +8,7 @@ import { listCleanerJobs } from "@/lib/cleaner.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { STAGE_LABEL, type CleanerJob } from "@/lib/cleaner";
 import { toast } from "sonner";
+import { currentUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/limpar-ia")({
   head: () => ({
@@ -47,8 +48,17 @@ function LimparIAPage() {
   const listJobs = useServerFn(listCleanerJobs);
 
   useEffect(() => {
-    listJobs().then((jobs) => setHistory((jobs as CleanerJob[]).slice(0, 10))).catch(() => null);
-  }, []);
+    let active = true;
+    currentUser()
+      .then((user) => (user ? listJobs() : []))
+      .then((jobs) => {
+        if (active) setHistory((jobs as CleanerJob[]).slice(0, 10));
+      })
+      .catch(() => null);
+    return () => {
+      active = false;
+    };
+  }, [listJobs]);
 
   const onFile = useCallback(async (files: FileList | null) => {
     const file = files?.item(0);

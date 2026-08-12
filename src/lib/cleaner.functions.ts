@@ -1,9 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
+import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { CleanerJob, CleanerRegion } from "@/lib/cleaner";
+import { cleanerRegionSchema } from "@/lib/cleaner.schemas";
 import {
+  appOrigin,
   jobToken,
   workerPublicBase,
   workerCancel,
@@ -13,42 +15,12 @@ import {
   workerStatus,
 } from "@/lib/cleaner.server";
 
-const region = z.object({
-  id: z.string(),
-  kind: z.enum(["rect", "poly", "brush"]),
-  role: z.enum(["remove", "protect"]),
-  x: z.number().optional(),
-  y: z.number().optional(),
-  w: z.number().optional(),
-  h: z.number().optional(),
-  points: z.array(z.object({ x: z.number(), y: z.number() })).optional(),
-  size: z.number().optional(),
-  grow: z.number().optional(),
-  from: z.number().optional(),
-  to: z.number().optional(),
-  track: z.boolean().optional(),
-  enabled: z.boolean().optional(),
-  label: z.string().optional(),
-  score: z.number().optional(),
-});
-
-function origin() {
-  const req = getRequest();
-  const fromEnv = process.env["PUBLIC_SITE_URL"];
-  if (fromEnv) return fromEnv.replace(/\/+$/, "");
-  try {
-    return new URL(req.url).origin;
-  } catch {
-    return "";
-  }
-}
-
 export const cleanerHealth = createServerFn({ method: "GET" }).handler(async () => {
   return workerHealth();
 });
 
 export const createCleanerJob = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
@@ -83,7 +55,7 @@ export const createCleanerJob = createServerFn({ method: "POST" })
   });
 
 export const listCleanerJobs = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("cleaner_jobs")
@@ -95,7 +67,7 @@ export const listCleanerJobs = createServerFn({ method: "GET" })
   });
 
 export const deleteCleanerJob = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     await workerCancel(data.id).catch(() => null);
@@ -106,13 +78,13 @@ export const deleteCleanerJob = createServerFn({ method: "POST" })
 
 /** roda o detector no worker e grava as regiões encontradas no job */
 export const detectCleanerJob = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
         id: z.string().uuid(),
         mode: z.enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"]),
-        roi: region.nullable().optional(),
+        roi: cleanerRegionSchema.nullable().optional(),
       })
       .parse(d),
   )
@@ -140,9 +112,9 @@ export const detectCleanerJob = createServerFn({ method: "POST" })
   });
 
 export const saveCleanerMasks = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .inputValidator((d: unknown) =>
-    z.object({ id: z.string().uuid(), masks: z.array(region) }).parse(d),
+    z.object({ id: z.string().uuid(), masks: z.array(cleanerRegionSchema) }).parse(d),
   )
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
@@ -154,14 +126,14 @@ export const saveCleanerMasks = createServerFn({ method: "POST" })
   });
 
 export const processCleanerJob = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .inputValidator((d: unknown) =>
     z
       .object({
         id: z.string().uuid(),
         mode: z.enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"]),
         preset: z.enum(["fast", "quality", "max"]),
-        masks: z.array(region),
+        masks: z.array(cleanerRegionSchema),
         options: z.record(z.string(), z.any()).default({}),
       })
       .parse(d),
@@ -173,7 +145,7 @@ export const processCleanerJob = createServerFn({ method: "POST" })
       preset: data.preset,
       masks: data.masks as CleanerRegion[],
       options: data.options,
-      callbackUrl: `${origin()}/api/public/cleaner-callback`,
+      callbackUrl: `${appOrigin()}/api/public/cleaner-callback`,
     });
 
     const { data: row, error } = await context.supabase
@@ -198,7 +170,7 @@ export const processCleanerJob = createServerFn({ method: "POST" })
 
 /** consulta o worker e devolve o estado atualizado (usado no polling) */
 export const refreshCleanerJob = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     let patch: Record<string, any> = {};

@@ -3,7 +3,19 @@
  * Só roda no servidor — nunca importado por componente.
  */
 import { createHmac } from "crypto";
+import { getRequest } from "@tanstack/react-start/server";
 import type { CleanerRegion } from "@/lib/cleaner";
+
+export function appOrigin(): string {
+  const request = getRequest();
+  const configuredUrl = process.env["PUBLIC_SITE_URL"];
+  if (configuredUrl) return configuredUrl.replace(/\/+$/, "");
+  try {
+    return new URL(request.url).origin;
+  } catch {
+    return "";
+  }
+}
 
 export function workerBase(): string | null {
   const url = process.env["CLEANER_WORKER_URL"];
