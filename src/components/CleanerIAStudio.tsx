@@ -467,13 +467,20 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       }
       setJob((prev) => (prev ? { ...prev, status: "queued", progress: 0 } : prev));
       pushLog("info", "arquivo confirmado no motor");
-      toast.success("Vídeo enviado. Detecte as áreas ou marque à mão.");
+      setUploading(false);
+      if (autoMode) {
+        toast.success("Vídeo enviado. Analisando automaticamente…");
+        await autoClean(newJob.id);
+      } else {
+        toast.success("Vídeo enviado. Detecte as áreas ou marque à mão.");
+      }
     } catch (e) {
       pushLog("error", `upload falhou: ${errMsg(e)}`);
       toast.error(`Erro no upload: ${errMsg(e)}`);
     } finally {
       setUploading(false);
     }
+
 
   };
 
