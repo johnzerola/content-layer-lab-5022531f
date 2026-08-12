@@ -129,6 +129,18 @@ export function CleanupStudio({
 
   return (
     <div className="space-y-3">
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] leading-relaxed text-amber-200">
+        <p className="font-bold uppercase tracking-tight">Modo navegador (leve)</p>
+        <p className="mt-1 text-amber-200/80">
+          Reconstrói o fundo com placa temporal: funciona bem com legenda/marca fixa. Legenda que muda
+          palavra a palavra (karaokê) ou cena com muito movimento pode continuar aparecendo — nesse caso
+          use o{" "}
+          <a href="/limpar-ia" className="font-bold underline">
+            CleanerIA (motor GPU)
+          </a>
+          .
+        </p>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="mono-label flex items-center gap-1.5">
           <Eraser className="size-3.5" /> Remover legenda / marca d'água / texto
