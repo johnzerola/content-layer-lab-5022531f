@@ -458,7 +458,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             src={job?.status === "completed" && job.result_url ? job.result_url : src}
             controls={job?.status === "completed"}
             playsInline
-            className="absolute inset-0 size-full object-contain z-0 pointer-events-none"
+            className="absolute inset-0 size-full object-contain z-0"
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
             onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
           />
