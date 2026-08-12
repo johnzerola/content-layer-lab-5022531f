@@ -1031,7 +1031,10 @@ function Home() {
                     // cada vídeo usa as áreas detectadas para ele; sem detecção, usa as do template
                     cleanup: itemRegions,
                   }
-                : applyRatio(baseTpl, plat.w, plat.h);
+                : runMode === "limpar-ia"
+                  ? // a limpeza já foi feita na GPU: só reembala mantendo proporção original
+                    { ...cleanOnly(active, { w: item.w, h: item.h }), cleanup: [] }
+                  : applyRatio(baseTpl, plat.w, plat.h);
 
             for (let k = 0; k < n; k++) {
               const at = step;
@@ -1042,7 +1045,8 @@ function Home() {
                 ),
               );
               updateJob(id, { stage: stageLabel });
-              const { blob, ext } = await renderVideo(item.file, tpl, {
+              const { blob, ext } = await renderVideo(sourceFile, tpl, {
+
                 variation: variationOf(item, k),
                 offsetX: item.offsetX,
                 offsetY: item.offsetY,
