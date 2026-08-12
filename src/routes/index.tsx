@@ -653,8 +653,12 @@ function Home() {
         });
         if (!clips.length) {
           setLinkMsg("nenhum trecho atingiu o score mínimo — reduza a intensidade do score");
+          toast.warning("Nenhum trecho passou no score mínimo", {
+            description: "abra Avançado e reduza a intensidade do score",
+          });
           return;
         }
+        toast.success(`${clips.length} cortes encontrados`);
         const created: Item[] = clips.map((c) => ({
           id: crypto.randomUUID(),
           file: item.file,
@@ -692,7 +696,9 @@ function Home() {
         }
 
       } catch (err) {
-        setLinkMsg(`falha na clipagem: ${String((err as Error)?.message ?? err)}`);
+        const msg = String((err as Error)?.message ?? err);
+        setLinkMsg(`falha na clipagem: ${msg}`);
+        toast.error("Não consegui analisar este vídeo", { description: msg });
       } finally {
         setClipBusy(false);
       }
@@ -1528,6 +1534,10 @@ function Home() {
             fsAccess={fsAccessSupported()}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            onEdit={(id) => {
+              setSelectedId(id);
+              setStudioId(id);
+            }}
             onProcess={(ids) => void processAll(ids)}
             onTogglePause={togglePause}
             onCancel={cancelAll}
