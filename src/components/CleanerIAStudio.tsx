@@ -1112,6 +1112,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           </div>
         )}
       </div>
+      </div>
     </div>
   );
+
 }
