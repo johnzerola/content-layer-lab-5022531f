@@ -198,3 +198,15 @@ export const refreshCleanerJob = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return row as unknown as CleanerJob;
   });
+
+export const checkCleanerInput = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    try {
+      const info = await workerInputInfo(data.id);
+      return { ok: !!info.exists && info.readable !== false, ...info };
+    } catch (e: any) {
+      return { ok: false, exists: false, size: 0, error: e?.message || "motor inacessível" };
+    }
+  });
