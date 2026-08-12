@@ -11,9 +11,11 @@ import {
   workerCancel,
   workerDetect,
   workerHealth,
+  workerInputInfo,
   workerProcess,
   workerStatus,
 } from "@/lib/cleaner.server";
+
 
 export const cleanerHealth = createServerFn({ method: "GET" }).handler(async () => {
   const health = await workerHealth();
