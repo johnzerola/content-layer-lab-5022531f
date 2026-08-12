@@ -810,7 +810,8 @@ export function drawFrame(
   ctx: CanvasRenderingContext2D,
   t: Template,
   source?: FrameSource | null,
-  opts?: DrawOpts,
+  opts?: DrawOpts & { variation?: import("./variation").Variation },
+
 ) {
   const W = t.canvasW ?? CANVAS_W;
   const H = t.canvasH ?? CANVAS_H;
