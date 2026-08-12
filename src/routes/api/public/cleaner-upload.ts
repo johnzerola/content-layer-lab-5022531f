@@ -27,28 +27,27 @@ export const Route = createFileRoute("/api/public/cleaner-upload")({
           
           // O motor GPU espera multipart/form-data. Se recebermos binário bruto (stream),
           // precisamos envolver em FormData.
-          let body: any = request.body;
+          let body: any;
           let headers: Record<string, string> = {
             "x-job-token": token,
           };
 
           if (!contentType.includes("multipart/form-data")) {
+            // Em ambientes de borda, o body (ReadableStream) pode ter limitações com duplex: 'half'
+            // se misturado com transformações complexas. Vamos tentar ler como arrayBuffer para estabilidade.
+            const buffer = await request.arrayBuffer();
             const formData = new FormData();
-            const blob = await request.blob();
-            formData.append("file", blob, "video.mp4");
+            formData.append("file", new Blob([buffer]), "video.mp4");
             body = formData;
-            // O fetch definirá o boundary correto para o FormData
           } else {
-            // Se já for form-data, repassamos o header original (com o boundary)
-            headers["content-type"] = contentType;
+            // Repasse direto de form-data
+            body = await request.formData();
           }
 
           const upstream = await fetch(`${base}/v1/jobs/${jobId}/upload`, {
             method: "POST",
             headers,
             body,
-            // @ts-ignore
-            duplex: 'half'
           });
 
           const text = await upstream.text();
