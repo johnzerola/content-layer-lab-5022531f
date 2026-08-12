@@ -11,12 +11,17 @@ const errorMiddleware = createMiddleware().server(async ({ next }) => {
       throw error;
     }
     console.error("Server Error:", error);
-    return json(
-      {
+    // Returning a standard Response to avoid framework-level interference
+    // if it's during SSR/serverFn boundary
+    return new Response(
+      JSON.stringify({
         error: error instanceof Error ? error.message : "Unknown error",
         timestamp: Date.now(),
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
       },
-      { status: 500 },
     );
   }
 });
