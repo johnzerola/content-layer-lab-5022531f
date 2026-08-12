@@ -17,9 +17,21 @@ export function appOrigin(): string {
   }
 }
 
+/**
+ * O runtime de borda (Cloudflare) recusa fetch direto para IP puro em http
+ * ("error code: 1003"). O worker está publicado atrás do proxy HTTPS nip.io,
+ * então normalizamos http://IP:porta -> https://cleaner-<ip-com-tracos>.nip.io.
+ */
+function normalizeBase(url: string): string {
+  const clean = url.replace(/\/+$/, "");
+  const m = /^https?:\/\/(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?::\d+)?$/.exec(clean);
+  if (!m) return clean;
+  return `https://cleaner-${m[1]}-${m[2]}-${m[3]}-${m[4]}.nip.io`;
+}
+
 export function workerBase(): string | null {
   const url = process.env["CLEANER_WORKER_URL"];
-  return url ? url.replace(/\/+$/, "") : null;
+  return url ? normalizeBase(url) : null;
 }
 
 /**
@@ -28,8 +40,9 @@ export function workerBase(): string | null {
  */
 export function workerPublicBase(): string | null {
   const url = process.env["CLEANER_WORKER_PUBLIC_URL"];
-  return url ? url.replace(/\/+$/, "") : workerBase();
+  return url ? normalizeBase(url) : workerBase();
 }
+
 
 function secret(): string {
   return process.env["CLEANER_WORKER_SECRET"] ?? "";
