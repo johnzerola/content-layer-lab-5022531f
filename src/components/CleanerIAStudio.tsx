@@ -749,30 +749,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           )}
         </div>
 
-        {/* Ferramentas */}
-        <div className="flex flex-wrap items-center gap-2">
-          {([
-            ["rect", "Retângulo", Square],
-            ["poly", "Polígono", Pentagon],
-            ["brush", "Pincel", PenTool],
-            ["protect", "Proteger", Shield],
-            ["erase", "Apagar", Eraser],
-            ["select", "Selecionar", MousePointer2],
-          ] as const).map(([id, label, Icon]) => (
-            <button
-              key={id}
-              onClick={() => setTool(id)}
-              className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                tool === id ? "border-primary bg-primary/15 text-primary" : "border-border/60 bg-surface/40"
-              }`}
-            >
-              <Icon className="size-3.5" /> {label}
-            </button>
-          ))}
-          <span className="ml-auto font-mono text-[10px] text-muted-foreground">
-            {time.toFixed(2)}s / {duration.toFixed(2)}s
-          </span>
-        </div>
+
+
 
         {tool === "poly" && (
           <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs">
