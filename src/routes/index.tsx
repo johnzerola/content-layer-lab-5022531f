@@ -33,6 +33,7 @@ import { CloudPanel } from "@/components/CloudPanel";
 import { autoSyncTemplates, enableCloudQuotaFallback, logBatch, logExports, type ProjectSnapshot } from "@/lib/cloud";
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
+import { StudioBoundary } from "@/components/StudioBoundary";
 import { AuthGate } from "@/components/AuthGate";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
@@ -759,6 +760,59 @@ function Home() {
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
   const studioItem = studioId ? (items.find((i) => i.id === studioId) ?? null) : null;
+
+  /** Abre o Estúdio com diagnóstico: se não abrir, diz exatamente o porquê. */
+  const openStudio = useCallback(
+    async (id: string) => {
+      const it = items.find((i) => i.id === id) ?? null;
+      console.info("[studio] pedido de abertura", id, it && { w: it.w, h: it.h, duration: it.duration, file: it.file?.name, size: it.file?.size });
+      if (!it) {
+        toast.error("Editor não abriu", { description: `o vídeo ${id.slice(0, 6)} não está mais na lista (foi removido ou a lista recarregou)` });
+        return;
+      }
+      if (!(it.file instanceof File) || it.file.size === 0) {
+        toast.error("Editor não abriu", { description: "o arquivo deste vídeo não está mais na memória — reimporte o vídeo" });
+        return;
+      }
+      let w = it.w;
+      let h = it.h;
+      let duration = it.duration;
+      if (!w || !h || !Number.isFinite(duration) || duration <= 0) {
+        // tenta recuperar metadados antes de desistir
+        try {
+          const meta = await new Promise<{ w: number; h: number; d: number }>((resolve, reject) => {
+            const v = document.createElement("video");
+            v.preload = "metadata";
+            v.muted = true;
+            const url = URL.createObjectURL(it.file);
+            const done = (fn: () => void) => { URL.revokeObjectURL(url); fn(); };
+            v.onloadedmetadata = () => done(() => resolve({ w: v.videoWidth, h: v.videoHeight, d: v.duration }));
+            v.onerror = () => done(() => reject(new Error("codec não suportado pelo navegador")));
+            setTimeout(() => done(() => reject(new Error("tempo esgotado ao ler os metadados"))), 8000);
+            v.src = url;
+          });
+          w = meta.w; h = meta.h;
+          duration = it.clip ? it.clip.end - it.clip.start : meta.d;
+          setItems((p) => p.map((x) => (x.id === id ? { ...x, w, h, duration } : x)));
+          console.info("[studio] metadados recuperados", { w, h, duration });
+        } catch (err) {
+          const msg = String((err as Error)?.message ?? err);
+          console.error("[studio] metadados indisponíveis", err);
+          toast.error("Editor não abriu", { description: `não consegui ler as dimensões/duração do vídeo (${msg})` });
+          return;
+        }
+      }
+      if (!w || !h) {
+        toast.error("Editor não abriu", { description: "vídeo sem dimensões válidas (largura/altura = 0)" });
+        return;
+      }
+      setSelectedId(id);
+      setStudioId(id);
+      console.info("[studio] aberto", id);
+    },
+    [items, setItems],
+  );
+
 
 
   const antiDup = active.antiDup ?? defaultAntiDup();
@@ -1546,10 +1600,8 @@ function Home() {
             fsAccess={fsAccessSupported()}
             selectedId={selectedId}
             onSelect={setSelectedId}
-            onEdit={(id) => {
-              setSelectedId(id);
-              setStudioId(id);
-            }}
+            onEdit={(id) => void openStudio(id)}
+
             onProcess={(ids) => void processAll(ids)}
             onTogglePause={togglePause}
             onCancel={cancelAll}
@@ -2108,7 +2160,7 @@ function Home() {
 
                     <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
                       <p className="mono-label text-primary">Edite cores, legendas e variações no Estúdio</p>
-                      <Button size="sm" onClick={() => setStudioId(selected.id)}>
+                      <Button size="sm" onClick={() => void openStudio(selected.id)}>
                         <Pencil className="mr-1 size-3.5" /> Abrir Estúdio
                       </Button>
                     </div>
@@ -2344,9 +2396,9 @@ function Home() {
                       title="Editar vídeo (cortar, enquadrar, cor)"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedId(it.id);
-                        setStudioId(it.id);
+                        void openStudio(it.id);
                       }}
+
                       className={`rounded-md border p-1.5 hover:border-primary ${
                         hasPreEdit(it.preEdit) || it.clip ? "border-primary text-primary" : "border-border text-muted-foreground"
                       }`}
@@ -2408,7 +2460,9 @@ function Home() {
       )}
 
       {studioItem && (
+        <StudioBoundary onClose={() => setStudioId(null)}>
         <VideoStudio
+
           file={studioItem.file}
           width={studioItem.w}
           height={studioItem.h}
@@ -2457,7 +2511,9 @@ function Home() {
           }}
 
         />
+        </StudioBoundary>
       )}
+
 
       {cloudOpen && (
         <CloudPanel
