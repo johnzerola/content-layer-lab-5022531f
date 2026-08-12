@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  Bug,
   Eraser,
+
   MousePointer2,
   PenTool,
   Pentagon,
@@ -71,6 +73,15 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [brushSize, setBrushSize] = useState(0.015);
   const [inputReady, setInputReady] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const [logs, setLogs] = useState<Array<{ t: number; level: "info" | "warn" | "error"; msg: string }>>([]);
+  const [showDebug, setShowDebug] = useState(true);
+
+  /** Registro local de depuração — carimbo de tempo + evento do job/motor. */
+  const pushLog = useCallback((level: "info" | "warn" | "error", msg: string) => {
+    setLogs((prev) => [...prev.slice(-199), { t: Date.now(), level, msg }]);
+  }, []);
+
+
 
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -127,18 +138,26 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       try {
         const headers = await cloudAuthHeaders();
         const status = (await refreshJob({ data: { id: job.id }, headers })) as CleanerJob;
-        setJob((prev) => ({ ...(prev as CleanerJob), ...status }));
+        setJob((prev) => {
+          if (prev && (prev.status !== status.status || prev.stage !== status.stage)) {
+            pushLog("info", `status=${status.status} · ${status.stage ?? "-"} · ${Math.round(status.progress ?? 0)}%`);
+          }
+          return { ...(prev as CleanerJob), ...status };
+        });
         if (status.status === "completed") {
           setPolling(false);
           if (status.result_url) onComplete(status.result_url);
+          pushLog("info", `concluído · ${status.result_url ?? "sem URL"}`);
           toast.success("Vídeo limpo com sucesso.");
         } else if (status.status === "failed") {
           setPolling(false);
+          pushLog("error", `motor falhou: ${status.error || "erro desconhecido"}`);
           toast.error(`Falhou: ${status.error || "erro desconhecido"}`);
         }
-      } catch {
-        /* mantém o polling */
+      } catch (e) {
+        pushLog("warn", `consulta de status falhou: ${errMsg(e)}`);
       }
+
     }, 2500);
     return () => window.clearInterval(timer);
   }, [polling, job?.id]);
@@ -422,27 +441,34 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     setUploading(true);
     setInputReady(false);
     try {
+      pushLog("info", `criando job · ${item.file.name} · ${(item.file.size / 1e6).toFixed(1)} MB · ${mode}/${preset}`);
       const headers = await cloudAuthHeaders();
       const { job: newJob, upload } = (await createJob({
         data: { filename: item.file.name, size: item.file.size, mode, preset },
         headers,
       })) as { job: CleanerJob; upload?: { url: string; token: string } };
       setJob(newJob);
+      pushLog("info", `job criado · ${newJob.id}`);
 
       if (upload) await uploadToWorker(newJob.id, upload);
+      pushLog("info", "upload concluído — confirmando arquivo no motor");
 
       const info = await confirmInput(newJob.id);
       if (!info.ok) {
+        pushLog("error", `motor sem o arquivo: ${info.error || "arquivo ausente"}`);
         toast.error(`O motor não recebeu o vídeo (${info.error || "arquivo ausente"}). Use "Reenviar vídeo".`);
         return;
       }
       setJob((prev) => (prev ? { ...prev, status: "queued", progress: 0 } : prev));
+      pushLog("info", "arquivo confirmado no motor");
       toast.success("Vídeo enviado. Detecte as áreas ou marque à mão.");
     } catch (e) {
+      pushLog("error", `upload falhou: ${errMsg(e)}`);
       toast.error(`Erro no upload: ${errMsg(e)}`);
     } finally {
       setUploading(false);
     }
+
   };
 
   /** Reenvia o arquivo para um job já existente, sem recriar o job. */
@@ -487,15 +513,18 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
     try {
       setJob((prev) => (prev ? { ...prev, status: "detecting", stage: "detectando áreas" } : prev));
+      pushLog("info", `detectando (${mode})`);
       const headers = await cloudAuthHeaders();
       const res = (await detectJob({ data: { id: job.id, mode }, headers })) as CleanerJob;
       const found = (res.detections || []) as CleanerRegion[];
       setMasks((prev) => [...prev, ...found]);
       setJob({ ...res, status: "queued" });
       if (found.length) {
+        pushLog("info", `${found.length} área(s) detectada(s)`);
         toast.success(`${found.length} área(s) encontrada(s).`);
       } else {
         addPresetMask("bottom");
+        pushLog("warn", "detecção não encontrou nada — máscara de rodapé sugerida");
         toast.warning("Nada detectado — sugeri a área do rodapé. Ajuste ou apague se não servir.");
       }
 
@@ -503,8 +532,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       setJob((prev) => (prev ? { ...prev, status: "queued" } : prev));
       const msg = errMsg(e);
       if (/não está no motor/.test(msg)) setInputReady(false);
+      pushLog("error", `detecção falhou: ${msg}`);
       toast.error(`Erro na detecção: ${msg}`);
     }
+
   };
 
 
@@ -520,6 +551,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
 
     try {
+      pushLog("info", `enviando processamento · ${masks.length} máscara(s) · ${mode}/${preset}`);
       const headers = await cloudAuthHeaders();
       await processJob({
         data: {
@@ -538,12 +570,15 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       });
       setPolling(true);
       setJob((prev) => (prev ? { ...prev, status: "inpainting", progress: 1 } : prev));
+      pushLog("info", "motor aceitou o job — acompanhando status");
       toast.success("Reconstrução iniciada na GPU.");
     } catch (e) {
       const msg = errMsg(e);
       if (/não está no motor/.test(msg)) setInputReady(false);
+      pushLog("error", `início do processamento falhou: ${msg}`);
       toast.error(`Erro ao iniciar: ${msg}`);
     }
+
   };
 
 
@@ -1108,6 +1143,124 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             </div>
           </div>
         )}
+
+        <section className="space-y-3 rounded-2xl border border-border/70 bg-surface/50 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 font-display text-sm font-bold">
+              <Bug className="size-4 text-primary" /> Depuração
+            </h3>
+            <button
+              onClick={() => setShowDebug((v) => !v)}
+              className="text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
+            >
+              {showDebug ? "ocultar" : "mostrar"}
+            </button>
+          </div>
+
+          {showDebug && (
+            <>
+              <div className="space-y-1 rounded-lg border border-border/50 bg-background/50 p-2 text-[11px]">
+                {[
+                  ["Job ID", job?.id ?? "—"],
+                  ["Status", job ? `${job.status} · ${job.stage ?? "-"} · ${Math.round(job.progress ?? 0)}%` : "—"],
+                  ["Arquivo no motor", job ? (inputReady ? "confirmado" : "ausente") : "—"],
+                  ["Motor", health ? (health.online ? `online · ${health.cuda === false ? "CPU" : "GPU"}` : `offline · ${health.reason ?? "sem resposta"}`) : "checando…"],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-start justify-between gap-3">
+                    <span className="shrink-0 text-muted-foreground">{label}</span>
+                    <span className="break-all text-right font-mono text-[10px]">{value}</span>
+                  </div>
+                ))}
+                {job?.id && (
+                  <button
+                    onClick={() => {
+                      void navigator.clipboard.writeText(job.id);
+                      toast.success("ID do job copiado.");
+                    }}
+                    className="text-[10px] uppercase tracking-widest text-primary hover:underline"
+                  >
+                    copiar ID
+                  </button>
+                )}
+              </div>
+
+              {job?.error && (
+                <p className="break-words rounded-lg border border-destructive/30 bg-destructive/10 p-2 text-[11px] text-destructive">
+                  <strong>Erro do motor:</strong> {job.error}
+                </p>
+              )}
+
+              <div className="max-h-[220px] space-y-1 overflow-y-auto rounded-lg border border-border/50 bg-background/60 p-2 font-mono text-[10px] leading-relaxed">
+                {logs.length === 0 ? (
+                  <p className="text-muted-foreground">sem eventos ainda — envie um vídeo para começar.</p>
+                ) : (
+                  logs
+                    .slice()
+                    .reverse()
+                    .map((l, i) => (
+                      <div key={`${l.t}-${i}`} className="flex gap-2">
+                        <span className="shrink-0 text-muted-foreground">
+                          {new Date(l.t).toLocaleTimeString("pt-BR", { hour12: false })}
+                        </span>
+                        <span
+                          className={
+                            l.level === "error"
+                              ? "text-destructive"
+                              : l.level === "warn"
+                                ? "text-amber-500"
+                                : "text-foreground/80"
+                          }
+                        >
+                          {l.msg}
+                        </span>
+                      </div>
+                    ))
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 text-[10px] uppercase tracking-widest"
+                  disabled={!job?.id}
+                  onClick={async () => {
+                    if (!job?.id) return;
+                    try {
+                      const headers = await cloudAuthHeaders();
+                      const fresh = (await refreshJob({ data: { id: job.id }, headers })) as CleanerJob;
+                      setJob((prev) => ({ ...(prev as CleanerJob), ...fresh }));
+                      pushLog("info", `consulta manual · ${fresh.status} · ${fresh.stage ?? "-"}`);
+                    } catch (e) {
+                      pushLog("error", `consulta manual falhou: ${errMsg(e)}`);
+                    }
+                  }}
+                >
+                  <RefreshCw className="mr-1 size-3" /> Atualizar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 text-[10px] uppercase tracking-widest"
+                  disabled={!logs.length}
+                  onClick={() => {
+                    const dump = [
+                      `job=${job?.id ?? "-"}`,
+                      `status=${job?.status ?? "-"} stage=${job?.stage ?? "-"} progress=${job?.progress ?? 0}`,
+                      `erro=${job?.error ?? "-"}`,
+                      ...logs.map((l) => `${new Date(l.t).toISOString()} [${l.level}] ${l.msg}`),
+                    ].join("\n");
+                    void navigator.clipboard.writeText(dump);
+                    toast.success("Logs copiados.");
+                  }}
+                >
+                  Copiar logs
+                </Button>
+              </div>
+            </>
+          )}
+        </section>
+
       </div>
       </div>
     </div>
