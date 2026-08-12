@@ -310,12 +310,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               )
             : upload.url;
 
-        const send = () =>
+        const send = (url: string) =>
           new Promise<void>((resolve, reject) => {
             const formData = new FormData();
             formData.append("file", item.file);
             const xhr = new XMLHttpRequest();
-            xhr.open("POST", secureUrl);
+            xhr.open("POST", url);
             xhr.timeout = 15 * 60 * 1000;
             xhr.setRequestHeader("x-job-token", upload.token);
             xhr.upload.onprogress = (ev) => {
@@ -325,21 +325,29 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               xhr.status >= 200 && xhr.status < 300
                 ? resolve()
                 : reject(new Error(`${xhr.status} ${xhr.responseText || "falha no envio"}`));
-            xhr.onerror = () =>
-              reject(new Error(`não foi possível alcançar ${new URL(secureUrl).host}`));
+            xhr.onerror = () => reject(new Error("rede-bloqueada"));
             xhr.ontimeout = () => reject(new Error("tempo esgotado no envio"));
             xhr.send(formData);
           });
 
+        // rota alternativa pela própria origem, para redes que bloqueiam o domínio do motor
+        const proxyUrl = `/api/public/cleaner-upload?job=${encodeURIComponent(newJob.id)}`;
+
         try {
-          await send();
+          await send(secureUrl);
         } catch (first) {
           setUploadProgress(0);
-          await new Promise((r) => setTimeout(r, 1200));
+          await new Promise((r) => setTimeout(r, 1000));
           try {
-            await send();
-          } catch {
-            throw first;
+            await send(proxyUrl);
+          } catch (second) {
+            throw new Error(
+              `${first instanceof Error && first.message === "rede-bloqueada"
+                ? `sua rede não alcança ${new URL(secureUrl).host}`
+                : first instanceof Error
+                  ? first.message
+                  : "falha"} — via servidor também falhou (${second instanceof Error ? second.message : "erro"})`,
+            );
           }
         }
       }
