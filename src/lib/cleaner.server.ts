@@ -85,11 +85,11 @@ export async function workerHealth() {
   if (!base) return { online: false as const, reason: "CLEANER_WORKER_URL não configurada" };
   try {
     const res = await fetch(`${base}/v1/health`);
+    const text = await res.text();
     if (!res.ok) {
-      const text = await res.text();
       return { online: false as const, reason: text.slice(0, 100) || `worker ${res.status}` };
     }
-    const info = await res.json();
+    const info = JSON.parse(text);
     return { online: true as const, ...info };
   } catch (e: any) {
     return { online: false as const, reason: e?.message || "sem resposta" };
