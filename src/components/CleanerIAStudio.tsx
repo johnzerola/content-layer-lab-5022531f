@@ -1141,6 +1141,124 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             </div>
           </div>
         )}
+
+        <section className="space-y-3 rounded-2xl border border-border/70 bg-surface/50 p-4">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 font-display text-sm font-bold">
+              <Bug className="size-4 text-primary" /> Depuração
+            </h3>
+            <button
+              onClick={() => setShowDebug((v) => !v)}
+              className="text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
+            >
+              {showDebug ? "ocultar" : "mostrar"}
+            </button>
+          </div>
+
+          {showDebug && (
+            <>
+              <div className="space-y-1 rounded-lg border border-border/50 bg-background/50 p-2 text-[11px]">
+                {[
+                  ["Job ID", job?.id ?? "—"],
+                  ["Status", job ? `${job.status} · ${job.stage ?? "-"} · ${Math.round(job.progress ?? 0)}%` : "—"],
+                  ["Arquivo no motor", job ? (inputReady ? "confirmado" : "ausente") : "—"],
+                  ["Motor", health ? (health.online ? `online · ${health.cuda === false ? "CPU" : "GPU"}` : `offline · ${health.reason ?? "sem resposta"}`) : "checando…"],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex items-start justify-between gap-3">
+                    <span className="shrink-0 text-muted-foreground">{label}</span>
+                    <span className="break-all text-right font-mono text-[10px]">{value}</span>
+                  </div>
+                ))}
+                {job?.id && (
+                  <button
+                    onClick={() => {
+                      void navigator.clipboard.writeText(job.id);
+                      toast.success("ID do job copiado.");
+                    }}
+                    className="text-[10px] uppercase tracking-widest text-primary hover:underline"
+                  >
+                    copiar ID
+                  </button>
+                )}
+              </div>
+
+              {job?.error && (
+                <p className="break-words rounded-lg border border-destructive/30 bg-destructive/10 p-2 text-[11px] text-destructive">
+                  <strong>Erro do motor:</strong> {job.error}
+                </p>
+              )}
+
+              <div className="max-h-[220px] space-y-1 overflow-y-auto rounded-lg border border-border/50 bg-background/60 p-2 font-mono text-[10px] leading-relaxed">
+                {logs.length === 0 ? (
+                  <p className="text-muted-foreground">sem eventos ainda — envie um vídeo para começar.</p>
+                ) : (
+                  logs
+                    .slice()
+                    .reverse()
+                    .map((l, i) => (
+                      <div key={`${l.t}-${i}`} className="flex gap-2">
+                        <span className="shrink-0 text-muted-foreground">
+                          {new Date(l.t).toLocaleTimeString("pt-BR", { hour12: false })}
+                        </span>
+                        <span
+                          className={
+                            l.level === "error"
+                              ? "text-destructive"
+                              : l.level === "warn"
+                                ? "text-amber-500"
+                                : "text-foreground/80"
+                          }
+                        >
+                          {l.msg}
+                        </span>
+                      </div>
+                    ))
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 text-[10px] uppercase tracking-widest"
+                  disabled={!job?.id}
+                  onClick={async () => {
+                    if (!job?.id) return;
+                    try {
+                      const headers = await cloudAuthHeaders();
+                      const fresh = (await refreshJob({ data: { id: job.id }, headers })) as CleanerJob;
+                      setJob((prev) => ({ ...(prev as CleanerJob), ...fresh }));
+                      pushLog("info", `consulta manual · ${fresh.status} · ${fresh.stage ?? "-"}`);
+                    } catch (e) {
+                      pushLog("error", `consulta manual falhou: ${errMsg(e)}`);
+                    }
+                  }}
+                >
+                  <RefreshCw className="mr-1 size-3" /> Atualizar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="flex-1 text-[10px] uppercase tracking-widest"
+                  disabled={!logs.length}
+                  onClick={() => {
+                    const dump = [
+                      `job=${job?.id ?? "-"}`,
+                      `status=${job?.status ?? "-"} stage=${job?.stage ?? "-"} progress=${job?.progress ?? 0}`,
+                      `erro=${job?.error ?? "-"}`,
+                      ...logs.map((l) => `${new Date(l.t).toISOString()} [${l.level}] ${l.msg}`),
+                    ].join("\n");
+                    void navigator.clipboard.writeText(dump);
+                    toast.success("Logs copiados.");
+                  }}
+                >
+                  Copiar logs
+                </Button>
+              </div>
+            </>
+          )}
+        </section>
+
       </div>
       </div>
     </div>
