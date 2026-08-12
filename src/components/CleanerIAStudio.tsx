@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
+  Bug,
   Eraser,
+
   MousePointer2,
   PenTool,
   Pentagon,
