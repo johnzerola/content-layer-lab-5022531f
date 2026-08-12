@@ -22,7 +22,7 @@ export function StagePreview({
   pre: PreEdit;
   clip?: { start: number; end: number } | null;
   captions?: CaptionCue[] | null | undefined;
-  variation?: import("@/lib/variation").Variation;
+  variation?: import("@/lib/variation").Variation | undefined;
   bypass?: boolean;
   safeArea?: boolean;
   thirds?: boolean;
