@@ -274,10 +274,15 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       setMasks((prev) => [...prev, draft]);
       setSelected(draft.id);
     }
-    if (draft?.kind === "rect" && (draft.w ?? 0) > 0.01 && (draft.h ?? 0) > 0.01) {
-      setMasks((prev) => [...prev, draft]);
-      setSelected(draft.id);
+    if (draft?.kind === "rect") {
+      if ((draft.w ?? 0) > 0.01 && (draft.h ?? 0) > 0.01) {
+        setMasks((prev) => [...prev, draft]);
+        setSelected(draft.id);
+      } else if ((draft.w ?? 0) > 0.0005 || (draft.h ?? 0) > 0.0005) {
+        toast.message("Área muito pequena — arraste para criar uma área maior.");
+      }
     }
+
     setDraft(null);
     dragStart.current = null;
   };
