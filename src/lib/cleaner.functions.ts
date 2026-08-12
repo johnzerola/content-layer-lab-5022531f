@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { CleanerJob, CleanerRegion } from "@/lib/cleaner";
 import {
   jobToken,
-  workerBase,
+  workerPublicBase,
   workerPublicBase,
   workerCancel,
   workerDetect,
