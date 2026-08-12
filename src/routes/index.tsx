@@ -299,6 +299,8 @@ function Home() {
   const [linkMsg, setLinkMsg] = useState<string | null>(null);
   const [linkBlocked, setLinkBlocked] = useState(false);
   const [clipBusy, setClipBusy] = useState(false);
+  /** 0..1 — progresso da análise de cortes, mostrado no botão e na barra */
+  const [clipProgress, setClipProgress] = useState(0);
   const [clipMinLen, setClipMinLen] = useState(20);
   const [clipMaxLen, setClipMaxLen] = useState(45);
   const [clipMax, setClipMax] = useState(6);
@@ -644,21 +646,28 @@ function Home() {
     async (item: Item) => {
       if (clipBusy) return;
       setClipBusy(true);
+      setClipProgress(0);
+      setLinkMsg(null);
+      const toastId = toast.loading("Analisando o vídeo…", {
+        description: "áudio, silêncios e movimento — pode levar alguns minutos",
+      });
       try {
         const clips = await findClips(item.file, {
           minLen: Math.min(clipMinLen, clipMaxLen),
           maxLen: Math.max(clipMinLen, clipMaxLen),
           max: clipMax,
           minScore: clipMinScore,
+          onProgress: (p) => setClipProgress(Math.max(0, Math.min(1, p))),
         });
         if (!clips.length) {
           setLinkMsg("nenhum trecho atingiu o score mínimo — reduza a intensidade do score");
           toast.warning("Nenhum trecho passou no score mínimo", {
+            id: toastId,
             description: "abra Avançado e reduza a intensidade do score",
           });
           return;
         }
-        toast.success(`${clips.length} cortes encontrados`);
+        toast.success(`${clips.length} cortes encontrados`, { id: toastId });
         const created: Item[] = clips.map((c) => ({
           id: crypto.randomUUID(),
           file: item.file,
@@ -698,9 +707,10 @@ function Home() {
       } catch (err) {
         const msg = String((err as Error)?.message ?? err);
         setLinkMsg(`falha na clipagem: ${msg}`);
-        toast.error("Não consegui analisar este vídeo", { description: msg });
+        toast.error("Não consegui analisar este vídeo", { id: toastId, description: msg });
       } finally {
         setClipBusy(false);
+        setClipProgress(0);
       }
     },
     [clipBusy, clipMinLen, clipMaxLen, clipMax, clipMinScore],
@@ -1525,6 +1535,8 @@ function Home() {
               if (p.minScore !== undefined) setClipMinScore(p.minScore);
             }}
             clipBusy={clipBusy}
+            clipProgress={clipProgress}
+            clipError={linkMsg}
             onGenerate={(it) => void autoClip(items.find((x) => x.id === it.id)!)}
             running={running}
             paused={paused}
