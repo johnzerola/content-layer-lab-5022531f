@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AudioLines,
+  Camera,
   Crop,
   FlipHorizontal,
   FlipVertical,
@@ -42,6 +43,7 @@ import { translateWords } from "@/lib/translate.functions";
 import { detectSpeechSegments } from "@/lib/silence";
 import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { LayoutPreview } from "@/components/LayoutPreview";
+import { FramingStudio } from "@/components/FramingStudio";
 import { EditorTimeline } from "@/components/EditorTimeline";
 import type { CaptionCue } from "@/lib/captions";
 
@@ -88,7 +90,7 @@ type Drag = {
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-type Tab = "trim" | "layout" | "crop" | "keys" | "trans" | "color" | "caps" | "text";
+type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text";
 
 /** Miniatura esquemática de cada layout (9:16). */
 function LayoutGlyph({ id }: { id: LayoutKind }) {
@@ -471,7 +473,33 @@ export function VideoStudio({
           </div>
         </header>
 
-        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 md:grid-cols-[1.1fr_1fr] md:overflow-hidden">
+        {tab === "camera" && (
+          <>
+            <div className="flex items-center gap-2 border-b border-border px-4 py-2">
+              <span className="font-mono text-[11px] text-foreground">Câmera virtual · enquadramento dinâmico</span>
+              <Button className="ml-auto" size="sm" variant="ghost" onClick={() => setTab("layout")}>
+                Voltar aos ajustes
+              </Button>
+            </div>
+            <FramingStudio
+              url={url}
+              file={file}
+              width={width}
+              height={height}
+              duration={duration}
+              pre={pre}
+              onChange={setPre}
+            />
+          </>
+        )}
+
+
+        <div
+          className={`grid min-h-0 flex-1 gap-4 overflow-y-auto p-4 md:grid-cols-[1.1fr_1fr] md:overflow-hidden ${
+            tab === "camera" ? "hidden" : ""
+          }`}
+        >
+
           {/* palco */}
           <div className="flex min-h-0 flex-col gap-3 md:overflow-y-auto">
             <div
@@ -584,6 +612,7 @@ export function VideoStudio({
                 { id: "trim", label: "Cortar", icon: Scissors },
                 { id: "layout", label: "Layout", icon: LayoutTemplate },
                 { id: "crop", label: "Enquadrar", icon: Crop },
+                { id: "camera", label: "Câmera", icon: Camera },
                 { id: "keys", label: "Keyframes", icon: Sparkles },
                 { id: "trans", label: "Transições", icon: SlidersHorizontal },
                 { id: "color", label: "Cor", icon: SlidersHorizontal },

@@ -8,7 +8,9 @@ import {
   type TextLayer,
 } from "./template";
 import type { CaptionCue } from "./captions";
-import { cropRect, cropAt, isFullCrop, preEditFilter, transitionAt, type PreEdit } from "./preedit";
+import { cropRect, cropAt, isFullCrop, preEditFilter, rectForCrop, transitionAt, type PreEdit } from "./preedit";
+import { resolveFraming } from "./framing";
+
 
 /** Fallback local para regiões de limpeza quando o motor IA não está disponível.
  *  O processamento profissional agora acontece no backend Python (CleanerIA).
@@ -460,7 +462,11 @@ function drawVideoLayer(
   if (source && source.width) {
     // pré-edição do vídeo fonte (recorte, giro, espelho e cor)
     const pre = opts?.pre;
-    const cr = cropRect(pre, source.width, source.height, opts?.time);
+    // câmera virtual por trecho tem prioridade sobre o recorte simples
+    const fr = resolveFraming(pre?.framing ?? null, opts?.time);
+    const cr = fr
+      ? rectForCrop(fr.primary, source.width, source.height, pre?.rotate ?? 0)
+      : cropRect(pre, source.width, source.height, opts?.time);
     // a rotação exige um leve zoom extra pra não aparecer canto vazio
     const rotPad = rot ? 1 + Math.abs(rot) / 40 : 1;
     const zoom = (opts?.zoom ?? 1) * rotPad;
@@ -468,8 +474,9 @@ function drawVideoLayer(
     const boxAR = v.w / v.h;
     // recorte manual: o que o usuário selecionou tem que aparecer inteiro,
     // senão o "cover" reenquadra e o corte vira só um zoom
-    const manualCrop = !isFullCrop(cropAt(pre, opts?.time));
-    const layout = pre?.layout ?? "auto";
+    const manualCrop = fr ? true : !isFullCrop(cropAt(pre, opts?.time));
+    const layout = fr ? fr.layout : (pre?.layout ?? "auto");
+
     const mirror = Boolean(opts?.mirror ?? t.mirror);
     if (mirror) {
       ctx.translate(v.x * 2 + v.w, 0);
@@ -533,6 +540,12 @@ function drawVideoLayer(
       eh: quarter % 2 ? source.width : source.height,
     };
     const box = { x: v.x, y: v.y, w: v.w, h: v.h };
+    /** segunda região: no enquadramento dinâmico cada metade aponta pra um
+     *  lugar diferente do vídeo original; sem plano, mostra o quadro inteiro */
+    const sec = fr?.secondary
+      ? rectForCrop(fr.secondary, source.width, source.height, pre?.rotate ?? 0)
+      : full;
+
 
     /** Fundo dos layouts com preenchimento: desfoque do vídeo ou cor fixa. */
     const bgMode = pre?.bgMode ?? "blur";
@@ -571,7 +584,8 @@ function drawVideoLayer(
       const top = { x: v.x, y: v.y, w: v.w, h: v.h / 2 };
       const bottom = { x: v.x, y: v.y + v.h / 2, w: v.w, h: v.h / 2 };
       dest = paint(top, "cover");
-      paint(bottom, "cover", full, { useOffset: false });
+      paint(bottom, "cover", sec, { useOffset: false });
+
       ctx.save();
       ctx.fillStyle = "rgba(0,0,0,0.5)";
       ctx.fillRect(v.x, v.y + v.h / 2 - 1, v.w, 2);
@@ -595,7 +609,7 @@ function drawVideoLayer(
       const bottom = { x: v.x, y: v.y + topH, w: v.w, h: v.h - topH };
       paintBackdrop(box, 40, 0.45);
       dest = paint(top, "cover");
-      paint(bottom, "contain", full, { useOffset: false });
+      paint(bottom, "contain", sec, { useOffset: false });
       ctx.save();
       ctx.fillStyle = "rgba(0,0,0,0.5)";
       ctx.fillRect(v.x, v.y + topH - 1, v.w, 2);

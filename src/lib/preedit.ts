@@ -46,6 +46,9 @@ export interface PreEdit {
   crop: PreCrop | null;
   /** keyframes de enquadramento (vazio = recorte fixo acima) */
   keys: FrameKey[];
+  /** câmera virtual por trecho (enquadramento dinâmico) */
+  framing?: import("./framing").FramingPlan | null;
+
   /** trechos mantidos (vazio = usa a janela de corte simples) */
   segments: Segment[];
   /** layout do quadro final */
@@ -81,7 +84,9 @@ export function defaultPreEdit(): PreEdit {
   return {
     crop: null,
     keys: [],
+    framing: null,
     segments: [],
+
     layout: "auto",
     bgMode: "blur",
     bgBlur: 1,
@@ -176,8 +181,10 @@ export function hasPreEdit(p?: PreEdit | null) {
   return (
     !isFullCrop(p.crop) ||
     (p.keys?.length ?? 0) > 0 ||
+    Boolean(p.framing?.enabled && p.framing.segments.length) ||
     (p.segments?.length ?? 0) > 1 ||
     (p.layout ?? "auto") !== "auto" ||
+
     (p.bgMode ?? "blur") !== "blur" ||
     (p.bgBlur ?? 1) !== 1 ||
     (p.transIn?.kind ?? "none") !== "none" ||
@@ -280,10 +287,21 @@ export function transitionAt(
   return none;
 }
 
+/** Retângulo em pixels de um recorte normalizado + dimensões após o giro. */
+export function rectForCrop(c: PreCrop, w: number, h: number, rotate = 0) {
+  const sx = Math.max(0, Math.round(c.x * w));
+  const sy = Math.max(0, Math.round(c.y * h));
+  const sw = Math.max(2, Math.min(w - sx, Math.round(c.w * w)));
+  const sh = Math.max(2, Math.min(h - sy, Math.round(c.h * h)));
+  const quarter = (((rotate / 90) | 0) % 4 + 4) % 4;
+  return { sx, sy, sw, sh, quarter, ew: quarter % 2 ? sh : sw, eh: quarter % 2 ? sw : sh };
+}
+
 /** Retângulo em pixels da fonte + dimensões efetivas após o giro. */
 export function cropRect(p: PreEdit | null | undefined, w: number, h: number, time?: number) {
   const anim = cropAt(p, time);
   const c = anim && !isFullCrop(anim) ? anim : FULL;
+
   const sx = Math.max(0, Math.round(c.x * w));
   const sy = Math.max(0, Math.round(c.y * h));
   const sw = Math.max(2, Math.min(w - sx, Math.round(c.w * w)));
