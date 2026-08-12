@@ -8,7 +8,7 @@ import { listCleanerJobs } from "@/lib/cleaner.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { STAGE_LABEL, type CleanerJob } from "@/lib/cleaner";
 import { toast } from "sonner";
-import { currentUser } from "@/lib/cloud";
+import { cloudAuthHeaders, currentUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/limpar-ia")({
   head: () => ({
@@ -50,7 +50,7 @@ function LimparIAPage() {
   useEffect(() => {
     let active = true;
     currentUser()
-      .then((user) => (user ? listJobs() : []))
+      .then(async (user) => (user ? listJobs({ headers: await cloudAuthHeaders() }) : []))
       .then((jobs) => {
         if (active) setHistory((jobs as CleanerJob[]).slice(0, 10));
       })
