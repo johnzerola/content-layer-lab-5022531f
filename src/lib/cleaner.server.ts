@@ -84,8 +84,11 @@ export async function workerHealth() {
   }
   if (!base) return { online: false as const, reason: "CLEANER_WORKER_URL não configurada" };
   try {
+    console.log("Fetching health from:", `${base}/v1/health`);
     const res = await fetch(`${base}/v1/health`);
+    console.log("Health response status:", res.status);
     const text = await res.text();
+    console.log("Health response text:", text);
     if (!res.ok) {
       return { online: false as const, reason: text.slice(0, 100) || `worker ${res.status}` };
     }
