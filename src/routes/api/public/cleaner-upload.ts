@@ -26,23 +26,14 @@ export const Route = createFileRoute("/api/public/cleaner-upload")({
           const contentType = request.headers.get("content-type") || "";
           let body: any;
 
-          if (contentType.includes("multipart/form-data")) {
-            // Se já for form-data, repassa como está
-            body = await request.formData();
-          } else {
-            // Se for binário bruto (blob), empacota em FormData para o motor GPU
-            const formData = new FormData();
-            const blob = await request.blob();
-            formData.append("file", blob, "video.mp4");
-            body = formData;
-          }
-
           const upstream = await fetch(`${base}/v1/jobs/${jobId}/upload`, {
             method: "POST",
             headers: {
               "x-job-token": token,
             },
-            body: body,
+            body: request.body,
+            // @ts-ignore
+            duplex: 'half'
           });
 
           const text = await upstream.text();
