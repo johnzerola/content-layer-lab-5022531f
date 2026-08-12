@@ -428,8 +428,9 @@ export interface DrawOpts {
   clip?: { start: number; end: number } | null;
   /** "hq" = reconstrução em resolução total (exportação). Padrão: preview rápido. */
   quality?: "preview" | "hq";
-  variation?: import("./variation").Variation;
+  variation?: import("./variation").Variation | undefined;
 }
+
 
 
 
