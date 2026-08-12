@@ -9,12 +9,6 @@ import type { CleanerRegion } from "@/lib/cleaner";
 export function appOrigin(): string {
   const configuredUrl = process.env["PUBLIC_SITE_URL"];
   if (configuredUrl) return configuredUrl.replace(/\/+$/, "");
-  try {
-    const request = getRequest();
-    if (request?.url) return new URL(request.url).origin;
-  } catch (e) {
-    // getRequest can throw or return undefined in some contexts
-  }
   return "";
 }
 
