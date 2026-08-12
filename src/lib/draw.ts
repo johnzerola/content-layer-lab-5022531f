@@ -482,10 +482,12 @@ function drawVideoLayer(
       ctx.translate(v.x * 2 + v.w, 0);
       ctx.scale(-1, 1);
     }
+    const vr = opts?.variation;
     const baseFilter = preEditFilter(pre, {
-      brightness: opts?.brightness ?? 1,
-      saturation: opts?.saturation ?? 1,
+      brightness: (opts?.brightness ?? 1) * (vr?.brightness ?? 1),
+      saturation: (opts?.saturation ?? 1) * (vr?.saturation ?? 1),
     });
+
 
     /** Desenha a fonte dentro de uma caixa, no modo pedido. */
     const paint = (
@@ -845,11 +847,13 @@ export function drawFrame(
   (t.extras ?? []).forEach((extra, i) =>
     push(extra.z, 100 + i, () => ("src" in extra ? drawImageLayer(ctx, extra) : drawText(ctx, extra))),
   );
-  if (t.captions && opts?.captions?.length) {
-    const cues = opts.captions;
+  if (t.captions && (opts?.captions?.length || opts?.pre?.captionStyle)) {
+    const cues = opts.captions ?? [];
     const time = opts.time ?? 0;
-    push(t.captions.z, 70, () => drawCaptions(ctx, t.captions!, cues, time));
+    const style = { ...t.captions, ...(opts.pre?.captionStyle ?? {}) };
+    push(t.captions.z, 70, () => drawCaptions(ctx, style, cues, time));
   }
+
 
   jobs.sort((a, b) => a.z - b.z || a.i - b.i).forEach((j) => j.run());
   if (animating) ctx.restore();
