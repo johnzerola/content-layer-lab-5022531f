@@ -83,8 +83,9 @@ export async function workerHealth() {
   try {
     const info = await call<{ gpu: string; engines: string[]; version: string }>("/v1/health");
     return { online: true as const, ...info };
-  } catch (e) {
-    return { online: false as const, reason: e instanceof Error ? e.message : "sem resposta" };
+  } catch (e: any) {
+    console.error("Health check error:", e);
+    return { online: false as const, reason: e?.message || "sem resposta" };
   }
 }
 
