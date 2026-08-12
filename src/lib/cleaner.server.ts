@@ -72,8 +72,11 @@ async function call<T>(path: string, init: RequestInit & { jobId?: string } = {}
   headers.set("content-type", "application/json");
   if (init.jobId) headers.set("x-job-token", jobToken(init.jobId));
   const res = await fetch(`${base}${path}`, { ...init, headers });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text.slice(0, 400) || `worker ${res.status}`);
+  }
   const text = await res.text();
-  if (!res.ok) throw new Error(text.slice(0, 400) || `worker ${res.status}`);
   return (text ? JSON.parse(text) : {}) as T;
 }
 
