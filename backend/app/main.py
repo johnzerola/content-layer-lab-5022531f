@@ -73,6 +73,17 @@ async def health():
     }
 
 
+def input_path_for(job_id: str) -> str:
+    return os.path.join(STORAGE_DIR, job_id, "input.mp4")
+
+
+def require_input(job_id: str) -> str:
+    path = input_path_for(job_id)
+    if not os.path.exists(path) or os.path.getsize(path) == 0:
+        raise HTTPException(409, "vídeo não recebido — refaça o envio")
+    return path
+
+
 @app.post("/v1/jobs/{job_id}/upload")
 async def upload_video(job_id: str, file: UploadFile = File(...),
                        x_job_token: str = Header(None)):
@@ -87,12 +98,42 @@ async def upload_video(job_id: str, file: UploadFile = File(...),
     return {"ok": True, "filename": file.filename, "size": os.path.getsize(path)}
 
 
+@app.get("/v1/jobs/{job_id}/input")
+async def input_info(job_id: str, x_job_token: str = Header(None)):
+    verify_token(job_id, x_job_token)
+    path = input_path_for(job_id)
+    if not os.path.exists(path):
+        return {"exists": False, "size": 0}
+    size = os.path.getsize(path)
+    info = {"exists": size > 0, "size": size}
+    try:
+        from .utils.video import probe
+
+        p = probe(path)
+        info.update({
+            "width": p.width,
+            "height": p.height,
+            "fps": getattr(p, "fps", None),
+            "frames": getattr(p, "frames", None),
+            "readable": True,
+        })
+    except Exception as exc:
+        info.update({"readable": False, "error": str(exc)[:200]})
+    return info
+
+
 @app.post("/v1/jobs/{job_id}/detect")
 async def detect(job_id: str, req: DetectRequest, x_job_token: str = Header(None)):
     verify_token(job_id, x_job_token)
+    require_input(job_id)
     from .workers.tasks import auto_detect
 
-    regions = auto_detect(job_id, req.mode)
+    try:
+        regions = auto_detect(job_id, req.mode)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(500, f"falha na detecção: {str(exc)[:200]}")
     JOBS.setdefault(job_id, {}).update({"status": "detecting", "detections": regions})
     return {"regions": regions}
 
@@ -101,7 +142,9 @@ async def detect(job_id: str, req: DetectRequest, x_job_token: str = Header(None
 async def start_process(job_id: str, req: ProcessRequest, background_tasks: BackgroundTasks,
                         x_job_token: str = Header(None)):
     verify_token(job_id, x_job_token)
+    require_input(job_id)
     JOBS[job_id] = {"status": "queued", "progress": 0, "stage": "na fila"}
+
 
     if USE_CELERY:
         from .workers.tasks import process_video_task
