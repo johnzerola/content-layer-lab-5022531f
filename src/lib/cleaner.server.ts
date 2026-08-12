@@ -81,10 +81,14 @@ export async function workerHealth() {
   const base = workerBase();
   if (!base) return { online: false as const, reason: "CLEANER_WORKER_URL não configurada" };
   try {
-    const info = await call<{ gpu: string; engines: string[]; version: string }>("/v1/health");
+    const res = await fetch(`${base}/v1/health`, {
+      headers: { "Content-Type": "application/json" },
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(text || `worker ${res.status}`);
+    const info = JSON.parse(text);
     return { online: true as const, ...info };
   } catch (e: any) {
-    // console.error removido para simplificar e focar no retorno
     return { online: false as const, reason: e?.message || "sem resposta" };
   }
 }
