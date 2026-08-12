@@ -482,6 +482,17 @@ function Home() {
     [pendingSessions, setItemsIn],
   );
 
+  // aviso ao fechar a aba no meio de um render
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!runningRef.current) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
+
   const discardSession = useCallback(async (m: Mode) => {
     await clearSession(m);
     setPendingSessions((p) => ({ ...p, [m]: undefined }));
