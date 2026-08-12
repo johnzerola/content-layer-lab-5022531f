@@ -2120,49 +2120,13 @@ function Home() {
 
 
                     <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
-                      <p className="mono-label">Estilo das legendas (CapCut)</p>
-                      <label className="flex items-center gap-2 font-mono text-[11px]">
-                        <input
-                          type="checkbox"
-                          checked={(active.captions ?? defaultCaptions()).visible}
-                          onChange={(e) =>
-                            setActive((t) => ({
-                              ...t,
-                              captions: { ...(t.captions ?? defaultCaptions()), visible: e.target.checked },
-                            }))
-                          }
-                          className="size-4 accent-[var(--primary)]"
-                        />
-                        exibir no vídeo
-                      </label>
-                    </div>
-                    <label className="mt-2 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        checked={autoCap}
-                        onChange={(e) => setAutoCap(e.target.checked)}
-                        className="size-4 accent-[var(--primary)]"
-                      />
-                      transcrever automaticamente ao clicar em Processar
-                    </label>
-
-                    <div className="mt-3">
-                      <CaptionStudio
-                        style={active.captions ?? defaultCaptions()}
-                        cues={selected.captions}
-                        fonts={active.fonts}
-                        onAddFont={(f) =>
-                          setActive((t) => ({ ...t, fonts: [...(t.fonts ?? []), f] }))
-                        }
-                        onChange={(patch) =>
-                          setActive((t) => ({
-                            ...t,
-                            captions: { ...(t.captions ?? defaultCaptions()), ...patch },
-                          }))
-                        }
-                      />
+                      <p className="mono-label text-primary">Edite cores, legendas e variações no Estúdio</p>
+                      <Button size="sm" onClick={() => setStudioId(selected.id)}>
+                        <Pencil className="mr-1 size-3.5" /> Abrir Estúdio
+                      </Button>
                     </div>
                   </div>
+
 
                 )}
 
