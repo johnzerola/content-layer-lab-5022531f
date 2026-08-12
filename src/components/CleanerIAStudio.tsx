@@ -888,14 +888,34 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             </a>
           ) : (
             <div className="space-y-2">
-              <Button variant="outline" className="w-full" onClick={handleDetect} disabled={polling}>
+              {!inputReady && (
+                <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-2 text-[11px] text-destructive">
+                  {uploading ? "enviando o vídeo para o motor…" : "o motor ainda não tem este vídeo — reenvie o arquivo."}
+                </p>
+              )}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleDetect}
+                disabled={polling || uploading || !inputReady}
+              >
                 <Target className="mr-2 size-4" /> Detectar
               </Button>
-              <Button className="w-full shadow-glow" onClick={handleProcess} disabled={polling}>
+              <Button
+                className="w-full shadow-glow"
+                onClick={handleProcess}
+                disabled={polling || uploading || !inputReady}
+              >
                 <Sparkles className="mr-2 size-4" /> Remover
               </Button>
+              {!inputReady && !uploading && (
+                <Button variant="ghost" className="w-full" onClick={resendUpload}>
+                  <Upload className="mr-2 size-4" /> Reenviar vídeo
+                </Button>
+              )}
             </div>
           )}
+
         </section>
 
         <section className="space-y-3 rounded-2xl border border-border/70 bg-surface/50 p-5">
