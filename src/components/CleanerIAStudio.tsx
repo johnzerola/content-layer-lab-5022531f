@@ -290,12 +290,96 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     setDraft(null);
   };
 
+  const errMsg = (e: unknown) => {
+    const raw = e instanceof Error ? e.message : String(e ?? "");
+    if (/409|não está no motor|não recebido/i.test(raw)) return "o vídeo não está no motor — reenvie o arquivo";
+    if (/401|403|unauthorized|expirad/i.test(raw)) return "sessão expirada — entre novamente";
+    if (/inacess|failed to fetch|network|sem resposta|503/i.test(raw)) return "motor inacessível — tente de novo em instantes";
+    return raw || "erro desconhecido";
+  };
+
+  /** Confirma no motor que o arquivo realmente chegou antes de liberar Detectar/Remover. */
+  const confirmInput = async (jobId: string) => {
+    try {
+      const headers = await cloudAuthHeaders();
+      const info = (await checkInput({ data: { id: jobId }, headers })) as {
+        ok: boolean;
+        error?: string;
+      };
+      setInputReady(!!info.ok);
+      return info;
+    } catch (e) {
+      setInputReady(false);
+      return { ok: false, error: errMsg(e) };
+    }
+  };
+
+  const uploadToWorker = async (
+    jobId: string,
+    upload: { url: string; token: string },
+  ) => {
+    // Navegador bloqueia http:// dentro de página https (conteúdo misto):
+    // reescreve para o proxy HTTPS do worker antes de enviar.
+    const secureUrl =
+      typeof window !== "undefined" &&
+      window.location.protocol === "https:" &&
+      upload.url.startsWith("http://")
+        ? upload.url.replace(
+            /^http:\/\/(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?::\d+)?/,
+            (_m, a, b, c, d) => `https://cleaner-${a}-${b}-${c}-${d}.nip.io`,
+          )
+        : upload.url;
+
+    const send = (url: string) =>
+      new Promise<void>((resolve, reject) => {
+        const formData = new FormData();
+        formData.append("file", item.file);
+        const isProxy = url.includes("/api/public/cleaner-upload");
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", url);
+        xhr.timeout = 15 * 60 * 1000;
+        xhr.setRequestHeader("x-job-token", upload.token);
+        xhr.upload.onprogress = (ev) => {
+          if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
+        };
+        xhr.onload = () =>
+          xhr.status >= 200 && xhr.status < 300
+            ? resolve()
+            : reject(new Error(`${xhr.status} ${xhr.responseText || "falha no envio"}`));
+        xhr.onerror = () => reject(new Error("rede-bloqueada"));
+        xhr.ontimeout = () => reject(new Error("tempo esgotado no envio"));
+        xhr.send(isProxy ? item.file : formData);
+      });
+
+    // rota alternativa pela própria origem, para redes que bloqueiam o domínio do motor
+    const proxyUrl = `/api/public/cleaner-upload?job=${encodeURIComponent(jobId)}`;
+
+    try {
+      await send(secureUrl);
+    } catch (first) {
+      setUploadProgress(0);
+      await new Promise((r) => setTimeout(r, 1000));
+      try {
+        await send(proxyUrl);
+      } catch (second) {
+        throw new Error(
+          `${first instanceof Error && first.message === "rede-bloqueada"
+            ? `sua rede não alcança ${new URL(secureUrl, window.location.origin).host}`
+            : first instanceof Error
+              ? first.message
+              : "falha"} — via servidor também falhou (${second instanceof Error ? second.message : "erro"})`,
+        );
+      }
+    }
+  };
+
   const startUpload = async () => {
     if (!health?.online) {
       toast.error("Motor de IA offline — configure o worker GPU.");
       return;
     }
     setUploading(true);
+    setInputReady(false);
     try {
       const headers = await cloudAuthHeaders();
       const { job: newJob, upload } = (await createJob({
@@ -304,79 +388,60 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       })) as { job: CleanerJob; upload?: { url: string; token: string } };
       setJob(newJob);
 
-      if (upload) {
-        // Navegador bloqueia http:// dentro de página https (conteúdo misto):
-        // reescreve para o proxy HTTPS do worker antes de enviar.
-        const secureUrl =
-          typeof window !== "undefined" &&
-          window.location.protocol === "https:" &&
-          upload.url.startsWith("http://")
-            ? upload.url.replace(
-                /^http:\/\/(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?::\d+)?/,
-                (_m, a, b, c, d) => `https://cleaner-${a}-${b}-${c}-${d}.nip.io`,
-              )
-            : upload.url;
+      if (upload) await uploadToWorker(newJob.id, upload);
 
-        const send = (url: string) =>
-          new Promise<void>((resolve, reject) => {
-            const formData = new FormData();
-            formData.append("file", item.file);
-            const isProxy = url.includes("/api/public/cleaner-upload");
-            const xhr = new XMLHttpRequest();
-            xhr.open("POST", url);
-            xhr.timeout = 15 * 60 * 1000;
-            xhr.setRequestHeader("x-job-token", upload.token);
-            xhr.upload.onprogress = (ev) => {
-              if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
-            };
-            xhr.onload = () =>
-              xhr.status >= 200 && xhr.status < 300
-                ? resolve()
-                : reject(new Error(`${xhr.status} ${xhr.responseText || "falha no envio"}`));
-            xhr.onerror = () => reject(new Error("rede-bloqueada"));
-            xhr.ontimeout = () => reject(new Error("tempo esgotado no envio"));
-            xhr.send(isProxy ? item.file : formData);
-          });
-
-        // rota alternativa pela própria origem, para redes que bloqueiam o domínio do motor
-        const proxyUrl = `/api/public/cleaner-upload?job=${encodeURIComponent(newJob.id)}`;
-
-        try {
-          await send(secureUrl);
-        } catch (first) {
-          setUploadProgress(0);
-          await new Promise((r) => setTimeout(r, 1000));
-          try {
-            await send(proxyUrl);
-          } catch (second) {
-            throw new Error(
-              `${first instanceof Error && first.message === "rede-bloqueada"
-                ? `sua rede não alcança ${new URL(secureUrl).host}`
-                : first instanceof Error
-                  ? first.message
-                  : "falha"} — via servidor também falhou (${second instanceof Error ? second.message : "erro"})`,
-            );
-          }
-        }
+      const info = await confirmInput(newJob.id);
+      if (!info.ok) {
+        toast.error(`O motor não recebeu o vídeo (${info.error || "arquivo ausente"}). Use "Reenviar vídeo".`);
+        return;
       }
       setJob((prev) => (prev ? { ...prev, status: "queued", progress: 0 } : prev));
       toast.success("Vídeo enviado. Detecte as áreas ou marque à mão.");
     } catch (e) {
-      toast.error(`Erro no upload: ${e instanceof Error ? e.message : "desconhecido"}`);
+      toast.error(`Erro no upload: ${errMsg(e)}`);
     } finally {
       setUploading(false);
     }
   };
 
+  /** Reenvia o arquivo para um job já existente, sem recriar o job. */
+  const resendUpload = async () => {
+    if (!job?.id) return;
+    setUploading(true);
+    setUploadProgress(0);
+    try {
+      const headers = await cloudAuthHeaders();
+      const { job: fresh, upload } = (await createJob({
+        data: { filename: item.file.name, size: item.file.size, mode, preset },
+        headers,
+      })) as { job: CleanerJob; upload?: { url: string; token: string } };
+      setJob(fresh);
+      if (upload) await uploadToWorker(fresh.id, upload);
+      const info = await confirmInput(fresh.id);
+      if (!info.ok) {
+        toast.error(`Reenvio falhou: ${info.error || "arquivo ausente no motor"}`);
+        return;
+      }
+      toast.success("Vídeo reenviado com sucesso.");
+    } catch (e) {
+      toast.error(`Reenvio falhou: ${errMsg(e)}`);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleDetect = async () => {
+    if (!job?.id) return;
+    if (!inputReady) {
+      toast.error("Envie o vídeo para o motor antes de detectar.");
+      return;
+    }
     // Primeiro salva as máscaras atuais para garantir persistência antes da detecção
-    if (masks.length > 0 && job?.id) {
-      const headers = await cloudAuthHeaders();
-      await saveMasks({ data: { id: job.id, masks }, headers }).catch(() => null);
+    if (masks.length > 0) {
+      const h = await cloudAuthHeaders();
+      await saveMasks({ data: { id: job.id, masks }, headers: h }).catch(() => null);
     }
 
-    if (!job?.id) return;
     try {
       setJob((prev) => (prev ? { ...prev, status: "detecting", stage: "detectando áreas" } : prev));
       const headers = await cloudAuthHeaders();
@@ -389,9 +454,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       );
     } catch (e) {
       setJob((prev) => (prev ? { ...prev, status: "queued" } : prev));
-      toast.error(`Erro na detecção: ${e instanceof Error ? e.message : "desconhecido"}`);
+      const msg = errMsg(e);
+      if (/não está no motor/.test(msg)) setInputReady(false);
+      toast.error(`Erro na detecção: ${msg}`);
     }
   };
+
 
   const handleProcess = async () => {
     if (!job?.id) return;
