@@ -73,6 +73,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [brushSize, setBrushSize] = useState(0.015);
   const [inputReady, setInputReady] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const [autoMode, setAutoMode] = useState(true);
+  const [autoRunning, setAutoRunning] = useState(false);
+
   const [logs, setLogs] = useState<Array<{ t: number; level: "info" | "warn" | "error"; msg: string }>>([]);
   const [showDebug, setShowDebug] = useState(true);
 
@@ -331,21 +334,24 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   };
 
   /** Máscaras típicas em um clique: legenda no rodapé, marca d'água no topo. */
+  const presetMask = (where: "bottom" | "top"): CleanerRegion => ({
+    id: rid(),
+    kind: "rect",
+    role: "remove",
+    x: 0.06,
+    y: where === "bottom" ? 0.72 : 0.03,
+    w: 0.88,
+    h: 0.22,
+    grow: 0.008,
+    track: true,
+    enabled: true,
+    label: where === "bottom" ? "Rodapé (legenda)" : "Topo (marca d'água)",
+  });
+
   const addPresetMask = (where: "bottom" | "top") => {
-    const region: CleanerRegion = {
-      id: rid(),
-      kind: "rect",
-      role: "remove",
-      x: 0.06,
-      y: where === "bottom" ? 0.72 : 0.03,
-      w: 0.88,
-      h: 0.22,
-      grow: 0.008,
-      track: true,
-      enabled: true,
-      label: where === "bottom" ? "Rodapé (legenda)" : "Topo (marca d'água)",
-    };
+    const region = presetMask(where);
     setMasks((prev) => [...prev, region]);
+
     setSelected(region.id);
   };
 
@@ -461,13 +467,20 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       }
       setJob((prev) => (prev ? { ...prev, status: "queued", progress: 0 } : prev));
       pushLog("info", "arquivo confirmado no motor");
-      toast.success("Vídeo enviado. Detecte as áreas ou marque à mão.");
+      setUploading(false);
+      if (autoMode) {
+        toast.success("Vídeo enviado. Analisando automaticamente…");
+        await autoClean(newJob.id);
+      } else {
+        toast.success("Vídeo enviado. Detecte as áreas ou marque à mão.");
+      }
     } catch (e) {
       pushLog("error", `upload falhou: ${errMsg(e)}`);
       toast.error(`Erro no upload: ${errMsg(e)}`);
     } finally {
       setUploading(false);
     }
+
 
   };
 
@@ -497,6 +510,14 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
   };
 
+  /** Detecção pura: devolve as áreas encontradas pelo motor (sem tocar na UI). */
+  const runDetect = async (jobId: string, detectMode: CleanerMode) => {
+    pushLog("info", `analisando vídeo (${detectMode})`);
+    const headers = await cloudAuthHeaders();
+    const res = (await detectJob({ data: { id: jobId, mode: detectMode }, headers })) as CleanerJob;
+    return { res, found: (res.detections || []) as CleanerRegion[] };
+  };
+
   const handleDetect = async () => {
     if (!job?.id) return;
     // Revalida no motor antes de tentar: evita o 500 genérico quando o arquivo sumiu.
@@ -513,10 +534,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
     try {
       setJob((prev) => (prev ? { ...prev, status: "detecting", stage: "detectando áreas" } : prev));
-      pushLog("info", `detectando (${mode})`);
-      const headers = await cloudAuthHeaders();
-      const res = (await detectJob({ data: { id: job.id, mode }, headers })) as CleanerJob;
-      const found = (res.detections || []) as CleanerRegion[];
+      const { res, found } = await runDetect(job.id, mode);
       setMasks((prev) => [...prev, ...found]);
       setJob({ ...res, status: "queued" });
       if (found.length) {
@@ -538,6 +556,29 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
   };
 
+  /** Envia o job para o motor com um conjunto explícito de máscaras. */
+  const runProcess = async (jobId: string, masksToUse: CleanerRegion[], useMode: CleanerMode) => {
+    pushLog("info", `enviando processamento · ${masksToUse.length} máscara(s) · ${useMode}/${preset}`);
+    const headers = await cloudAuthHeaders();
+    await processJob({
+      data: {
+        id: jobId,
+        mode: useMode,
+        preset,
+        masks: masksToUse,
+        options: {
+          dynamic: dynamicMask,
+          protect_subject: protectSubject,
+          verify: verifyPass,
+          key_step: dynamicMask ? 3 : 8,
+        },
+      },
+      headers,
+    });
+    setPolling(true);
+    setJob((prev) => (prev ? { ...prev, status: "inpainting", progress: 1 } : prev));
+    pushLog("info", "motor aceitou o job — acompanhando status");
+  };
 
   const handleProcess = async () => {
     if (!job?.id) return;
@@ -551,26 +592,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
 
     try {
-      pushLog("info", `enviando processamento · ${masks.length} máscara(s) · ${mode}/${preset}`);
-      const headers = await cloudAuthHeaders();
-      await processJob({
-        data: {
-          id: job.id,
-          mode,
-          preset,
-          masks,
-          options: {
-            dynamic: dynamicMask,
-            protect_subject: protectSubject,
-            verify: verifyPass,
-            key_step: dynamicMask ? 3 : 8,
-          },
-        },
-        headers,
-      });
-      setPolling(true);
-      setJob((prev) => (prev ? { ...prev, status: "inpainting", progress: 1 } : prev));
-      pushLog("info", "motor aceitou o job — acompanhando status");
+      await runProcess(job.id, masks, mode);
       toast.success("Reconstrução iniciada na GPU.");
     } catch (e) {
       const msg = errMsg(e);
@@ -580,6 +602,56 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
 
   };
+
+  /**
+   * Modo automático: o motor analisa o vídeo, encontra legendas/marcas/textos e
+   * já inicia a remoção — sem nenhuma marcação manual. Se a análise não achar
+   * nada, usa a cobertura de rodapé (onde ficam 90% das legendas) como plano B.
+   */
+  const autoClean = async (jobId?: string) => {
+    const id = jobId ?? job?.id;
+    if (!id) return;
+    setAutoRunning(true);
+    try {
+      const check = await confirmInput(id);
+      if (!check.ok) {
+        pushLog("error", `automático abortado: ${check.error || "arquivo ausente no motor"}`);
+        toast.error("O motor não tem este vídeo — reenvie o arquivo.");
+        return;
+      }
+      setJob((prev) => (prev ? { ...prev, status: "detecting", stage: "analisando vídeo" } : prev));
+      let found: CleanerRegion[] = [];
+      try {
+        const r = await runDetect(id, "smart");
+        found = r.found;
+      } catch (e) {
+        pushLog("warn", `análise automática falhou (${errMsg(e)}) — usando cobertura de rodapé`);
+      }
+      const useMasks = found.length ? found : [presetMask("bottom")];
+      setMasks(useMasks);
+      pushLog(
+        found.length ? "info" : "warn",
+        found.length
+          ? `${found.length} área(s) encontrada(s) automaticamente — iniciando remoção`
+          : "nada detectado — removendo a faixa do rodapé automaticamente",
+      );
+      await runProcess(id, useMasks, found.length ? "smart" : "subtitle");
+      toast.success(
+        found.length
+          ? `Análise concluída: ${found.length} área(s). Removendo automaticamente…`
+          : "Análise sem detecção — removendo a faixa do rodapé automaticamente.",
+      );
+    } catch (e) {
+      const msg = errMsg(e);
+      if (/não está no motor/.test(msg)) setInputReady(false);
+      setJob((prev) => (prev ? { ...prev, status: "queued" } : prev));
+      pushLog("error", `modo automático falhou: ${msg}`);
+      toast.error(`Automático falhou: ${msg}`);
+    } finally {
+      setAutoRunning(false);
+    }
+  };
+
 
 
   const running = !!job && job.status !== "completed" && job.status !== "queued" && polling;
@@ -977,9 +1049,26 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             ))}
           </div>
 
+          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs">
+            <input
+              type="checkbox"
+              checked={autoMode}
+              disabled={polling || autoRunning || uploading}
+              onChange={(e) => setAutoMode(e.target.checked)}
+              className="mt-0.5 size-3.5 accent-[var(--primary)]"
+            />
+            <span>
+              <span className="block font-semibold">Modo automático</span>
+              <span className="block text-[10px] text-muted-foreground">
+                A IA analisa o vídeo, encontra legendas/marcas/textos e já remove — sem marcar nada à mão.
+              </span>
+            </span>
+          </label>
+
           {!job ? (
             <Button className="w-full shadow-glow" onClick={startUpload} disabled={!health?.online || uploading}>
-              <Upload className="mr-2 size-4" /> Enviar para GPU
+              <Upload className="mr-2 size-4" />
+              {autoMode ? "Analisar e limpar automaticamente" : "Enviar para GPU"}
             </Button>
           ) : job.status === "completed" ? (
             <a
@@ -997,19 +1086,28 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 </p>
               )}
               <Button
+                className="w-full shadow-glow"
+                onClick={() => autoClean()}
+                disabled={polling || uploading || autoRunning || !inputReady}
+              >
+                <Sparkles className="mr-2 size-4" />
+                {autoRunning ? "Analisando o vídeo…" : "Analisar e remover (automático)"}
+              </Button>
+              <Button
                 variant="outline"
                 className="w-full"
                 onClick={handleDetect}
-                disabled={polling || uploading || !inputReady}
+                disabled={polling || uploading || autoRunning || !inputReady}
               >
                 <Target className="mr-2 size-4" /> Detectar
               </Button>
               <Button
-                className="w-full shadow-glow"
+                variant="outline"
+                className="w-full"
                 onClick={handleProcess}
-                disabled={polling || uploading || !inputReady}
+                disabled={polling || uploading || autoRunning || !inputReady}
               >
-                <Sparkles className="mr-2 size-4" /> Remover
+                <Eraser className="mr-2 size-4" /> Remover áreas marcadas
               </Button>
               {!inputReady && !uploading && (
                 <Button variant="ghost" className="w-full" onClick={resendUpload}>
@@ -1018,6 +1116,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               )}
             </div>
           )}
+
 
         </section>
 
