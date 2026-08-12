@@ -127,7 +127,9 @@ function LimparIAPage() {
               </a>
             )}
           </div>
-          <CleanerIAStudio item={item} onComplete={(url) => setResultUrl(url)} />
+          <AuthGate>
+            <CleanerIAStudio item={item} onComplete={(url) => setResultUrl(url)} />
+          </AuthGate>
         </div>
       </div>
     );
