@@ -503,6 +503,8 @@ function Home() {
 
 
   const [running, setRunning] = useState(false);
+  const runningRef = useRef(false);
+  runningRef.current = running;
   const [paused, setPaused] = useState(false);
   const [zipping, setZipping] = useState(false);
   // Canvas, decoder e encoder disputam a mesma thread/GPU. Dois vídeos em
