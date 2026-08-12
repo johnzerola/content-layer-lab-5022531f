@@ -61,7 +61,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [protectSubject, setProtectSubject] = useState(true);
   const [verifyPass, setVerifyPass] = useState(true);
   const [masks, setMasks] = useState<CleanerRegion[]>([]);
-  const [health, setHealth] = useState<{ online: boolean; reason?: string } | null>(null);
+  const [health, setHealth] = useState<{ online: boolean; reason?: string; cuda?: boolean } | null>(null);
   const [polling, setPolling] = useState(false);
   const [tool, setTool] = useState<Tool>("rect");
   const [selected, setSelected] = useState<string | null>(null);
@@ -69,6 +69,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [brushSize, setBrushSize] = useState(0.015);
+  const [inputReady, setInputReady] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
+
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stageRef = useRef<HTMLDivElement | null>(null);
