@@ -33,6 +33,7 @@ import { CloudPanel } from "@/components/CloudPanel";
 import { autoSyncTemplates, enableCloudQuotaFallback, logBatch, logExports, type ProjectSnapshot } from "@/lib/cloud";
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
+import { StudioBoundary } from "@/components/StudioBoundary";
 import { AuthGate } from "@/components/AuthGate";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
