@@ -58,8 +58,9 @@ import { StagePreview } from "@/components/editor/StagePreview";
 import { useEditorHistory } from "@/components/editor/useEditorHistory";
 import { defaultAntiDup, makeVariation, describeVariation, type AntiDupConfig } from "@/lib/variation";
 import { CaptionStudio } from "@/components/CaptionStudio";
+import { defaultCaptions, type CaptionStyle } from "@/lib/template";
 import type { CaptionCue } from "@/lib/captions";
-import type { CaptionStyle } from "@/lib/template";
+
 
 
 export interface PreEditResult {
@@ -102,7 +103,7 @@ type Drag = {
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text";
+type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text" | "antidup";
 
 const TOOL_GROUPS: { group: string; items: { id: Tab; label: string; icon: typeof Scissors }[] }[] = [
   {
@@ -1180,7 +1181,7 @@ export function VideoStudio({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="font-mono text-[11px] text-muted-foreground">Preview anti-duplicidade</span>
-                  <ToggleChip on={adPreview} onClick={() => setAdPreview((v) => !v)} label={adPreview ? "Ativo" : "Off"} />
+                  <ToggleChip on={adPreview} onClick={() => setAdPreview((v) => !v)} icon={Eye} label={adPreview ? "Ativo" : "Off"} />
                 </div>
                 {adPreview && (
                   <div className="rounded-lg border border-primary/20 bg-primary/5 p-2 font-mono text-[10px] leading-snug text-primary">
@@ -1200,7 +1201,9 @@ export function VideoStudio({
                     <ToggleChip
                       on={adConfig.auto}
                       onClick={() => set({ antiDup: { ...adConfig, auto: !adConfig.auto } }, "ia anti-duplicidade")}
+                      icon={Sparkles}
                       label={adConfig.auto ? "IA Ativa" : "Manual"}
+
                     />
                   </div>
                   <p className="font-mono text-[10px] text-muted-foreground">

@@ -419,7 +419,7 @@ export interface DrawOpts {
   borderColor?: string;
   /** tempo atual do vídeo fonte (segundos) — usado pelas legendas e janelas de limpeza */
   time?: number;
-  captions?: CaptionCue[];
+  captions?: CaptionCue[] | null;
   /** placa de fundo (mediana temporal) para reconstruir áreas com pixels reais */
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null;
   /** pré-edição do vídeo fonte (recorte, giro, cor) aplicada antes do template */
