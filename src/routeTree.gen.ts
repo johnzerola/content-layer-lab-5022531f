@@ -21,6 +21,7 @@ import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } fr
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as ApiPublicCleanerCallbackRouteImport } from './routes/api/public/cleaner-callback'
+import { Route as ApiPublicCleanerUploadRouteImport } from './routes/api/public/cleaner-upload'
 import { Route as ApiPublicHlsProxyRouteImport } from './routes/api/public/hls-proxy'
 import { Route as ApiPublicMediaProxyRouteImport } from './routes/api/public/media-proxy'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
@@ -89,6 +90,11 @@ const ApiPublicCleanerCallbackRoute =
     path: '/api/public/cleaner-callback',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicCleanerUploadRoute = ApiPublicCleanerUploadRouteImport.update({
+  id: '/api/public/cleaner-upload',
+  path: '/api/public/cleaner-upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHlsProxyRoute = ApiPublicHlsProxyRouteImport.update({
   id: '/api/public/hls-proxy',
   path: '/api/public/hls-proxy',
@@ -119,6 +125,7 @@ export interface FileRoutesByFullPath {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
+  '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
@@ -136,6 +143,7 @@ export interface FileRoutesByTo {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
+  '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
@@ -154,6 +162,7 @@ export interface FileRoutesById {
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
   '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
+  '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
@@ -173,6 +182,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
+    | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
     | '/api/public/hooks/publish-due'
@@ -190,6 +200,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
+    | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
     | '/api/public/hooks/publish-due'
@@ -207,6 +218,7 @@ export interface FileRouteTypes {
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
     | '/api/public/cleaner-callback'
+    | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
     | '/api/public/hooks/publish-due'
@@ -225,6 +237,7 @@ export interface RootRouteChildren {
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
   ApiPublicCleanerCallbackRoute: typeof ApiPublicCleanerCallbackRoute
+  ApiPublicCleanerUploadRoute: typeof ApiPublicCleanerUploadRoute
   ApiPublicHlsProxyRoute: typeof ApiPublicHlsProxyRoute
   ApiPublicMediaProxyRoute: typeof ApiPublicMediaProxyRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
@@ -316,6 +329,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicCleanerCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/cleaner-upload': {
+      id: '/api/public/cleaner-upload'
+      path: '/api/public/cleaner-upload'
+      fullPath: '/api/public/cleaner-upload'
+      preLoaderRoute: typeof ApiPublicCleanerUploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hls-proxy': {
       id: '/api/public/hls-proxy'
       path: '/api/public/hls-proxy'
@@ -354,6 +374,7 @@ const rootRouteChildren: RootRouteChildren = {
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
   ApiPublicCleanerCallbackRoute: ApiPublicCleanerCallbackRoute,
+  ApiPublicCleanerUploadRoute: ApiPublicCleanerUploadRoute,
   ApiPublicHlsProxyRoute: ApiPublicHlsProxyRoute,
   ApiPublicMediaProxyRoute: ApiPublicMediaProxyRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
