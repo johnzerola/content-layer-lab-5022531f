@@ -7,14 +7,9 @@ import { getRequest } from "@tanstack/react-start/server";
 import type { CleanerRegion } from "@/lib/cleaner";
 
 export function appOrigin(): string {
-  const request = getRequest();
   const configuredUrl = process.env["PUBLIC_SITE_URL"];
   if (configuredUrl) return configuredUrl.replace(/\/+$/, "");
-  try {
-    return new URL(request.url).origin;
-  } catch {
-    return "";
-  }
+  return "";
 }
 
 /**
@@ -72,19 +67,32 @@ async function call<T>(path: string, init: RequestInit & { jobId?: string } = {}
   headers.set("content-type", "application/json");
   if (init.jobId) headers.set("x-job-token", jobToken(init.jobId));
   const res = await fetch(`${base}${path}`, { ...init, headers });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text.slice(0, 400) || `worker ${res.status}`);
+  }
   const text = await res.text();
-  if (!res.ok) throw new Error(text.slice(0, 400) || `worker ${res.status}`);
   return (text ? JSON.parse(text) : {}) as T;
 }
 
 export async function workerHealth() {
-  const base = workerBase();
+  let base: string | null = null;
+  try {
+    base = workerBase();
+  } catch (e) {
+    return { online: false as const, reason: "Erro ao resolver URL do worker" };
+  }
   if (!base) return { online: false as const, reason: "CLEANER_WORKER_URL não configurada" };
   try {
-    const info = await call<{ gpu: string; engines: string[]; version: string }>("/v1/health");
+    const res = await fetch(`${base}/v1/health`);
+    const text = await res.text();
+    if (!res.ok) {
+      return { online: false as const, reason: text.slice(0, 100) || `worker ${res.status}` };
+    }
+    const info = JSON.parse(text);
     return { online: true as const, ...info };
-  } catch (e) {
-    return { online: false as const, reason: e instanceof Error ? e.message : "sem resposta" };
+  } catch (e: any) {
+    return { online: false as const, reason: e?.message || "sem resposta" };
   }
 }
 

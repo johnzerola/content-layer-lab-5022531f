@@ -16,7 +16,8 @@ import {
 } from "@/lib/cleaner.server";
 
 export const cleanerHealth = createServerFn({ method: "GET" }).handler(async () => {
-  return workerHealth();
+  const health = await workerHealth();
+  return health;
 });
 
 export const createCleanerJob = createServerFn({ method: "POST" })
@@ -76,7 +77,6 @@ export const deleteCleanerJob = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-/** roda o detector no worker e grava as regiões encontradas no job */
 export const detectCleanerJob = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .inputValidator((d: unknown) =>
@@ -168,7 +168,6 @@ export const processCleanerJob = createServerFn({ method: "POST" })
     return row as unknown as CleanerJob;
   });
 
-/** consulta o worker e devolve o estado atualizado (usado no polling) */
 export const refreshCleanerJob = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
@@ -188,7 +187,7 @@ export const refreshCleanerJob = createServerFn({ method: "POST" })
       };
       for (const k of Object.keys(patch)) if (patch[k] === undefined) delete patch[k];
     } catch {
-      // worker fora do ar: devolve o que está no banco
+      // worker fora do ar
     }
     const q = context.supabase.from("cleaner_jobs");
     const { data: row, error } = Object.keys(patch).length
