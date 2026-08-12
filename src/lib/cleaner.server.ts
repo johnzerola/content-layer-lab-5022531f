@@ -81,12 +81,12 @@ export async function workerHealth() {
   const base = workerBase();
   if (!base) return { online: false as const, reason: "CLEANER_WORKER_URL não configurada" };
   try {
-    const res = await fetch(`${base}/v1/health`, {
-      headers: { "Content-Type": "application/json" },
-    });
-    const text = await res.text();
-    if (!res.ok) throw new Error(text || `worker ${res.status}`);
-    const info = JSON.parse(text);
+    const res = await fetch(`${base}/v1/health`);
+    if (!res.ok) {
+      const text = await res.text();
+      return { online: false as const, reason: text || `worker ${res.status}` };
+    }
+    const info = await res.json();
     return { online: true as const, ...info };
   } catch (e: any) {
     return { online: false as const, reason: e?.message || "sem resposta" };
