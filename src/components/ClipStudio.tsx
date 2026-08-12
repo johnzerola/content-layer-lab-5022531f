@@ -54,6 +54,7 @@ interface Props {
   fsAccess: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onEdit: (id: string) => void;
   onProcess: (ids?: string[]) => void;
   onTogglePause: () => void;
   onCancel: () => void;
@@ -95,6 +96,7 @@ function ClipCard({
   active,
   onToggle,
   onSelect,
+  onEdit,
   onRemove,
   onDownload,
 }: {
@@ -104,6 +106,7 @@ function ClipCard({
   active: boolean;
   onToggle: () => void;
   onSelect: () => void;
+  onEdit: () => void;
   onRemove: () => void;
   onDownload: () => void;
 }) {
@@ -245,6 +248,7 @@ function ClipCard({
             onClick={(e) => {
               e.stopPropagation();
               onSelect();
+              onEdit();
             }}
             className="rounded-md p-1.5 hover:text-foreground"
             title="abrir no editor"
@@ -452,6 +456,7 @@ export function ClipStudio(props: Props) {
     fsAccess,
     selectedId,
     onSelect,
+    onEdit,
     onProcess,
     onTogglePause,
     onCancel,
