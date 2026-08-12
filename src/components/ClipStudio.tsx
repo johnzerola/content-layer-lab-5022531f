@@ -45,6 +45,10 @@ interface Props {
   settings: ClipSettings;
   onSettings: (patch: Partial<ClipSettings>) => void;
   clipBusy: boolean;
+  /** 0..1 — progresso da análise */
+  clipProgress?: number;
+  /** última falha da análise, mostrada na tela */
+  clipError?: string | null;
   onGenerate: (item: ClipItem) => void;
   running: boolean;
   paused: boolean;
@@ -447,6 +451,8 @@ export function ClipStudio(props: Props) {
     settings,
     onSettings,
     clipBusy,
+    clipProgress = 0,
+    clipError,
     onGenerate,
     running,
     paused,
@@ -512,10 +518,43 @@ export function ClipStudio(props: Props) {
               <Sliders className="size-4" /> Avançado
             </Button>
             <Button disabled={!source || clipBusy} onClick={() => source && onGenerate(source)}>
-              <Scissors className="size-4" /> {clipBusy ? "Analisando…" : "Gerar clipes"}
+              <Scissors className="size-4" />{" "}
+              {clipBusy
+                ? `Analisando… ${Math.round(clipProgress * 100)}%`
+                : clips.length
+                  ? "Gerar clipes de novo"
+                  : "Gerar clipes"}
             </Button>
           </div>
         </div>
+
+        {clipBusy && (
+          <div className="mt-4 space-y-1">
+            <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+              <div
+                className="h-full bg-primary transition-[width] duration-300"
+                style={{ width: `${Math.max(4, clipProgress * 100)}%` }}
+              />
+            </div>
+            <p className="font-mono text-[11px] text-muted-foreground">
+              analisando áudio, silêncios e movimento · {Math.round(clipProgress * 100)}%
+            </p>
+          </div>
+        )}
+
+        {!clipBusy && clipError && (
+          <div className="mt-4 rounded-xl border border-destructive/50 bg-destructive/10 p-3">
+            <p className="font-mono text-[11px] text-destructive">{clipError}</p>
+          </div>
+        )}
+
+        {!source && (
+          <div className="mt-4 rounded-xl border border-border bg-surface-2 p-3">
+            <p className="font-mono text-[11px] text-muted-foreground">
+              importe um vídeo acima para liberar o botão de gerar clipes.
+            </p>
+          </div>
+        )}
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="mono-label mr-1">duração do clipe</span>
