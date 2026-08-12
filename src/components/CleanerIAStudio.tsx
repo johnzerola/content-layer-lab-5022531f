@@ -468,8 +468,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               const baseClasses = m.role === "protect"
                 ? "border-emerald-400 bg-emerald-400/10"
                 : selected === m.id
-                  ? "border-primary bg-primary/25"
-                  : "border-primary/70 bg-primary/15";
+                  ? "border-primary bg-primary/30 ring-2 ring-primary ring-offset-1 ring-offset-black z-20"
+                  : "border-primary/80 bg-primary/20 hover:bg-primary/30 z-10";
 
               if (m.kind === "poly" && m.points) {
                 const pts = m.points.map((pt) => `${pt.x * 100}% ${pt.y * 100}%`).join(",");
