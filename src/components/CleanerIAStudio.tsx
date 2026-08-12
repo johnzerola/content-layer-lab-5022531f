@@ -549,6 +549,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     }
 
     try {
+      pushLog("info", `enviando processamento · ${masks.length} máscara(s) · ${mode}/${preset}`);
       const headers = await cloudAuthHeaders();
       await processJob({
         data: {
@@ -567,12 +568,15 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       });
       setPolling(true);
       setJob((prev) => (prev ? { ...prev, status: "inpainting", progress: 1 } : prev));
+      pushLog("info", "motor aceitou o job — acompanhando status");
       toast.success("Reconstrução iniciada na GPU.");
     } catch (e) {
       const msg = errMsg(e);
       if (/não está no motor/.test(msg)) setInputReady(false);
+      pushLog("error", `início do processamento falhou: ${msg}`);
       toast.error(`Erro ao iniciar: ${msg}`);
     }
+
   };
 
 
