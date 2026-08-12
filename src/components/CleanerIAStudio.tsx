@@ -136,18 +136,26 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       try {
         const headers = await cloudAuthHeaders();
         const status = (await refreshJob({ data: { id: job.id }, headers })) as CleanerJob;
-        setJob((prev) => ({ ...(prev as CleanerJob), ...status }));
+        setJob((prev) => {
+          if (prev && (prev.status !== status.status || prev.stage !== status.stage)) {
+            pushLog("info", `status=${status.status} · ${status.stage ?? "-"} · ${Math.round(status.progress ?? 0)}%`);
+          }
+          return { ...(prev as CleanerJob), ...status };
+        });
         if (status.status === "completed") {
           setPolling(false);
           if (status.result_url) onComplete(status.result_url);
+          pushLog("info", `concluído · ${status.result_url ?? "sem URL"}`);
           toast.success("Vídeo limpo com sucesso.");
         } else if (status.status === "failed") {
           setPolling(false);
+          pushLog("error", `motor falhou: ${status.error || "erro desconhecido"}`);
           toast.error(`Falhou: ${status.error || "erro desconhecido"}`);
         }
-      } catch {
-        /* mantém o polling */
+      } catch (e) {
+        pushLog("warn", `consulta de status falhou: ${errMsg(e)}`);
       }
+
     }, 2500);
     return () => window.clearInterval(timer);
   }, [polling, job?.id]);
