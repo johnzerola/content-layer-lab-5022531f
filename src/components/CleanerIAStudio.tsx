@@ -806,6 +806,14 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
           </div>
 
+          {health?.online && health.cuda === false && (
+            <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-[11px] leading-snug text-amber-500">
+              Modo CPU — o motor está sem GPU disponível. O processamento funciona, mas é bem mais
+              lento; não parece travado, só demora.
+            </p>
+          )}
+
+
           <div className="space-y-2">
             <span className="mono-label">Qualidade</span>
             {PRESETS.map((p) => (
