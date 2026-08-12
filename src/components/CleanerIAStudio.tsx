@@ -1049,9 +1049,26 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             ))}
           </div>
 
+          <label className="flex cursor-pointer items-start gap-2 rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs">
+            <input
+              type="checkbox"
+              checked={autoMode}
+              disabled={polling || autoRunning || uploading}
+              onChange={(e) => setAutoMode(e.target.checked)}
+              className="mt-0.5 size-3.5 accent-[var(--primary)]"
+            />
+            <span>
+              <span className="block font-semibold">Modo automático</span>
+              <span className="block text-[10px] text-muted-foreground">
+                A IA analisa o vídeo, encontra legendas/marcas/textos e já remove — sem marcar nada à mão.
+              </span>
+            </span>
+          </label>
+
           {!job ? (
             <Button className="w-full shadow-glow" onClick={startUpload} disabled={!health?.online || uploading}>
-              <Upload className="mr-2 size-4" /> Enviar para GPU
+              <Upload className="mr-2 size-4" />
+              {autoMode ? "Analisar e limpar automaticamente" : "Enviar para GPU"}
             </Button>
           ) : job.status === "completed" ? (
             <a
@@ -1069,19 +1086,28 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 </p>
               )}
               <Button
+                className="w-full shadow-glow"
+                onClick={() => autoClean()}
+                disabled={polling || uploading || autoRunning || !inputReady}
+              >
+                <Sparkles className="mr-2 size-4" />
+                {autoRunning ? "Analisando o vídeo…" : "Analisar e remover (automático)"}
+              </Button>
+              <Button
                 variant="outline"
                 className="w-full"
                 onClick={handleDetect}
-                disabled={polling || uploading || !inputReady}
+                disabled={polling || uploading || autoRunning || !inputReady}
               >
                 <Target className="mr-2 size-4" /> Detectar
               </Button>
               <Button
-                className="w-full shadow-glow"
+                variant="outline"
+                className="w-full"
                 onClick={handleProcess}
-                disabled={polling || uploading || !inputReady}
+                disabled={polling || uploading || autoRunning || !inputReady}
               >
-                <Sparkles className="mr-2 size-4" /> Remover
+                <Eraser className="mr-2 size-4" /> Remover áreas marcadas
               </Button>
               {!inputReady && !uploading && (
                 <Button variant="ghost" className="w-full" onClick={resendUpload}>
@@ -1090,6 +1116,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               )}
             </div>
           )}
+
 
         </section>
 
