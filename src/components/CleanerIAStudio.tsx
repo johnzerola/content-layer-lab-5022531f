@@ -314,6 +314,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           new Promise<void>((resolve, reject) => {
             const formData = new FormData();
             formData.append("file", item.file);
+            const isProxy = url.includes("/api/public/cleaner-upload");
             const xhr = new XMLHttpRequest();
             xhr.open("POST", url);
             xhr.timeout = 15 * 60 * 1000;
@@ -327,7 +328,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 : reject(new Error(`${xhr.status} ${xhr.responseText || "falha no envio"}`));
             xhr.onerror = () => reject(new Error("rede-bloqueada"));
             xhr.ontimeout = () => reject(new Error("tempo esgotado no envio"));
-            xhr.send(formData);
+            xhr.send(isProxy ? item.file : formData);
           });
 
         // rota alternativa pela própria origem, para redes que bloqueiam o domínio do motor
