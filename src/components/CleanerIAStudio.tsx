@@ -992,9 +992,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           </h3>
           {masks.length === 0 ? (
             <p className="text-[11px] leading-relaxed text-muted-foreground">
-              Arraste sobre o vídeo para marcar o que remover, ou clique em Detectar. O fundo é
+              Escolha <strong>Retângulo</strong> na barra acima do vídeo e arraste sobre o que quer
+              remover — ou use <strong>Cobrir rodapé</strong> / <strong>Detectar</strong>. O fundo é
               reconstruído com contexto temporal — nunca borrado.
             </p>
+
           ) : (
             <div className="max-h-[220px] space-y-2 overflow-y-auto pr-1">
               {masks.map((m) => (
