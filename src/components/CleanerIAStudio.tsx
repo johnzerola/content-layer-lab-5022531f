@@ -331,21 +331,24 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   };
 
   /** Máscaras típicas em um clique: legenda no rodapé, marca d'água no topo. */
+  const presetMask = (where: "bottom" | "top"): CleanerRegion => ({
+    id: rid(),
+    kind: "rect",
+    role: "remove",
+    x: 0.06,
+    y: where === "bottom" ? 0.72 : 0.03,
+    w: 0.88,
+    h: 0.22,
+    grow: 0.008,
+    track: true,
+    enabled: true,
+    label: where === "bottom" ? "Rodapé (legenda)" : "Topo (marca d'água)",
+  });
+
   const addPresetMask = (where: "bottom" | "top") => {
-    const region: CleanerRegion = {
-      id: rid(),
-      kind: "rect",
-      role: "remove",
-      x: 0.06,
-      y: where === "bottom" ? 0.72 : 0.03,
-      w: 0.88,
-      h: 0.22,
-      grow: 0.008,
-      track: true,
-      enabled: true,
-      label: where === "bottom" ? "Rodapé (legenda)" : "Topo (marca d'água)",
-    };
+    const region = presetMask(where);
     setMasks((prev) => [...prev, region]);
+
     setSelected(region.id);
   };
 
