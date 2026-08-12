@@ -155,3 +155,14 @@ export async function workerStatus(jobId: string) {
 export async function workerCancel(jobId: string) {
   return call<{ ok: boolean }>(`/v1/jobs/${jobId}/cancel`, { method: "POST", jobId });
 }
+
+export async function workerInputInfo(jobId: string) {
+  return call<{
+    exists: boolean;
+    size: number;
+    readable?: boolean;
+    width?: number;
+    height?: number;
+    error?: string;
+  }>(`/v1/jobs/${jobId}/input`, { jobId });
+}
