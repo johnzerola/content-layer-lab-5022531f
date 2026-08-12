@@ -82,8 +82,19 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   useEffect(() => () => URL.revokeObjectURL(src), [src]);
 
   useEffect(() => {
-    getHealth().then((h) => setHealth(h as { online: boolean; reason?: string }));
+    let alive = true;
+    const check = () =>
+      getHealth()
+        .then((h) => alive && setHealth(h as { online: boolean; reason?: string }))
+        .catch((e) => alive && setHealth({ online: false, reason: e instanceof Error ? e.message : "sem resposta" }));
+    check();
+    const timer = window.setInterval(check, 30_000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
   }, []);
+
 
   useEffect(() => {
     if (!polling || !job?.id) return;
@@ -621,18 +632,31 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         <section className="space-y-4 rounded-2xl border border-border/70 bg-surface/50 p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <h3 className="font-display font-bold">Configurações</h3>
-            <span
+            <button
+              type="button"
+              onClick={() => {
+                setHealth(null);
+                getHealth()
+                  .then((h) => setHealth(h as { online: boolean; reason?: string }))
+                  .catch((e) => setHealth({ online: false, reason: String(e) }));
+              }}
+              title="verificar novamente"
               className={`flex items-center gap-1.5 text-[10px] font-bold uppercase ${
-                health?.online ? "text-emerald-500" : "text-destructive"
+                health === null ? "text-muted-foreground" : health.online ? "text-emerald-500" : "text-destructive"
               }`}
             >
               <span
                 className={`size-1.5 rounded-full ${
-                  health?.online ? "animate-pulse bg-emerald-500" : "bg-destructive"
+                  health === null
+                    ? "animate-pulse bg-muted-foreground"
+                    : health.online
+                      ? "animate-pulse bg-emerald-500"
+                      : "bg-destructive"
                 }`}
               />
-              {health?.online ? "gpu online" : "offline"}
-            </span>
+              {health === null ? "verificando…" : health.online ? "gpu online" : "offline"}
+            </button>
+
           </div>
 
           <div className="space-y-2">
