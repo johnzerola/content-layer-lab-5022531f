@@ -71,6 +71,15 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [brushSize, setBrushSize] = useState(0.015);
   const [inputReady, setInputReady] = useState(false);
   const [videoReady, setVideoReady] = useState(false);
+  const [logs, setLogs] = useState<Array<{ t: number; level: "info" | "warn" | "error"; msg: string }>>([]);
+  const [showDebug, setShowDebug] = useState(true);
+
+  /** Registro local de depuração — carimbo de tempo + evento do job/motor. */
+  const pushLog = useCallback((level: "info" | "warn" | "error", msg: string) => {
+    setLogs((prev) => [...prev.slice(-199), { t: Date.now(), level, msg }]);
+  }, []);
+
+
 
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
