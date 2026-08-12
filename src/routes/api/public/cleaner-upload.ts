@@ -20,17 +20,17 @@ export const Route = createFileRoute("/api/public/cleaner-upload")({
         const base = workerPublicBase();
         if (!base) return new Response("worker offline", { status: 503 });
 
+        const formData = new FormData();
+        // O motor espera o arquivo no campo 'file'
+        const blob = await request.blob();
+        formData.append("file", blob, "video.mp4");
+
         const upstream = await fetch(`${base}/v1/jobs/${jobId}/upload`, {
           method: "POST",
           headers: {
             "x-job-token": token,
-            ...(request.headers.get("content-type")
-              ? { "content-type": request.headers.get("content-type") as string }
-              : {}),
           },
-          body: request.body,
-          // @ts-expect-error runtime-only: streaming request body
-          duplex: "half",
+          body: formData,
         });
         const text = await upstream.text();
         return new Response(text, { status: upstream.status });
