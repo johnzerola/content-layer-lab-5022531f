@@ -81,13 +81,18 @@ async function call<T>(path: string, init: RequestInit & { jobId?: string } = {}
 }
 
 export async function workerHealth() {
-  const base = workerBase();
+  let base: string | null = null;
+  try {
+    base = workerBase();
+  } catch (e) {
+    return { online: false as const, reason: "Erro ao resolver URL do worker" };
+  }
   if (!base) return { online: false as const, reason: "CLEANER_WORKER_URL não configurada" };
   try {
     const res = await fetch(`${base}/v1/health`);
     if (!res.ok) {
       const text = await res.text();
-      return { online: false as const, reason: text || `worker ${res.status}` };
+      return { online: false as const, reason: text.slice(0, 100) || `worker ${res.status}` };
     }
     const info = await res.json();
     return { online: true as const, ...info };
