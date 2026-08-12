@@ -1,38 +1,34 @@
-# O que falta hoje no VaiViral
+# Autosave de sessão + Biblioteca de resultados
 
-Panorama depois de olhar o código: as ferramentas (ViralBatch, CorteIA, LimpaVídeo, Legendas, Monitora Live, Agenda) já funcionam bem isoladamente. O que falta é a camada de "produto": nada sobrevive a um F5, não existe plano/cobrança, e a fila roda só enquanto a aba está aberta.
+Duas entregas: (1) o lote nunca mais se perde ao recarregar ou fechar a aba; (2) uma página com tudo que já foi gerado, para baixar de novo quando quiser.
 
-## Lacunas encontradas
+## 1. Autosave e retomada do lote
 
-**1. Perda de trabalho ao recarregar (mais crítico)**
-A lista de vídeos e a fila vivem só na memória da página (`src/routes/index.tsx`, `src/lib/jobs.ts` — nenhuma persistência local). Fechou a aba, perdeu o lote inteiro: arquivos importados, cortes gerados, edições e resultados prontos. Já existem tabelas `projects`/`batches` na nuvem, mas não há salvamento automático nem retomada.
+Hoje a lista de vídeos, cortes, edições e status vive só na memória da página — um F5 apaga tudo. O registro na nuvem (`projects`) já existe, mas não guarda os arquivos de vídeo e não é acionado sozinho.
 
-**2. Sem plano, limite ou cobrança**
-Existe página de vendas (`/vendas`) com preços, mas não existe assinatura, contador de uso, nem bloqueio por limite. Qualquer conta usa GPU e exportação à vontade — inviável cobrar assim.
+O que muda:
 
-**3. Sem histórico de trabalhos**
-Não há uma tela "meus vídeos/meus jobs" com o que foi processado, quando, quanto tempo levou e link para baixar de novo. Hoje o download só existe no instante em que termina.
+- **Salvamento contínuo, sem clicar em nada.** A cada mudança relevante (importar vídeo, gerar cortes, editar no Estúdio, terminar um render) o lote é gravado em segundo plano, com espera curta para não pesar.
+- **O que é guardado:** os arquivos de vídeo importados, os cortes gerados (início/fim, score, título), as edições do Estúdio (crop, cor, legendas, anti-duplicidade), o template em uso, o status de cada item e os MP4 já prontos.
+- **Retomada ao voltar:** ao abrir a ferramenta, se houver sessão anterior, aparece uma faixa no topo: "Você tem um lote de 34 vídeos de ontem às 20:12 — Retomar / Começar novo". Retomar recoloca a lista exatamente como estava, com os prontos já baixáveis.
+- **Aviso ao sair no meio:** se houver render em andamento, o navegador pergunta antes de fechar.
+- **Sessão por ferramenta:** ViralBatch, CorteIA e LimpaVídeo mantêm lotes separados, cada um retoma o seu.
+- **Controle de espaço:** um botão "Descartar sessão" limpa tudo, e sessões com mais de 7 dias são apagadas sozinhas para não encher o disco.
 
-**4. Processamento preso ao navegador**
-Cortes, legendas e exportação MP4 rodam na aba. Lote grande = máquina travada por horas e nada continua se o usuário fecha. Só o LimpaVídeo (GPU) roda fora.
+## 2. Biblioteca de resultados
 
-**5. Onboarding inexistente**
-Ao entrar, a tela pede que a pessoa já saiba o que é template, anti-duplicidade e score. Falta um primeiro caminho guiado ("cole um link → escolha o estilo → baixe 10 cortes").
+Nova página **Biblioteca** no menu, listando tudo que já foi exportado.
 
-**6. Ferramentas ainda pouco conectadas**
-Existe handoff, mas não um fluxo natural do tipo "limpou a marca d'água → mandar para cortes → legendar → exportar" em um clique só.
-
-## Onde eu começaria (ordem sugerida)
-
-1. **Autosave + retomar sessão** — salvar o lote (itens, cortes, edições, status) e recarregar automaticamente ao voltar. Resolve a dor mais concreta.
-2. **Biblioteca de resultados** — página com tudo já processado e download novamente.
-3. **Planos e limites** — assinatura, contagem de minutos/exportações, bloqueio suave com aviso.
-4. **Fila que continua fora da aba** — mover exportação pesada para o worker GPU já existente.
-5. **Onboarding em 3 passos** na primeira visita.
+- Grade com miniatura, nome do arquivo, ferramenta de origem, duração, tamanho e data.
+- Filtros por ferramenta (cortes, lote, limpeza) e busca por nome.
+- Ações: baixar de novo, baixar vários em ZIP, mandar de volta para o Estúdio para reeditar, e apagar.
+- Itens gerados no navegador ficam disponíveis enquanto estiverem na sessão local; itens processados na GPU e os que forem enviados para a nuvem ficam disponíveis de qualquer dispositivo, com aviso de expiração.
+- Estado vazio explicando como gerar o primeiro vídeo.
 
 ## Detalhes técnicos
 
-- Autosave: gravar snapshot do estado de `Home` (itens sem os arquivos binários + preEdit/clip/captions) em IndexedDB para os arquivos e em `projects` (Supabase) para os metadados, com debounce; ao montar, oferecer "retomar lote anterior".
-- Biblioteca: usar a tabela `exports` já existente + Storage bucket para os MP4 finais, com expiração.
-- Planos: tabela `subscriptions` + `usage_events`, checagem em server function antes de disparar job GPU/exportação; integração de pagamento a definir.
-- Fila fora da aba: estender o worker do CleanerIA para aceitar jobs de render/legenda, reaproveitando o callback em `src/routes/api/public/cleaner-callback.ts`.
+- **Persistência local:** novo `src/lib/session.ts` usando IndexedDB (sem dependência nova, API nativa) com duas stores — `blobs` (File/Blob dos vídeos e dos resultados) e `sessions` (snapshot serializável dos itens, referenciando blobs por chave). Debounce de ~1,5s, gravação também no `visibilitychange`.
+- **Snapshot:** reaproveitar/estender `ProjectSnapshot` em `src/lib/cloud.ts` (adicionar `preEdit`, `status`, `clipTitle`, `resultKey`); espelhar os metadados em `projects` via `saveProject(mode, "sessão", snap)` quando houver login, para retomar em outro dispositivo (sem os binários).
+- **Retomada:** hook `useSessionRestore(mode)` chamado no `Home` de `src/routes/index.tsx`; a faixa de retomada é um componente próprio, sem restaurar automaticamente para não sobrescrever um lote novo.
+- **Biblioteca:** nova rota `src/routes/biblioteca.tsx` com `head()` próprio, unindo três fontes — resultados locais do IndexedDB, linhas de `exports` (histórico já registrado por `logExports`) e `cleaner_jobs` com `result_url`. Sem migração de banco nesta etapa; o upload opcional dos MP4 para Storage entra depois, se você quiser download entre dispositivos.
+- **Reeditar:** reutilizar o `handoff` existente (`src/lib/handoff.ts`) para mandar um item da Biblioteca para o Estúdio.
