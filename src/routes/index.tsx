@@ -1528,6 +1528,10 @@ function Home() {
             fsAccess={fsAccessSupported()}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            onEdit={(id) => {
+              setSelectedId(id);
+              setStudioId(id);
+            }}
             onProcess={(ids) => void processAll(ids)}
             onTogglePause={togglePause}
             onCancel={cancelAll}
