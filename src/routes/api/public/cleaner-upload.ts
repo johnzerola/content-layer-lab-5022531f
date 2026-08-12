@@ -24,14 +24,29 @@ export const Route = createFileRoute("/api/public/cleaner-upload")({
           if (!base) return new Response("worker offline", { status: 503 });
 
           const contentType = request.headers.get("content-type") || "";
-          let body: any;
+          
+          // O motor GPU espera multipart/form-data. Se recebermos binário bruto (stream),
+          // precisamos envolver em FormData.
+          let body: any = request.body;
+          let headers: Record<string, string> = {
+            "x-job-token": token,
+          };
+
+          if (!contentType.includes("multipart/form-data")) {
+            const formData = new FormData();
+            const blob = await request.blob();
+            formData.append("file", blob, "video.mp4");
+            body = formData;
+            // O fetch definirá o boundary correto para o FormData
+          } else {
+            // Se já for form-data, repassamos o header original (com o boundary)
+            headers["content-type"] = contentType;
+          }
 
           const upstream = await fetch(`${base}/v1/jobs/${jobId}/upload`, {
             method: "POST",
-            headers: {
-              "x-job-token": token,
-            },
-            body: request.body,
+            headers,
+            body,
             // @ts-ignore
             duplex: 'half'
           });
