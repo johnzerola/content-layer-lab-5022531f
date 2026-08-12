@@ -449,7 +449,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           onPointerMove={onMove}
           onPointerUp={onUp}
           onDoubleClick={() => tool === "poly" && finishPolygon()}
-          className={`panel relative aspect-video overflow-hidden rounded-2xl border border-border/60 bg-black touch-none ${
+          className={`panel relative aspect-video overflow-hidden rounded-2xl border border-border/60 bg-black touch-none z-0 ${
             tool === "select" ? "cursor-default" : tool === "erase" ? "cursor-pointer" : "cursor-crosshair"
           }`}
         >
@@ -458,7 +458,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             src={job?.status === "completed" && job.result_url ? job.result_url : src}
             controls={job?.status === "completed"}
             playsInline
-            className="absolute inset-0 size-full object-contain"
+            className="absolute inset-0 size-full object-contain z-0 pointer-events-none"
             onLoadedMetadata={(e) => setDuration(e.currentTarget.duration || 0)}
             onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
           />
