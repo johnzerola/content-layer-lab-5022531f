@@ -89,6 +89,16 @@ export function AuthGate({ children }: { children: ReactNode }) {
             Criar conta
           </Button>
         </div>
+        <button
+          onClick={() => {
+            setEmail("teste@vaiviral.com");
+            setPassword("123456");
+            toast.info("Dados de teste preenchidos. Clique em 'Entrar'.");
+          }}
+          className="w-full text-center text-[10px] text-muted-foreground underline hover:text-primary transition-colors"
+        >
+          Usar login de teste
+        </button>
       </div>
     </div>
   );
