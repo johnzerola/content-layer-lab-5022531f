@@ -149,7 +149,7 @@ function Dashboard() {
 
                 <div className="mt-8 pt-8 border-t border-border w-full flex flex-col items-center gap-4">
                   <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/60">
-                    tudo roda no navegador - nenhum vídeo sai da sua máquina
+                    este projeto tá conectado no github? se sim tá em qual?
                   </p>
                 </div>
             </div>
