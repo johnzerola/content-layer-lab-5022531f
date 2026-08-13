@@ -152,11 +152,9 @@ function Dashboard() {
                     '''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''
                                         
                                             
-                                            Sincronize este projeto com o último commit da branch main do GitHub.
+                                            O preview ficou com o bloco hero/dashboard duplicado. Remova a duplicação visual mantendo apenas uma seção principal do ViralBatch antes da área de upload.
 
-O GitHub é a fonte principal agora. Puxe/aplique o commit mais recente da branch main e atualize o preview para ficar igual ao repositório.
-
-Não reescreva a integração CleanerIA/VPS. Preserve:
+Preserve todas as integrações técnicas existentes do CleanerIA/VPS:
 
 - upload direto para a VPS com fallback proxy
 
@@ -164,11 +162,13 @@ Não reescreva a integração CleanerIA/VPS. Preserve:
 
 - token v2 sem cache antigo
 
-- modo Legenda por recorte limpo
+- CleanerIA usando modo Legenda por recorte limpo
 
 - Melhorar qualidade ativado
 
 - cleanupCleanerRemoteJob após download
+
+Não altere arquivos de backend nem funções de CleanerIA. Faça apenas ajuste visual/layout para remover o card duplicado no dashboard.
                   </p>
                 </div>
             </div>
