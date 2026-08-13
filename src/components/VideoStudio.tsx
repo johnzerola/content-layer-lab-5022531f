@@ -1675,11 +1675,12 @@ export function VideoStudio({
               </div>
             )}
           </div>
-        </div>
+        </aside>
       </div>
     </div>
   );
 }
+
 
 
 
