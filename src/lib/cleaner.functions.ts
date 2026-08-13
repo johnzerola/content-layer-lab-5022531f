@@ -49,23 +49,44 @@ export const startCleanerJob = createServerFn({ method: "POST" })
       throw new Error("Cleaner configuration missing");
     }
 
-    // Fallback: Tentamos /v1/process se /v1/clean falhar, mas o padrão mais comum para ProPainter-API é /process
-    const endpoint = `${workerUrl}/process`; 
-    
-    const resp = await fetch(endpoint, {
+    // O worker usa um fluxo de duas etapas: 1. Criar Job/Upload, 2. Processar.
+    // Primeiro, tentamos resolver a URL para ver se já é conhecida ou criar um novo job de importação.
+    const resolveEndpoint = `${workerUrl}/v1/media/resolve`;
+    const resolveResp = await fetch(resolveEndpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${secret}`,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ url: data.videoUrl }),
     });
 
-    if (!resp.ok) {
-      const errorText = await resp.text();
-      throw new Error(`Worker error: ${errorText.slice(0, 100)}`);
+    if (!resolveResp.ok) {
+      const errorText = await resolveResp.text();
+      throw new Error(`Media resolution failed: ${errorText.slice(0, 100)}`);
     }
 
-    return resp.json();
+    const { job_id } = await resolveResp.json();
+
+    // Agora iniciamos o processamento
+    const processEndpoint = `${workerUrl}/v1/jobs/${job_id}/process`;
+    const processResp = await fetch(processEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${secret}`,
+      },
+      body: JSON.stringify({
+        regions: data.regions,
+        options: data.options,
+      }),
+    });
+
+    if (!processResp.ok) {
+      const errorText = await processResp.text();
+      throw new Error(`Process start failed: ${errorText.slice(0, 100)}`);
+    }
+
+    return { job_id };
   });
 
