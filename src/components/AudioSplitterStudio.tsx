@@ -7,7 +7,7 @@ import { startJob, updateJob, finishJob, failJob } from "@/lib/jobs";
 
 interface Props {
   file: File;
-  onComplete?: (voice: Blob, music: Blob) => void;
+  onComplete?: (voice: Blob, music: Blob, voiceUrl: string, musicUrl: string) => void;
 }
 
 export function AudioSplitterStudio({ file, onComplete }: Props) {
@@ -34,7 +34,7 @@ export function AudioSplitterStudio({ file, onComplete }: Props) {
       finishJob(jobId, "Áudio separado");
       toast.success("Áudio separado com sucesso!");
       
-      if (onComplete) onComplete(voice, music);
+      if (onComplete) onComplete(voice, music, voiceUrl, musicUrl);
     } catch (error) {
       console.error(error);
       setProcessing(false);

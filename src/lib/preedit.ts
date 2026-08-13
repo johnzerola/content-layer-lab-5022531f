@@ -84,6 +84,14 @@ export interface PreEdit {
   antiDupSeed?: string;
   /** legenda específica para este vídeo */
   captionStyle?: Partial<import("./template").CaptionStyle>;
+  /** trilhas de áudio externas (substituição/mixagem) */
+  audioTracks?: {
+    voice?: string; // blob URL
+    music?: string; // blob URL
+    voiceVolume: number; // 0..1
+    musicVolume: number; // 0..1
+    originalVolume: number; // 0..1
+  };
 }
 
 export function defaultPreEdit(): PreEdit {

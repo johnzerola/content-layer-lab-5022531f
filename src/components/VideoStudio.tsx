@@ -29,6 +29,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
+import { AudioSplitterStudio } from "@/components/AudioSplitterStudio";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -103,7 +104,7 @@ type Drag = {
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text" | "antidup";
+type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text" | "antidup" | "audio";
 
 const TOOL_GROUPS: { group: string; items: { id: Tab; label: string; icon: typeof Scissors }[] }[] = [
   {
@@ -124,11 +125,11 @@ const TOOL_GROUPS: { group: string; items: { id: Tab; label: string; icon: typeo
     ],
   },
   {
-    group: "Estilo & IA",
+    group: "Som & Estilo",
     items: [
+      { id: "audio", label: "Áudio", icon: AudioLines },
       { id: "caps", label: "Legenda", icon: Subtitles },
       { id: "antidup", label: "Anti-duplicidade", icon: Repeat },
-      { id: "color", label: "Cores", icon: SlidersHorizontal },
     ],
   },
   {
@@ -234,6 +235,7 @@ export function VideoStudio({
       transOut: { ...defaults.transOut, ...(saved?.transOut ?? {}) },
       ...(saved?.antiDup ? { antiDup: { ...saved.antiDup } } : {}),
       ...(saved?.captionStyle ? { captionStyle: { ...saved.captionStyle } } : {}),
+      ...(saved?.audioTracks ? { audioTracks: { ...saved.audioTracks } } : {}),
     };
   }, [value.pre]);
   const hist = useEditorHistory<Doc>({
@@ -1548,6 +1550,87 @@ export function VideoStudio({
                     Sem legenda ainda. Gere a transcrição no painel de legendas e volte aqui para corrigir
                     palavras e tempos.
                   </p>
+                )}
+              </div>
+            )}
+
+            {tab === "audio" && (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AudioLines className="size-4 text-primary" />
+                    <span className="font-bold text-xs">Mixagem de Trilhas</span>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <Field label={`Volume Original · ${Math.round((pre.audioTracks?.originalVolume ?? 1) * 100)}%`}>
+                      <Slider
+                        value={[pre.audioTracks?.originalVolume ?? 1]}
+                        min={0}
+                        max={1.5}
+                        step={0.05}
+                        onValueChange={([v]) => set({ audioTracks: { ...pre.audioTracks, originalVolume: v ?? 1, voiceVolume: pre.audioTracks?.voiceVolume ?? 1, musicVolume: pre.audioTracks?.musicVolume ?? 1 } }, "volume original")}
+                      />
+                    </Field>
+
+                    <Field label={`Volume Voz IA · ${Math.round((pre.audioTracks?.voiceVolume ?? 1) * 100)}%`}>
+                      <Slider
+                        value={[pre.audioTracks?.voiceVolume ?? 1]}
+                        min={0}
+                        max={1.5}
+                        step={0.05}
+                        disabled={!pre.audioTracks?.voice}
+                        onValueChange={([v]) => setPre((prev) => ({ ...prev, audioTracks: { ...prev.audioTracks, voiceVolume: v ?? 1, voice: prev.audioTracks?.voice, music: prev.audioTracks?.music, musicVolume: prev.audioTracks?.musicVolume ?? 1, originalVolume: prev.audioTracks?.originalVolume ?? 1 } as NonNullable<PreEdit["audioTracks"]> }), "volume voz")}
+                      />
+                    </Field>
+
+                    <Field label={`Volume Trilha IA · ${Math.round((pre.audioTracks?.musicVolume ?? 1) * 100)}%`}>
+                      <Slider
+                        value={[pre.audioTracks?.musicVolume ?? 1]}
+                        min={0}
+                        max={1.5}
+                        step={0.05}
+                        disabled={!pre.audioTracks?.music}
+                        onValueChange={([v]) => setPre((prev) => ({ ...prev, audioTracks: { ...prev.audioTracks, musicVolume: v ?? 1, voice: prev.audioTracks?.voice, music: prev.audioTracks?.music, voiceVolume: prev.audioTracks?.voiceVolume ?? 1, originalVolume: prev.audioTracks?.originalVolume ?? 1 } as NonNullable<PreEdit["audioTracks"]> }), "volume trilha")}
+                      />
+                    </Field>
+                  </div>
+
+                  {pre.audioTracks?.voice && (
+                    <div className="pt-2">
+                       <Button variant="ghost" size="sm" className="w-full text-[10px]" onClick={() => setPre((v) => { const next = { ...v }; delete next.audioTracks; return next; }, "remover trilhas")}>
+                         Remover trilhas externas
+                       </Button>
+                    </div>
+                  )}
+                </div>
+
+                {!pre.audioTracks?.voice && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[11px] text-muted-foreground">Isolamento via FFmpeg</span>
+                      <Sparkles className="size-3.5 text-primary" />
+                    </div>
+                    <p className="font-mono text-[10px] text-muted-foreground leading-relaxed">
+                      Separe voz e música deste vídeo para ajustar volumes de forma independente.
+                    </p>
+                    <div className="mt-2">
+                      <AudioSplitterStudio 
+                        file={file} 
+                        onComplete={(vBlob, mBlob, vUrl, mUrl) => {
+                          set({ 
+                            audioTracks: { 
+                              voice: vUrl, 
+                              music: mUrl, 
+                              voiceVolume: 1, 
+                              musicVolume: 1, 
+                              originalVolume: 0 
+                            } 
+                          }, "separação de áudio");
+                        }} 
+                      />
+                    </div>
+                  </div>
                 )}
               </div>
             )}

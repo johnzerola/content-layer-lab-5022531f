@@ -111,14 +111,14 @@ async function pickAudioCodec(channels: number, sampleRate: number): Promise<"aa
 }
 
 async function decodeAudio(
-  file: File,
+  file: File | string,
   segments: { start: number; end: number }[],
   speed: number,
   pitchCents = 0,
   eqDb = 0,
 ) {
   try {
-    const buf = await file.arrayBuffer();
+    const buf = typeof file === "string" ? await (await fetch(file)).arrayBuffer() : await file.arrayBuffer();
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ac = new Ctx();
     const decoded = await ac.decodeAudioData(buf);
@@ -177,6 +177,63 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
   const W = t.canvasW ?? CANVAS_W;
   const H = t.canvasH ?? CANVAS_H;
   const v = opts.variation;
+  const pre = opts.pre;
+
+  const audio = await (async () => {
+    const segments = keptSegments(pre, opts.clip, opts.file.size ? undefined : 0); // fallback segments
+    // Simplificado: usa a lógica de decodeAudio existente
+    const baseAudio = await decodeAudio(opts.file, segments, v.speed, v.pitch, v.eq);
+    
+    if (pre?.audioTracks && (pre.audioTracks.voice || pre.audioTracks.music)) {
+      const Ctx = window.AudioContext ?? (window as any).webkitAudioContext;
+      const ac = new Ctx();
+      const dur = segmentsDuration(segments);
+      const outLen = Math.max(1, Math.floor((dur / v.speed) * 48000));
+      const off = new OfflineAudioContext(baseAudio?.channels ?? 2, outLen, 48000);
+      
+      // Original
+      if (baseAudio && pre.audioTracks.originalVolume > 0) {
+        const s = off.createBufferSource();
+        s.buffer = baseAudio.rendered;
+        const g = off.createGain();
+        g.gain.value = pre.audioTracks.originalVolume;
+        s.connect(g).connect(off.destination);
+        s.start(0);
+      }
+      
+      // Voz IA
+      if (pre.audioTracks.voice && pre.audioTracks.voiceVolume > 0) {
+        const vData = await decodeAudio(pre.audioTracks.voice, [{ start: 0, end: dur }], 1);
+        if (vData) {
+          const s = off.createBufferSource();
+          s.buffer = vData.rendered;
+          const g = off.createGain();
+          g.gain.value = pre.audioTracks.voiceVolume;
+          s.connect(g).connect(off.destination);
+          s.start(0);
+        }
+      }
+      
+      // Trilha IA
+      if (pre.audioTracks.music && pre.audioTracks.musicVolume > 0) {
+        const mData = await decodeAudio(pre.audioTracks.music, [{ start: 0, end: dur }], 1);
+        if (mData) {
+          const s = off.createBufferSource();
+          s.buffer = mData.rendered;
+          const g = off.createGain();
+          g.gain.value = pre.audioTracks.musicVolume;
+          s.connect(g).connect(off.destination);
+          s.start(0);
+        }
+      }
+      
+      const res = await off.startRendering();
+      void ac.close();
+      return { rendered: res, channels: res.numberOfChannels, sampleRate: res.sampleRate };
+    }
+    
+    return baseAudio;
+  })();
 
   const picked = await pickVideoCodec(W, H, bitrate, fps);
   if (!picked) throw new Error("Codificação de vídeo não suportada neste navegador");
@@ -214,15 +271,62 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     // defeituosos deixam decodeAudioData pendurado indefinidamente; nesse caso
     // continuamos com o vídeo, em vez de deixar o lote parado em 0% por horas.
     opts.onProgress?.(0.005);
-    const audio = await withTimeout(
-      decodeAudio(opts.file, segments, v.speed, v.pitch, v.eq),
-      Math.min(60_000, Math.max(20_000, effDur * 250)),
-      "A faixa de áudio não pôde ser preparada",
-    ).catch((error) => {
+    const audio = await (async () => {
+      const base = await withTimeout(
+        decodeAudio(opts.file, segments, v.speed, v.pitch, v.eq),
+        Math.min(60_000, Math.max(20_000, effDur * 250)),
+        "A faixa de áudio não pôde ser preparada",
+      ).catch((err) => {
+        console.warn("Áudio base ignorado:", err);
+        return null;
+      });
 
-      console.warn("Áudio ignorado para evitar bloqueio da exportação:", error);
-      return null;
-    });
+      if (opts.pre?.audioTracks && (opts.pre.audioTracks.voice || opts.pre.audioTracks.music)) {
+        const Ctx = window.AudioContext ?? (window as any).webkitAudioContext;
+        const ac = new Ctx();
+        const sampleRate = 48000;
+        const outLen = Math.max(1, Math.floor(outDur * sampleRate));
+        const off = new OfflineAudioContext(base?.channels ?? 2, outLen, sampleRate);
+        
+        if (base && opts.pre.audioTracks.originalVolume > 0) {
+          const s = off.createBufferSource();
+          s.buffer = base.rendered;
+          const g = off.createGain();
+          g.gain.value = opts.pre.audioTracks.originalVolume;
+          s.connect(g).connect(off.destination);
+          s.start(0);
+        }
+        
+        if (opts.pre.audioTracks.voice && opts.pre.audioTracks.voiceVolume > 0) {
+          const vData = await decodeAudio(opts.pre.audioTracks.voice, [{ start: 0, end: effDur }], 1).catch(() => null);
+          if (vData) {
+            const s = off.createBufferSource();
+            s.buffer = vData.rendered;
+            const g = off.createGain();
+            g.gain.value = opts.pre.audioTracks.voiceVolume;
+            s.connect(g).connect(off.destination);
+            s.start(0);
+          }
+        }
+        
+        if (opts.pre.audioTracks.music && opts.pre.audioTracks.musicVolume > 0) {
+          const mData = await decodeAudio(opts.pre.audioTracks.music, [{ start: 0, end: effDur }], 1).catch(() => null);
+          if (mData) {
+            const s = off.createBufferSource();
+            s.buffer = mData.rendered;
+            const g = off.createGain();
+            g.gain.value = opts.pre.audioTracks.musicVolume;
+            s.connect(g).connect(off.destination);
+            s.start(0);
+          }
+        }
+        
+        const rendered = await off.startRendering();
+        void ac.close();
+        return { rendered, channels: rendered.numberOfChannels, sampleRate: rendered.sampleRate };
+      }
+      return base;
+    })();
     const audioCodec = audio ? await pickAudioCodec(audio.channels, audio.sampleRate) : null;
 
     const muxer = new Muxer({
@@ -374,7 +478,9 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     encoder.close();
 
     if (audio && audioCodec) {
-      const { rendered, channels, sampleRate } = audio;
+      const rendered = audio.rendered;
+      const channels = audio.channels;
+      const sampleRate = audio.sampleRate;
       const AudioEnc = window.AudioEncoder;
       if (AudioEnc) {
         const aenc = new AudioEnc({
