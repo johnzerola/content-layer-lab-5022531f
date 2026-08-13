@@ -952,6 +952,7 @@ export function VideoStudio({
 
             <ScrollArea className="flex-1">
               <div className="space-y-6 p-4">
+
                 {tab === "camera" && (
                   <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border py-12 text-center">
                     <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
