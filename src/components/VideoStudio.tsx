@@ -30,6 +30,18 @@ import {
   Type,
   Undo2,
   X,
+  Plus,
+  Trash2,
+  History,
+  Layers,
+  ArrowRight,
+  Monitor,
+  Maximize,
+  Volume2,
+  Timer,
+  Palette,
+  Captions,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -59,6 +71,12 @@ import { EditorTimeline } from "@/components/EditorTimeline";
 import { StagePreview } from "@/components/editor/StagePreview";
 import { useEditorHistory } from "@/components/editor/useEditorHistory";
 import type { CaptionCue } from "@/lib/captions";
+import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export interface PreEditResult {
   pre: PreEdit;
