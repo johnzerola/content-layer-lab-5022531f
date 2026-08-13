@@ -39,6 +39,10 @@ class ApiSecurityTests(unittest.TestCase):
     def service_token(self) -> str:
         return create_service_token(SETTINGS.worker_secret, "media", 300)
 
+    def setUp(self):
+        ACTIVE_JOBS.discard(JOB_ID)
+        shutil.rmtree(Path(TEMPORARY.name) / JOB_ID, ignore_errors=True)
+
     @patch("app.main.resolve_public_media")
     def test_media_resolver_requires_service_token(self, resolver):
         resolver.return_value = {
@@ -104,6 +108,37 @@ class ApiSecurityTests(unittest.TestCase):
             files={"file": ("video.mp4", b"test", "video/mp4")},
         )
         self.assertEqual(repeated.status_code, 409)
+
+    @patch("app.main.shutil.disk_usage")
+    @patch("app.main._validate_video")
+    def test_raw_upload_and_input_confirmation(self, validate_video, disk_usage):
+        disk_usage.return_value = shutil._ntuple_diskusage(200 * 1024**3, 10 * 1024**3, 190 * 1024**3)
+        validate_video.return_value = {
+            "width": 1280,
+            "height": 720,
+            "fps": 30,
+            "duration": 2,
+            "frames": 60,
+            "has_audio": True,
+        }
+        uploaded = self.client.post(
+            f"/v1/jobs/{JOB_ID}/upload",
+            headers={
+                "x-job-token": self.token("upload"),
+                "x-file-size": "4",
+                "x-file-name": "clip.mp4",
+                "content-type": "video/mp4",
+            },
+            content=b"test",
+        )
+        confirmed = self.client.get(
+            f"/v1/jobs/{JOB_ID}/input",
+            headers={"x-job-token": self.token("control")},
+        )
+        self.assertEqual(uploaded.status_code, 200)
+        self.assertEqual(confirmed.status_code, 200)
+        self.assertTrue(confirmed.json()["exists"])
+        self.assertEqual(confirmed.json()["size"], 4)
 
     def test_result_requires_result_scope(self):
         directory = Path(TEMPORARY.name) / JOB_ID

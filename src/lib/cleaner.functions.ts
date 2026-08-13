@@ -13,6 +13,7 @@ import {
   workerDelete,
   workerDetect,
   workerHealth,
+  workerInputStatus,
   workerProcess,
   workerStatus,
 } from "@/lib/cleaner.server";
@@ -90,6 +91,30 @@ export const listCleanerJobs = createServerFn({ method: "GET" })
       .limit(50);
     if (error) throw new Error(error.message);
     return (data ?? []) as unknown as CleanerJob[];
+  });
+
+export const confirmCleanerUpload = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .validator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireOwnedJob(context.supabase, context.userId, data.id);
+    const input = await workerInputStatus(data.id);
+    if (!input.exists || input.size < 1) throw new Error("video nao chegou ao motor; reenvie o arquivo");
+    const { data: row, error } = await context.supabase
+      .from("cleaner_jobs")
+      .update({
+        status: "uploaded",
+        stage: "enviado e verificado",
+        progress: 0,
+        probe: (input.probe ?? null) as never,
+        error: null,
+      })
+      .eq("id", data.id)
+      .eq("user_id", context.userId)
+      .select("*")
+      .single();
+    if (error) throw new Error(error.message);
+    return row as unknown as CleanerJob;
   });
 
 export const deleteCleanerJob = createServerFn({ method: "POST" })

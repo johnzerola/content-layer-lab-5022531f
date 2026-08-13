@@ -10,6 +10,7 @@ import shutil
 import threading
 import time
 from typing import Deque, Dict, List, Literal, Optional
+from urllib.parse import unquote
 
 from fastapi import BackgroundTasks, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -233,9 +234,10 @@ async def resolve_media(
 async def upload_video(
     request: Request,
     job_id: str,
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
     x_job_token: Optional[str] = Header(None),
     x_file_size: Optional[int] = Header(None),
+    x_file_name: Optional[str] = Header(None),
 ):
     verify_token(job_id, x_job_token, "upload")
     if x_file_size is not None and (x_file_size < 1 or x_file_size > SETTINGS.max_upload_bytes):
@@ -243,8 +245,14 @@ async def upload_video(
     content_length = _positive_header(request.headers.get("content-length"))
     if content_length > SETTINGS.max_upload_bytes + 2 * 1024 * 1024:
         raise HTTPException(413, "arquivo excede o limite configurado")
-    suffix = Path(file.filename or "").suffix.lower()
-    content_type = (file.content_type or "application/octet-stream").lower()
+    raw_upload = file is None
+    filename = unquote((x_file_name or "video.mp4")[:500]) if raw_upload else (file.filename or "")
+    suffix = Path(filename).suffix.lower()
+    content_type = (
+        request.headers.get("content-type", "application/octet-stream")
+        if raw_upload
+        else (file.content_type or "application/octet-stream")
+    ).split(";", 1)[0].lower()
     if suffix not in VIDEO_SUFFIXES or content_type not in VIDEO_TYPES:
         raise HTTPException(415, "formato de video nao permitido")
 
@@ -265,7 +273,15 @@ async def upload_video(
     size = 0
     try:
         with temporary.open("wb") as buffer:
-            while chunk := await file.read(1024 * 1024):
+            if raw_upload:
+                chunks = request.stream()
+            else:
+                async def multipart_chunks():
+                    while chunk := await file.read(1024 * 1024):
+                        yield chunk
+
+                chunks = multipart_chunks()
+            async for chunk in chunks:
                 size += len(chunk)
                 if size > SETTINGS.max_upload_bytes:
                     raise HTTPException(413, "arquivo excede o limite configurado")
@@ -279,7 +295,8 @@ async def upload_video(
         temporary.unlink(missing_ok=True)
         raise
     finally:
-        await file.close()
+        if file is not None:
+            await file.close()
 
     state = _set_state(job_id, {
         "status": "uploaded",
@@ -292,6 +309,21 @@ async def upload_video(
     return {"ok": True, "file_id": state["file_id"], "size": size, "probe": metadata}
 
 
+@app.get("/v1/jobs/{job_id}/input")
+async def input_status(job_id: str, x_job_token: Optional[str] = Header(None)):
+    verify_token(job_id, x_job_token, "control")
+    directory = job_dir(SETTINGS.storage_dir, job_id)
+    input_path = directory / "input.mp4"
+    state = {**read_state(directory), **JOBS.get(job_id, {})}
+    exists = input_path.is_file()
+    return {
+        "exists": exists,
+        "size": input_path.stat().st_size if exists else 0,
+        "probe": state.get("probe"),
+        "file_id": state.get("file_id"),
+    }
+
+
 @app.post("/v1/jobs/{job_id}/detect")
 async def detect(job_id: str, req: DetectRequest, x_job_token: Optional[str] = Header(None)):
     verify_token(job_id, x_job_token, "control")
@@ -299,7 +331,10 @@ async def detect(job_id: str, req: DetectRequest, x_job_token: Optional[str] = H
         raise HTTPException(409, "video ainda nao foi enviado")
     from .workers.tasks import auto_detect
 
-    regions = auto_detect(job_id, req.mode)
+    try:
+        regions = auto_detect(job_id, req.mode)
+    except Exception as exc:
+        raise HTTPException(422, f"falha ao detectar areas: {str(exc)[:300]}") from None
     _set_state(job_id, {"status": "uploaded", "detections": regions})
     return {"regions": regions}
 

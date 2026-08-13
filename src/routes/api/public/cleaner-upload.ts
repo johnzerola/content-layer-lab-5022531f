@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { workerPublicBase } from "@/lib/cleaner.server";
 
+// Fallback for clients that cannot reach the worker directly. The request body
+// remains streamed; the worker accepts this raw form as well as multipart.
 export const Route = createFileRoute("/api/public/cleaner-upload")({
   server: {
     handlers: {
@@ -20,19 +22,21 @@ export const Route = createFileRoute("/api/public/cleaner-upload")({
           const contentLength = Number(request.headers.get("content-length") ?? "0");
           if (
             (claimedSize > 0 && claimedSize > maxBytes) ||
-            (contentLength > 0 && contentLength > maxBytes + 2 * 1024 * 1024)
+            (contentLength > 0 && contentLength > maxBytes)
           ) {
             return new Response("payload too large", { status: 413 });
           }
 
           const base = workerPublicBase();
           if (!base) return new Response("worker offline", { status: 503 });
+          const fileName = request.headers.get("x-file-name");
           const upstream = await fetch(`${base}/v1/jobs/${jobId}/upload`, {
             method: "POST",
             headers: {
               "content-type": request.headers.get("content-type") || "application/octet-stream",
               "x-job-token": token,
               ...(claimedSize > 0 ? { "x-file-size": String(claimedSize) } : {}),
+              ...(fileName ? { "x-file-name": fileName.slice(0, 500) } : {}),
             },
             body: request.body,
           });

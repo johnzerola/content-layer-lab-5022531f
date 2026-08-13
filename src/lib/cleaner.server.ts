@@ -209,6 +209,13 @@ export async function workerDetect(jobId: string, mode: string, roi?: CleanerReg
   });
 }
 
+export async function workerInputStatus(jobId: string) {
+  return call<{ exists: boolean; size: number; probe?: unknown; file_id?: string | null }>(
+    `/v1/jobs/${jobId}/input`,
+    { jobId },
+  );
+}
+
 export async function workerProcess(input: {
   jobId: string;
   mode: string;

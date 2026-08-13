@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import {
   cleanerHealth,
+  confirmCleanerUpload,
   createCleanerJob,
   detectCleanerJob,
   processCleanerJob,
@@ -53,6 +54,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [job, setJob] = useState<CleanerJob | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
+  const [inputReady, setInputReady] = useState(false);
   const [mode, setMode] = useState<CleanerMode>("subtitle");
   const [preset, setPreset] = useState<CleanerPreset>("quality");
   const [dynamicMask, setDynamicMask] = useState(true);
@@ -79,6 +81,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const polyPoints = useRef<{ x: number; y: number }[]>([]);
 
   const getHealth = useServerFn(cleanerHealth);
+  const confirmUpload = useServerFn(confirmCleanerUpload);
   const createJob = useServerFn(createCleanerJob);
   const detectJob = useServerFn(detectCleanerJob);
   const processJob = useServerFn(processCleanerJob);
@@ -317,6 +320,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       return;
     }
     setUploading(true);
+    setInputReady(false);
     try {
       const headers = await cloudAuthHeaders();
       const { job: newJob, upload } = (await createJob({
@@ -342,11 +346,13 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           new Promise<void>((resolve, reject) => {
             const formData = new FormData();
             formData.append("file", item.file);
+            const isProxy = url.includes("/api/public/cleaner-upload");
             const xhr = new XMLHttpRequest();
             xhr.open("POST", url);
             xhr.timeout = 15 * 60 * 1000;
             xhr.setRequestHeader("x-job-token", upload.token);
             xhr.setRequestHeader("x-file-size", String(item.file.size));
+            xhr.setRequestHeader("x-file-name", encodeURIComponent(item.file.name).slice(0, 500));
             xhr.upload.onprogress = (ev) => {
               if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
             };
@@ -356,33 +362,43 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 : reject(new Error(`${xhr.status} ${xhr.responseText || "falha no envio"}`));
             xhr.onerror = () => reject(new Error("rede-bloqueada"));
             xhr.ontimeout = () => reject(new Error("tempo esgotado no envio"));
-            xhr.send(formData);
+            xhr.send(isProxy ? item.file : formData);
           });
 
         // rota alternativa pela própria origem, para redes que bloqueiam o domínio do motor
         const proxyUrl = `/api/public/cleaner-upload?job=${encodeURIComponent(newJob.id)}`;
 
+        let confirmed: CleanerJob | null = null;
+        const verifyUpload = async () =>
+          (await confirmUpload({ data: { id: newJob.id }, headers })) as CleanerJob;
+
         try {
           await send(secureUrl);
         } catch (first) {
-          setUploadProgress(0);
-          await new Promise((r) => setTimeout(r, 1000));
           try {
-            await send(proxyUrl);
-          } catch (second) {
-            throw new Error(
-              `${
-                first instanceof Error && first.message === "rede-bloqueada"
-                  ? `sua rede não alcança ${new URL(secureUrl).host}`
-                  : first instanceof Error
-                    ? first.message
-                    : "falha"
-              } — via servidor também falhou (${second instanceof Error ? second.message : "erro"})`,
-            );
+            confirmed = await verifyUpload();
+          } catch {
+            setUploadProgress(0);
+            await new Promise((r) => setTimeout(r, 1000));
+            try {
+              await send(proxyUrl);
+            } catch (second) {
+              try {
+                confirmed = await verifyUpload();
+              } catch {
+                throw new Error(
+                  `${first instanceof Error ? first.message : "falha"}; fallback: ${
+                    second instanceof Error ? second.message : "erro"
+                  }`,
+                );
+              }
+            }
           }
         }
+        confirmed ??= await verifyUpload();
+        setJob(confirmed);
+        setInputReady(true);
       }
-      setJob((prev) => (prev ? { ...prev, status: "queued", progress: 0 } : prev));
       toast.success("Vídeo enviado. Detecte as áreas ou marque à mão.");
     } catch (e) {
       toast.error(`Erro no upload: ${e instanceof Error ? e.message : "desconhecido"}`);
@@ -392,6 +408,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   };
 
   const handleDetect = async () => {
+    if (!inputReady) {
+      toast.error("O vídeo ainda não foi confirmado no motor. Reenvie o arquivo.");
+      return;
+    }
     // Primeiro salva as máscaras atuais para garantir persistência antes da detecção
     if (masks.length > 0 && job?.id) {
       const headers = await cloudAuthHeaders();
@@ -417,6 +437,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
   const handleProcess = async () => {
     if (!job?.id) return;
+    if (!inputReady) {
+      toast.error("O vídeo ainda não foi confirmado no motor. Reenvie o arquivo.");
+      return;
+    }
     if (!masks.length) {
       toast.error("Marque ao menos uma área ou use Detectar.");
       return;
@@ -858,13 +882,13 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             ))}
           </div>
 
-          {!job ? (
+          {!job || !inputReady ? (
             <Button
               className="w-full shadow-glow"
               onClick={startUpload}
               disabled={!health?.online || uploading}
             >
-              <Upload className="mr-2 size-4" /> Enviar para GPU
+              <Upload className="mr-2 size-4" /> {job ? "Reenviar vídeo" : "Enviar para IA"}
             </Button>
           ) : job.status === "completed" ? (
             <a
@@ -880,11 +904,15 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 variant="outline"
                 className="w-full"
                 onClick={handleDetect}
-                disabled={polling}
+                disabled={polling || !inputReady}
               >
                 <Target className="mr-2 size-4" /> Detectar
               </Button>
-              <Button className="w-full shadow-glow" onClick={handleProcess} disabled={polling}>
+              <Button
+                className="w-full shadow-glow"
+                onClick={handleProcess}
+                disabled={polling || !inputReady}
+              >
                 <Sparkles className="mr-2 size-4" /> Remover
               </Button>
             </div>
