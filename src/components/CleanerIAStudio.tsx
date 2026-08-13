@@ -1069,7 +1069,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             <Button className="w-full shadow-glow" onClick={startUpload} disabled={!health?.online || uploading}>
               <Upload className="mr-2 size-4" />
               {autoMode
-                ? "'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            analise limpai veja se ta funcionando 100% desde concado a vps a versão atualizada etc"
+                ? "'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            cria um login de teste por favor"
                 : "Enviar para GPU"}
             </Button>
           ) : job.status === "completed" ? (
