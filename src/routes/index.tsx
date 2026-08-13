@@ -83,9 +83,9 @@ function Dashboard() {
   const restoreSnapshot = (s: any) => {};
 
   return (
-    <AppShell mode={mode} onMode={setMode} count={items.length} onLibrary={() => setLibraryOpen(true)} onCloud={() => setCloudOpen(true)}>
+    <AppShell mode={mode} onMode={setMode} count={items.length} counts={{ limpar: items.filter(it => it.mode === 'limpar').length }} onLibrary={() => setLibraryOpen(true)} onCloud={() => setCloudOpen(true)}>
       <div className="mx-auto max-w-7xl p-6">
-        {mode !== "clip" ? (
+        {mode === "lote" && (
           <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
             <section className="panel space-y-4 p-5">
               {selected ? (
@@ -173,7 +173,9 @@ function Dashboard() {
               </div>
             </section>
           </div>
-        ) : (
+        )}
+
+        {mode === "clip" && (
           <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
             <section className="panel p-5">
               <p className="mb-4 font-semibold">Cortes Automáticos</p>
@@ -202,6 +204,24 @@ function Dashboard() {
                  ))}
               </div>
             </section>
+          </div>
+        )}
+
+        {mode === "limpar" && selected && (
+          <div className="w-full">
+            <CleanerIAStudio 
+              item={selected} 
+              onComplete={(url) => {
+                setItems(p => p.map(x => x.id === selected.id ? { ...x, status: 'pronto', result: url } : x));
+              }} 
+            />
+          </div>
+        )}
+
+        {mode === "limpar" && !selected && (
+          <div className="flex h-96 flex-col items-center justify-center rounded-2xl border-2 border-dashed border-border bg-surface-1 p-10 text-center">
+            <Eraser className="mb-4 size-10 text-primary/50" />
+            <p className="text-muted-foreground">Adicione um vídeo na aba Nuvem ou Lote para limpar</p>
           </div>
         )}
 
