@@ -15,10 +15,11 @@ import {
   HardDrive,
   Radio,
   Film,
-
+  Music,
 } from "lucide-react";
 
-export type AppMode = "lote" | "clip" | "limpar" | "cleaner";
+export type AppMode = "lote" | "clip" | "limpar" | "cleaner" | "audio";
+
 
 type ModeDef = {
   id: AppMode;
@@ -93,7 +94,22 @@ export const MODES: ModeDef[] = [
     icon: Radio,
     badge: Sparkle,
   },
+  {
+    id: "audio",
+    label: "AudioSplit",
+    hint: "separar voz e música",
+    brand: "AudioSplit",
+    mark: "AS",
+    tagline: "isolamento de trilha",
+    headline: "Separe Voz e Música com Precisão",
+    description:
+      "Extraia diálogos e remova trilhas sonoras de fundo. Ideal para dublagem, limpeza de áudio e criação de novos conteúdos.",
+    chips: ["FFmpeg.wasm", "Isolamento de voz", "Extração HQ", "Privacidade total"],
+    icon: Music,
+    badge: Sparkle,
+  },
 ];
+
 
 interface Props {
   mode: AppMode;
