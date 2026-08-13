@@ -155,7 +155,7 @@ export function VideoStudio({
              <Button variant="ghost" size="sm" onClick={() => setPre(defaultPreEdit())}><RotateCcw className="mr-1 size-3" /> '''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''
                                         
                                             
-                                            Adicione uma edição de legendas com estilo, posição e sincronização para cada clipe no editor.</Button>
+                                            nada aqui funciona</Button>
             <Button variant="ghost" size="icon" onClick={onClose}><X className="size-4" /></Button>
             <Button size="sm" onClick={() => onSave({ pre, clip })}>Concluir</Button>
           </div>
