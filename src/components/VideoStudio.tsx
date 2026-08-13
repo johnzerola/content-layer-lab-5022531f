@@ -655,10 +655,10 @@ export function VideoStudio({
             </p>
           </div>
           <div className="flex items-center gap-1.5">
-            <Button variant="ghost" size="icon" disabled={!hist.canUndo} onClick={undo} aria-label="Desfazer">
+            <Button variant="ghost" size="icon" disabled={!hist.canUndo} onClick={() => hist.undo()} aria-label="Desfazer">
               <Undo2 className="size-4" />
             </Button>
-            <Button variant="ghost" size="icon" disabled={!hist.canRedo} onClick={redo} aria-label="Refazer">
+            <Button variant="ghost" size="icon" disabled={!hist.canRedo} onClick={() => hist.redo()} aria-label="Refazer">
               <Redo2 className="size-4" />
             </Button>
             <Button
