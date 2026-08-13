@@ -59,6 +59,7 @@ export const startCleanerJob = createServerFn({ method: "POST" })
         "Content-Type": "application/json",
         "Authorization": `Bearer ${secret}`,
         "X-Service-Token": secret,
+        "X-Access-Key": secret,
       },
       body: JSON.stringify({ url: data.videoUrl }),
     });
@@ -78,6 +79,7 @@ export const startCleanerJob = createServerFn({ method: "POST" })
         "Content-Type": "application/json",
         "Authorization": `Bearer ${secret}`,
         "X-Job-Token": secret,
+        "X-Access-Key": secret,
       },
       body: JSON.stringify({
         mode: data.options.mode,
