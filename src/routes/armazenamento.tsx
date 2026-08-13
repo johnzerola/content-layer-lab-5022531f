@@ -20,7 +20,7 @@ export const Route = createFileRoute("/armazenamento")({
       {
         name: "description",
         content:
-          "'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            usaro ver a pagina de vendas se interresa faz o login ou cadastro e usa o sistema",
+          "'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            cria um login de teste por favor",
       },
       { property: "og:title", content: "Armazenamento e versões de templates — VaiViral" },
       {
