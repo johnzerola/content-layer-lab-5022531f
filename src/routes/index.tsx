@@ -155,19 +155,29 @@ function Dashboard() {
               <aside className="space-y-4">
                  <div className="panel p-4 space-y-4">
                     <div className="flex items-center justify-between">
-                       <h4 className="font-bold text-sm">Fila ({items.length})</h4>
-                       <Button variant="ghost" size="icon" className="size-8 text-destructive" onClick={() => setItems([])}>
+                       <h4 className="font-bold text-sm tracking-tight">Fila ({items.length})</h4>
+                       <Button variant="ghost" size="icon" className="size-8 text-destructive/70 hover:text-destructive hover:bg-destructive/10" onClick={() => setItems([])}>
                           <Trash2 className="size-4" />
                        </Button>
                     </div>
                     <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                        {items.map(it => (
-                         <div key={it.id} onClick={() => setSelectedId(it.id)} className={cn("p-2 rounded-lg border border-border bg-surface-2 cursor-pointer hover:border-primary/50 transition", selectedId === it.id && "border-primary bg-primary/5")}>
-                            <p className="text-xs truncate font-medium">{it.file.name}</p>
+                         <div 
+                          key={it.id} 
+                          onClick={() => setSelectedId(it.id)} 
+                          className={cn(
+                            "group p-3 rounded-xl border border-border/60 bg-surface-2 cursor-pointer hover:border-primary/50 transition relative overflow-hidden", 
+                            selectedId === it.id && "border-primary bg-primary/5 shadow-[0_0_15px_rgba(34,197,94,0.05)]"
+                          )}
+                         >
+                            <p className="text-xs truncate font-semibold leading-none mb-1">{it.file.name}</p>
+                            <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-widest">Pendente</p>
+                            {selectedId === it.id && <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary" />}
                          </div>
                        ))}
                     </div>
-                    <Button className="w-full shadow-glow" onClick={() => setRunning(true)}>
+                    <Button className="w-full shadow-glow h-11" onClick={() => setRunning(true)}>
+                       <Sparkles className="size-4 mr-2" />
                        Processar Tudo
                     </Button>
                  </div>
