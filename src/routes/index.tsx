@@ -149,26 +149,7 @@ function Dashboard() {
 
                 <div className="mt-8 pt-8 border-t border-border w-full flex flex-col items-center gap-4">
                   <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/60">
-                    '''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''
-                                        
-                                            
-                                            O preview ficou com o bloco hero/dashboard duplicado. Remova a duplicação visual mantendo apenas uma seção principal do ViralBatch antes da área de upload.
-
-Preserve todas as integrações técnicas existentes do CleanerIA/VPS:
-
-- upload direto para a VPS com fallback proxy
-
-- watchdog de upload travado
-
-- token v2 sem cache antigo
-
-- CleanerIA usando modo Legenda por recorte limpo
-
-- Melhorar qualidade ativado
-
-- cleanupCleanerRemoteJob após download
-
-Não altere arquivos de backend nem funções de CleanerIA. Faça apenas ajuste visual/layout para remover o card duplicado no dashboard.
+                    tudo roda no navegador - nenhum vídeo sai da sua máquina
                   </p>
                 </div>
             </div>
