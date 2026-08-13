@@ -18,6 +18,8 @@ import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
 import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { CloudPanel } from "@/components/CloudPanel";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
+import { getCleanerHealth } from "@/lib/cleaner.functions";
+
 import { 
   createTemplate, 
   defaultCaptions,
