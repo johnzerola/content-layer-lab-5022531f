@@ -37,7 +37,8 @@ export const startCleanerJob = createServerFn({ method: "POST" })
     videoUrl: z.string(),
     regions: z.array(cleanerRegionSchema),
     options: z.object({
-      mode: z.enum(["auto", "manual"]),
+      mode: z.enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"]),
+      preset: z.enum(["fast", "quality", "max"]).optional(),
       upscale: z.boolean().optional(),
     }),
   }).parse(data))
