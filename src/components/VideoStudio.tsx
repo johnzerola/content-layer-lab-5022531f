@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import {
   Scissors,
   Play,
@@ -15,14 +15,18 @@ import {
   RotateCcw,
   Undo2,
   Redo2,
+  Sparkles,
+  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { EditorTimeline } from "./EditorTimeline";
 import { StagePreview } from "./editor/StagePreview";
+import { CaptionStudio } from "./CaptionStudio";
 import { toast } from "sonner";
 import { type Template, createTemplate } from "@/lib/template";
 import { type PreEdit, defaultPreEdit } from "@/lib/preedit";
+import { generateCaptions, type CaptionCue } from "@/lib/captions";
 
 interface VideoStudioProps {
   file: File;
@@ -46,7 +50,7 @@ export function VideoStudio({
   width,
   height,
   duration: initialDuration,
-  captions,
+  captions: initialCaptions,
   onCaptionsChange,
   texts,
   onTextsChange,
@@ -62,6 +66,9 @@ export function VideoStudio({
   const [view, setView] = useState<"src" | "out">("out");
   const [pre, setPre] = useState<PreEdit>(initial?.pre || defaultPreEdit());
   const [compare, setCompare] = useState(false);
+
+  const [localCaptions, setLocalCaptions] = useState<CaptionCue[]>(initialCaptions || []);
+  const [transcribing, setTranscribing] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -80,6 +87,22 @@ export function VideoStudio({
       v.removeEventListener("timeupdate", onTime);
     };
   }, [initial]);
+
+  const onTranscribe = async () => {
+    if (transcribing) return;
+    setTranscribing(true);
+    const tid = toast.loading("Gerando legendas com IA...");
+    try {
+      const res = await generateCaptions(file, { clip });
+      setLocalCaptions(res);
+      onCaptionsChange?.(res);
+      toast.success("Legendas geradas com sucesso!", { id: tid });
+    } catch (err) {
+      toast.error(String(err), { id: tid });
+    } finally {
+      setTranscribing(false);
+    }
+  };
 
   const seek = (t: number) => {
     if (videoRef.current) videoRef.current.currentTime = t;
@@ -132,7 +155,7 @@ export function VideoStudio({
              <Button variant="ghost" size="sm" onClick={() => setPre(defaultPreEdit())}><RotateCcw className="mr-1 size-3" /> '''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''
                                         
                                             
-                                            continua</Button>
+                                            Adicione uma edição de legendas com estilo, posição e sincronização para cada clipe no editor.</Button>
             <Button variant="ghost" size="icon" onClick={onClose}><X className="size-4" /></Button>
             <Button size="sm" onClick={() => onSave({ pre, clip })}>Concluir</Button>
           </div>
@@ -181,6 +204,7 @@ export function VideoStudio({
                     clip={clip}
                     bypass={compare}
                     className="h-full"
+                    captions={localCaptions}
                   />
                 )}
               </div>
@@ -207,6 +231,7 @@ export function VideoStudio({
                 onTrim={(s, e) => setClip({ start: s, end: e })}
                 keys={pre.keys}
                 segments={pre.segments}
+                cues={localCaptions}
                 onKeysChange={keys => setPatch({ keys })}
                 onAddKey={() => {}}
               />
@@ -226,6 +251,49 @@ export function VideoStudio({
                     <span className="text-[11px] font-bold text-muted-foreground uppercase">Fim: {clip.end.toFixed(2)}s</span>
                     <Slider value={[clip.end]} max={duration} step={0.1} onValueChange={([v]) => setClip(c => ({ ...c, end: v ?? duration }))} />
                   </div>
+                </div>
+              )}
+              {tab === "captions" && (
+                <div className="space-y-4">
+                  {!localCaptions?.length ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
+                      <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Wand2 className="size-6 text-primary" />
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-bold">Sem legendas</p>
+                        <p className="text-[11px] text-muted-foreground">Clique abaixo para gerar legendas automáticas usando IA.</p>
+                      </div>
+                      <Button 
+                        onClick={onTranscribe} 
+                        disabled={transcribing}
+                        className="w-full bg-primary text-primary-foreground shadow-glow-sm"
+                      >
+                        {transcribing ? "Transcrevendo..." : "Gerar Legendas IA"}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="w-full border-primary/20 hover:border-primary/50 text-[10px] h-7 uppercase font-black"
+                        onClick={onTranscribe}
+                        disabled={transcribing}
+                      >
+                        Refazer Legendas
+                      </Button>
+                      
+                      <CaptionStudio
+                        style={pre.captionStyle as any}
+                        onChange={patch => setPre(p => ({
+                          ...p,
+                          captionStyle: { ...p.captionStyle, ...patch }
+                        }))}
+                        cues={localCaptions}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
               {tab === "color" && (
