@@ -1449,9 +1449,15 @@ export function VideoStudio({
                           <Music className="h-3 w-3 text-blue-400" />
                           <span>Música de Fundo</span>
                         </div>
-                        <span className="font-mono">100%</span>
+                        <span className="font-mono">{pre.musicLevel ?? 100}%</span>
                       </div>
-                      <Slider defaultValue={[100]} max={100} step={1} />
+                      <Slider
+                        value={[pre.musicLevel ?? 100]}
+                        max={150}
+                        step={1}
+                        onValueChange={([v]) => set({ musicLevel: v ?? 100 }, "volume da música")}
+                      />
+
                     </div>
                   </div>
 
