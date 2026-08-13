@@ -218,8 +218,26 @@ export function VideoStudio({
   onClose,
   onSave,
 }: Props) {
+  // Sessões e itens criados por versões anteriores podem conter somente parte
+  // do PreEdit. Hidrate todas as coleções antes do primeiro render para que o
+  // editor nunca tente chamar find/filter/map em campos ausentes.
+  const initialPre = useMemo<PreEdit>(() => {
+    const defaults = defaultPreEdit();
+    const saved = value.pre;
+    return {
+      ...defaults,
+      ...saved,
+      crop: saved?.crop ?? defaults.crop,
+      keys: Array.isArray(saved?.keys) ? saved.keys : [],
+      segments: Array.isArray(saved?.segments) ? saved.segments : [],
+      transIn: { ...defaults.transIn, ...(saved?.transIn ?? {}) },
+      transOut: { ...defaults.transOut, ...(saved?.transOut ?? {}) },
+      antiDup: saved?.antiDup ? { ...saved.antiDup } : undefined,
+      captionStyle: saved?.captionStyle ? { ...saved.captionStyle } : undefined,
+    };
+  }, [value.pre]);
   const hist = useEditorHistory<Doc>({
-    pre: value.pre ?? defaultPreEdit(),
+    pre: initialPre,
     start: value.clip?.start ?? 0,
     end: value.clip?.end ?? duration,
   });

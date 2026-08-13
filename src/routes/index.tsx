@@ -27,6 +27,7 @@ import {
   orientationOf,
 } from "@/lib/template";
 import { cn } from "@/lib/utils";
+import { defaultPreEdit } from "@/lib/preedit";
 
 export const Route = createFileRoute("/")({
   component: Dashboard,
@@ -321,7 +322,7 @@ function Dashboard() {
             height={studioItem.h}
             duration={studioItem.duration}
             value={{
-              pre: studioItem.preEdit ?? { trim: { start: 0, end: studioItem.duration }, crop: { x: 0, y: 0, w: 1, h: 1 }, speed: 1, mirror: false },
+              pre: studioItem.preEdit ?? defaultPreEdit(),
               clip: studioItem.clip ?? null,
             }}
             captions={studioItem.captions}
