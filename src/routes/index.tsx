@@ -84,33 +84,8 @@ function Dashboard() {
       onCloud={() => setCloudOpen(true)}
     >
       <div className="flex-1 flex flex-col items-center">
-        {/* HERO SECTION */}
-        <div className="w-full max-w-4xl px-4 py-8">
-          <div className="relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-surface-2 to-surface p-8 shadow-xl">
-             <div className="flex items-start justify-between gap-6">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-primary font-mono text-xs uppercase tracking-wider">
-                     <Sparkles className="size-4" />
-                     {current?.brand} · Ferramenta Independente
-                  </div>
-                  <h1 className="text-4xl font-display font-bold tracking-tight text-foreground">
-                    {current?.headline}
-                  </h1>
-                  <p className="max-w-xl text-muted-foreground leading-relaxed">
-                    {current?.description}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                     {current?.chips.map(chip => (
-                       <span key={chip} className="px-3 py-1 rounded-full bg-background/50 border border-border font-mono text-[10px] text-muted-foreground">{chip}</span>
-                     ))}
-                  </div>
-                </div>
-                <div className="grid size-20 place-items-center shrink-0 rounded-2xl bg-primary/10 border border-primary/20 text-primary">
-                    {current?.icon && <current.icon className="size-8" />}
-                </div>
-             </div>
-          </div>
-        </div>
+        {/* HERO SECTION REMOVED TO PREVENT DUPLICATION */}
+
 
         {/* WORKFLOW AREA */}
         <div className="w-full max-w-4xl px-4 pb-12">
@@ -177,11 +152,9 @@ function Dashboard() {
                     '''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''
                                         
                                             
-                                            Sincronize este projeto com o último commit da branch main do GitHub.
+                                            O preview ficou com o bloco hero/dashboard duplicado. Remova a duplicação visual mantendo apenas uma seção principal do ViralBatch antes da área de upload.
 
-O GitHub é a fonte principal agora. Puxe/aplique o commit mais recente da branch main e atualize o preview para ficar igual ao repositório.
-
-Não reescreva a integração CleanerIA/VPS. Preserve:
+Preserve todas as integrações técnicas existentes do CleanerIA/VPS:
 
 - upload direto para a VPS com fallback proxy
 
@@ -189,11 +162,13 @@ Não reescreva a integração CleanerIA/VPS. Preserve:
 
 - token v2 sem cache antigo
 
-- modo Legenda por recorte limpo
+- CleanerIA usando modo Legenda por recorte limpo
 
 - Melhorar qualidade ativado
 
 - cleanupCleanerRemoteJob após download
+
+Não altere arquivos de backend nem funções de CleanerIA. Faça apenas ajuste visual/layout para remover o card duplicado no dashboard.
                   </p>
                 </div>
             </div>
