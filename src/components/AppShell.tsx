@@ -18,7 +18,7 @@ import {
 
 } from "lucide-react";
 
-export type AppMode = "lote" | "clip" | "limpar";
+export type AppMode = "lote" | "clip" | "limpar" | "cleaner";
 
 type ModeDef = {
   id: AppMode;
@@ -36,7 +36,7 @@ type ModeDef = {
   badge: typeof Sparkle;
 };
 
-const MODES: ModeDef[] = [
+export const MODES: ModeDef[] = [
   {
     id: "lote",
     label: "Lote com template",
@@ -79,6 +79,20 @@ const MODES: ModeDef[] = [
     icon: Eraser,
     badge: Droplets,
   },
+  {
+    id: "cleaner",
+    label: "CleanerIA",
+    hint: "remover textos via VPS",
+    brand: "CleanerIA",
+    mark: "CA",
+    tagline: "remoção profissional",
+    headline: "Remoção Profissional de Objetos e Textos",
+    description:
+      "Motor avançado ProPainter + PaddleOCR rodando em GPU externa para remoção perfeita de elementos indesejados sem perda de qualidade.",
+    chips: ["ProPainter GPU", "PaddleOCR", "Sem rastro", "Alta definição"],
+    icon: Radio,
+    badge: Sparkle,
+  },
 ];
 
 interface Props {
@@ -86,7 +100,7 @@ interface Props {
   onMode: (m: AppMode) => void;
   count: number;
   /** total de vídeos na fila de cada ferramenta (filas independentes) */
-  counts?: Partial<Record<AppMode, number>>;
+  counts?: Partial<Record<AppMode | "cleaner", number>>;
   onLibrary: () => void;
   onCloud: () => void;
   children: ReactNode;
@@ -108,7 +122,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
     <div className={`theme-${mode} flex min-h-dvh w-full bg-background`}>
       <aside
         className={`sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-border/70 bg-surface/60 backdrop-blur transition-[width] duration-300 md:flex ${
-          open ? "w-[16.5rem]" : "w-[4.5rem]"
+          open ? "w-[15rem]" : "w-[4.5rem]"
         }`}
       >
         <div className="flex items-center gap-3 px-4 py-5">
@@ -135,9 +149,9 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
                 onClick={() => onMode(m.id)}
                 title={m.brand}
                 aria-current={active ? "page" : undefined}
-                className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
+                className={`group flex items-center gap-3 rounded-xl px-3 py-2 text-left transition ${
                   active
-                    ? "bg-accent text-accent-foreground ring-1 ring-primary/30"
+                    ? "bg-primary/10 text-primary ring-1 ring-primary/20 shadow-[0_0_15px_rgba(34,197,94,0.05)]"
                     : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
                 }`}
               >
@@ -171,7 +185,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           <button
             onClick={onLibrary}
             title="Biblioteca de templates"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
           >
             <Library className="size-[18px] shrink-0" />
             {open && "Templates"}
@@ -179,7 +193,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           <Link
             to="/live"
             title="Monitora Live"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
           >
             <Radio className="size-[18px] shrink-0" />
             {open && "Monitora Live"}
@@ -187,7 +201,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           <Link
             to="/agenda"
             title="Agenda de postagens"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
           >
             <CalendarClock className="size-[18px] shrink-0" />
             {open && "Agenda"}
@@ -195,7 +209,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           <Link
             to="/biblioteca"
             title="Biblioteca de resultados"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
           >
             <Film className="size-[18px] shrink-0" />
             {open && "Resultados"}
@@ -203,7 +217,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           <Link
             to="/armazenamento"
             title="Armazenamento e versões"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
           >
             <HardDrive className="size-[18px] shrink-0" />
             {open && "Armazenamento"}
@@ -211,7 +225,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           <button
             onClick={onCloud}
             title="Nuvem"
-            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
           >
             <Cloud className="size-[18px] shrink-0" />
             {open && "Nuvem"}
@@ -222,7 +236,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           <button
             onClick={() => setOpen((v) => !v)}
             aria-label={open ? "Recolher menu" : "Expandir menu"}
-            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
           >
             {open ? <PanelLeftClose className="size-[18px]" /> : <PanelLeftOpen className="size-[18px]" />}
             {open && "Recolher"}
