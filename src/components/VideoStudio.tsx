@@ -1432,9 +1432,15 @@ export function VideoStudio({
                           <Mic className="h-3 w-3 text-primary" />
                           <span>Voz / Diálogo</span>
                         </div>
-                        <span className="font-mono">100%</span>
+                        <span className="font-mono">{pre.voiceLevel ?? 100}%</span>
                       </div>
-                      <Slider defaultValue={[100]} max={100} step={1} />
+                      <Slider
+                        value={[pre.voiceLevel ?? 100]}
+                        max={150}
+                        step={1}
+                        onValueChange={([v]) => set({ voiceLevel: v ?? 100 }, "volume da voz")}
+                      />
+
                     </div>
 
                     <div className="space-y-3">
