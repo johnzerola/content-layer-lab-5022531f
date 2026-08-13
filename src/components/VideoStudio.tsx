@@ -1073,7 +1073,9 @@ export function VideoStudio({
                   Duração final: {fmt(Math.max(0, outDur))}
                   {segs.length > 1 ? ` · ${segs.length} trechos` : ""}
                 </p>
-                )}
+                </div>
+              )}
+
 
 
 
