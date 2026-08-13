@@ -135,8 +135,8 @@ function Dashboard() {
                         input.accept = 'video/*';
                         input.onchange = (e: any) => {
                             const files = Array.from(e.target.files || []);
-                            if (files.length > 0) {
-                                Promise.all(files.map(f => {
+                             if (files.length > 0) {
+                                Promise.all(files.map((f: any) => {
                                   return new Promise<any>((resolve) => {
                                     const video = document.createElement('video');
                                     video.preload = 'metadata';
@@ -151,9 +151,9 @@ function Dashboard() {
                                         mode: mode === 'cleaner' ? 'limpar' : mode
                                       });
                                     };
-                                    video.src = URL.createObjectURL(f);
+                                    video.src = URL.createObjectURL(f as Blob);
                                   });
-                                })).then(newItems => {
+                                })).then((newItems: any[]) => {
                                   setItems(p => [...p, ...newItems]);
                                   if (!selectedId && newItems.length > 0) {
                                     setSelectedId(newItems[0].id);
