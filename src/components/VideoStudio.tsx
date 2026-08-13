@@ -103,7 +103,7 @@ type Drag = {
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text" | "antidup";
+type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text" | "antidup" | "audio";
 
 const TOOL_GROUPS: { group: string; items: { id: Tab; label: string; icon: typeof Scissors }[] }[] = [
   {
@@ -124,11 +124,11 @@ const TOOL_GROUPS: { group: string; items: { id: Tab; label: string; icon: typeo
     ],
   },
   {
-    group: "Estilo & IA",
+    group: "Som & Estilo",
     items: [
+      { id: "audio", label: "Áudio", icon: AudioLines },
       { id: "caps", label: "Legenda", icon: Subtitles },
       { id: "antidup", label: "Anti-duplicidade", icon: Repeat },
-      { id: "color", label: "Cores", icon: SlidersHorizontal },
     ],
   },
   {
