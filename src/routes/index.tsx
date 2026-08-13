@@ -17,6 +17,7 @@ import { CaptionTimeline } from "@/components/CaptionTimeline";
 import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
 import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { CloudPanel } from "@/components/CloudPanel";
+import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { 
   createTemplate, 
   defaultCaptions,
@@ -211,7 +212,7 @@ function Dashboard() {
           <div className="w-full">
             <CleanerIAStudio 
               item={selected} 
-              onComplete={(url) => {
+              onComplete={(url: string) => {
                 setItems(p => p.map(x => x.id === selected.id ? { ...x, status: 'pronto', result: url } : x));
               }} 
             />
