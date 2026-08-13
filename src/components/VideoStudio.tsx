@@ -1678,7 +1678,7 @@ export function VideoStudio({
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 
