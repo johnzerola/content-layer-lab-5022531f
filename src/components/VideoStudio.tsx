@@ -927,18 +927,31 @@ export function VideoStudio({
             />
           </section>
 
-          {/* inspetor */}
           <aside
-            className={`min-h-0 space-y-4 border-t border-border p-3 md:overflow-y-auto md:border-l md:border-t-0 ${
-              tab === "camera" ? "hidden md:block" : ""
-            }`}
+            className={cn(
+              "flex flex-col border-t border-border bg-surface/50 p-0 md:border-l md:border-t-0 md:overflow-hidden",
+              tab === "camera" ? "hidden md:flex" : "flex"
+            )}
           >
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-sm text-foreground">{toolLabel}</h3>
-              <span className="font-mono text-[10px] text-muted-foreground">
-                {TOOL_ORDER.indexOf(tab) + 1} · atalho
-              </span>
+            <div className="flex items-center justify-between border-b border-border p-4 bg-surface/80 backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-tighter opacity-70">
+                  Ajustes
+                </Badge>
+                <h3 className="font-display text-sm font-bold tracking-tight text-foreground">{toolLabel}</h3>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="size-8 rounded-full" onClick={() => hist.undo()} disabled={!hist.canUndo}>
+                  <Undo2 className="size-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="size-8 rounded-full" onClick={() => hist.redo()} disabled={!hist.canRedo}>
+                  <Redo2 className="size-4" />
+                </Button>
+              </div>
             </div>
+
+            <ScrollArea className="flex-1">
+              <div className="space-y-6 p-4">
 
             {tab === "camera" && (
               <p className="font-mono text-[11px] text-muted-foreground">
