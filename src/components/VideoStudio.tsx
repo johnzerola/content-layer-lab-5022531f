@@ -969,112 +969,70 @@ export function VideoStudio({
 
                 {tab === "trim" && (
                   <div className="space-y-4">
-
-
-
-                <Field label={`Início · ${fmt(start)}`}>
-                  <Slider
-                    value={[start]}
-                    min={0}
-                    max={Math.max(0.2, duration)}
-                    step={0.05}
-                    onValueChange={([v]) => {
-                      const s = Math.min(v ?? 0, end - 0.3);
-                      setStart(s);
-                      seek(s);
-                    }}
-                  />
-                </Field>
-                <Field label={`Fim · ${fmt(end)}`}>
-                  <Slider
-                    value={[end]}
-                    min={0}
-                    max={Math.max(0.2, duration)}
-                    step={0.05}
-                    onValueChange={([v]) => {
-                      const e = Math.max(v ?? duration, start + 0.3);
-                      setEnd(e);
-                      seek(Math.max(start, e - 0.5));
-                    }}
-                  />
-                </Field>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => setStart(Math.min(time, end - 0.3))}>
-                    Início aqui (I)
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => setEnd(Math.max(start + 0.3, time))}>
-                    Fim aqui (O)
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => hist.set((d) => ({ ...d, start: 0, end: duration }), "vídeo inteiro")}
-                  >
-                    Vídeo inteiro
-                  </Button>
-                </div>
-                <div className="space-y-2 rounded-lg border border-border p-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" variant="secondary" onClick={split}>
-                      <Scissors className="mr-1 size-3.5" /> Dividir aqui (S)
-                    </Button>
-                    {pre.segments.length > 0 && (
-                      <Button size="sm" variant="ghost" onClick={() => set({ segments: [] }, "juntar trechos")}>
-                        Juntar tudo
+                    <Field label={`Início · ${fmt(start)}`}>
+                      <Slider
+                        value={[start]}
+                        min={0}
+                        max={Math.max(0.2, duration)}
+                        step={0.05}
+                        onValueChange={([v]) => {
+                          const s = Math.min(v ?? 0, end - 0.3);
+                          setStart(s);
+                          seek(s);
+                        }}
+                      />
+                    </Field>
+                    <Field label={`Fim · ${fmt(end)}`}>
+                      <Slider
+                        value={[end]}
+                        min={0}
+                        max={Math.max(0.2, duration)}
+                        step={0.05}
+                        onValueChange={([v]) => {
+                          const e = Math.max(v ?? duration, start + 0.3);
+                          setEnd(e);
+                          seek(Math.max(start, e - 0.5));
+                        }}
+                      />
+                    </Field>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="secondary" size="sm" onClick={() => seek(start)}>
+                        Ir para início
                       </Button>
-                    )}
-                  </div>
-                  {segs.length > 1 ? (
-                    <ul className="space-y-1">
-                      {segs.map((s, i) => (
-                        <li
-                          key={`${i}-${s.start}`}
-                          className="flex items-center justify-between rounded-md border border-border px-2 py-1 font-mono text-[11px]"
-                        >
-                          <button className="text-primary" onClick={() => seek(s.start)}>
-                            {i + 1}. {fmt(s.start)} → {fmt(s.end)}
-                          </button>
-                          <span className="text-muted-foreground">{fmt(s.end - s.start)}</span>
-                          <button className="text-destructive" onClick={() => deleteSegment(i)}>
-                            remover
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
+                      <Button variant="secondary" size="sm" onClick={() => seek(end)}>
+                        Ir para fim
+                      </Button>
+                    </div>
+                    <Separator className="my-2 opacity-50" />
+                    <div className="space-y-2 rounded-lg border border-border p-2">
+                      <p className="font-mono text-[11px] text-foreground">Remover silêncio automaticamente</p>
+                      <Field label={`Sensibilidade · ${Math.round(sens * 100)}%`}>
+                        <Slider value={[sens]} min={0.1} max={0.95} step={0.05} onValueChange={([v]) => setSens(v ?? 0.5)} />
+                      </Field>
+                      <Field label={`Pausa mínima · ${minSil.toFixed(2)}s`}>
+                        <Slider
+                          value={[minSil]}
+                          min={0.15}
+                          max={1.5}
+                          step={0.05}
+                          onValueChange={([v]) => setMinSil(v ?? 0.35)}
+                        />
+                      </Field>
+                      <Button size="sm" variant="secondary" disabled={cutting} onClick={cutSilence}>
+                        <AudioLines className="mr-1 size-3.5" />
+                        {cutting ? "Analisando áudio…" : "Cortar pausas"}
+                      </Button>
+                      <p className="font-mono text-[10px] text-muted-foreground">
+                        Analisa o áudio e mantém só os trechos com fala — os trechos ficam editáveis na timeline.
+                      </p>
+                    </div>
                     <p className="font-mono text-[11px] text-muted-foreground">
-                      Divida o vídeo para remover partes do meio e exportar só os trechos bons.
+                      Duração final: {fmt(Math.max(0, outDur))}
+                      {segs.length > 1 ? ` · ${segs.length} trechos` : ""}
                     </p>
-                  )}
-                </div>
+                  </div>
+                )}
 
-                <div className="space-y-2 rounded-lg border border-border p-2">
-                  <p className="font-mono text-[11px] text-foreground">Remover silêncio automaticamente</p>
-                  <Field label={`Sensibilidade · ${Math.round(sens * 100)}%`}>
-                    <Slider value={[sens]} min={0.1} max={0.95} step={0.05} onValueChange={([v]) => setSens(v ?? 0.5)} />
-                  </Field>
-                  <Field label={`Pausa mínima · ${minSil.toFixed(2)}s`}>
-                    <Slider
-                      value={[minSil]}
-                      min={0.15}
-                      max={1.5}
-                      step={0.05}
-                      onValueChange={([v]) => setMinSil(v ?? 0.35)}
-                    />
-                  </Field>
-                  <Button size="sm" variant="secondary" disabled={cutting} onClick={cutSilence}>
-                    <AudioLines className="mr-1 size-3.5" />
-                    {cutting ? "Analisando áudio…" : "Cortar pausas"}
-                  </Button>
-                  <p className="font-mono text-[10px] text-muted-foreground">
-                    Analisa o áudio e mantém só os trechos com fala — os trechos ficam editáveis na timeline.
-                  </p>
-                </div>
-                <p className="font-mono text-[11px] text-muted-foreground">
-                  Duração final: {fmt(Math.max(0, outDur))}
-                  {segs.length > 1 ? ` · ${segs.length} trechos` : ""}
-                </p>
-              )}
 
 
 
