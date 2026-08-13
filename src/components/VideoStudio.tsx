@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AudioLines,
+  Music,
+  Mic,
   Camera,
   ChevronFirst,
   ChevronLast,
@@ -98,7 +100,7 @@ type Drag = {
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text";
+type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text" | "audio";
 
 const TOOL_GROUPS: { group: string; items: { id: Tab; label: string; icon: typeof Scissors }[] }[] = [
   {
@@ -123,6 +125,7 @@ const TOOL_GROUPS: { group: string; items: { id: Tab; label: string; icon: typeo
     items: [
       { id: "caps", label: "Legenda", icon: Subtitles },
       { id: "text", label: "Textos", icon: Type },
+      { id: "audio", label: "Áudio", icon: AudioLines },
     ],
   },
 ];
@@ -245,6 +248,7 @@ export function VideoStudio({
   const [cutting, setCutting] = useState(false);
   /** proporção travada do recorte (largura/altura em pixels da fonte) */
   const [lock, setLock] = useState<number | null>(null);
+  const [separating, setSeparating] = useState(false);
 
   const [url, setUrl] = useState("");
   useEffect(() => {
@@ -497,6 +501,24 @@ export function VideoStudio({
       setCutting(false);
     }
   };
+
+  const separateAudioTracks = async () => {
+    setSeparating(true);
+    try {
+      // Aqui chamaremos a função server-side ou worker quando integrada
+      toast.promise(
+        new Promise((resolve) => setTimeout(resolve, 2000)),
+        {
+          loading: "Analisando frequências e separando trilhas...",
+          success: "Áudio separado com sucesso! (Modo Simulação)",
+          error: "Erro ao processar áudio.",
+        }
+      );
+    } finally {
+      setSeparating(false);
+    }
+  };
+
 
   /** traduz a legenda mantendo os tempos por palavra */
   const translate = async () => {
@@ -1360,7 +1382,62 @@ export function VideoStudio({
               </div>
             )}
 
-            {tab === "color" && (
+              {tab === "audio" && (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Separar Áudio e Música</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Use nossa IA para isolar a voz da música de fundo automaticamente.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    <Button
+                      variant="outline"
+                      className="h-auto flex-col items-start gap-1 py-4 text-left"
+                      onClick={separateAudioTracks}
+                      disabled={separating}
+                    >
+                      <div className="flex items-center gap-2 font-semibold">
+                        <Sparkles className="h-4 w-4 text-primary" />
+                        <span>Separar com IA</span>
+                      </div>
+                      <span className="text-[10px] opacity-70">Detecta vozes e instrumentos de forma independente</span>
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Mixagem</h4>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <Mic className="h-3 w-3 text-primary" />
+                          <span>Voz / Diálogo</span>
+                        </div>
+                        <span className="font-mono">100%</span>
+                      </div>
+                      <Slider defaultValue={[100]} max={100} step={1} />
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <Music className="h-3 w-3 text-blue-400" />
+                          <span>Música de Fundo</span>
+                        </div>
+                        <span className="font-mono">100%</span>
+                      </div>
+                      <Slider defaultValue={[100]} max={100} step={1} />
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg bg-muted/30 p-3 text-[11px] leading-relaxed text-muted-foreground">
+                    Dica: Reduza a música para destacar a fala em vídeos com muito ruído ambiente.
+                  </div>
+                </div>
+              )}
+              {tab === "color" && (
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-1.5">
                   {COLOR_PRESETS.map((p) => (
