@@ -65,9 +65,14 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       // Para o MVP mantemos a simulação de fluxo mas chamando a infra.
       
       const job = await startCleanerJob({
-        video_url: "pending_upload_from_client", // Aqui integraria com upload real
-        mode: "auto",
-        webhook_url: "https://content-layer-lab.lovable.app/api/public/cleaner-webhook"
+        data: {
+          videoUrl: "pending_upload_from_client",
+          regions: [], // Vazio para modo auto
+          options: {
+            mode: "auto",
+            upscale: false
+          }
+        }
       });
 
       console.log("Job criado:", job);
