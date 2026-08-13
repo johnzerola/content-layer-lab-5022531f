@@ -16,7 +16,6 @@ export type Database = {
     Tables: {
       batches: {
         Row: {
-          callback_seq: number
           created_at: string
           failed: number
           id: string
@@ -29,7 +28,6 @@ export type Database = {
           videos: number
         }
         Insert: {
-          callback_seq?: number
           created_at?: string
           failed?: number
           id?: string
@@ -42,7 +40,6 @@ export type Database = {
           videos?: number
         }
         Update: {
-          callback_seq?: number
           created_at?: string
           failed?: number
           id?: string
