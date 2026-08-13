@@ -49,7 +49,10 @@ export const startCleanerJob = createServerFn({ method: "POST" })
       throw new Error("Cleaner configuration missing");
     }
 
-    const resp = await fetch(`${workerUrl}/v1/jobs`, {
+    // Fallback: Tentamos /v1/process se /v1/clean falhar, mas o padrão mais comum para ProPainter-API é /process
+    const endpoint = `${workerUrl}/process`; 
+    
+    const resp = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
