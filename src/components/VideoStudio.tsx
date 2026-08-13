@@ -1512,8 +1512,11 @@ export function VideoStudio({
                 <Field label={`Desfoque · ${pre.blur.toFixed(1)}px`}>
                   <Slider value={[pre.blur]} min={0} max={8} step={0.1} onValueChange={([v]) => set({ blur: v ?? 0 }, "cor")} />
                 </Field>
+                  </div>
+                )}
               </div>
             </ScrollArea>
+
 
 
 
