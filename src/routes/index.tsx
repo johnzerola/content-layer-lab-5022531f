@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { 
   Download, Wand2, X, Play, Pause, StopCircle, 
   Columns2, Crop, Copy, Trash2, Layout, Sparkles, 
-  Eraser, Radio, History, Database, Settings
+  Eraser, Radio, History, Database, Settings, Film
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
