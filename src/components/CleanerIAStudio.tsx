@@ -76,7 +76,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   };
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+    <div className="grid gap-6 xl:grid-cols-[1fr_300px]">
       <div className="min-w-0 space-y-4">
         <div className="relative aspect-video overflow-hidden rounded-2xl border border-border/60 bg-black/20 shadow-2xl">
           {item.poster && (
