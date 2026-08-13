@@ -19,9 +19,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { EditorTimeline } from "./EditorTimeline";
-import { StagePreview } from "./StagePreview";
+import { StagePreview } from "./editor/StagePreview";
 import { toast } from "sonner";
-import { type PreEdit, defaultPreEdit } from "@/lib/template";
+import { type Template, createTemplate } from "@/lib/template";
+import { type PreEdit, defaultPreEdit } from "@/lib/preedit";
 
 interface VideoStudioProps {
   file: File;
@@ -47,7 +48,7 @@ export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps
     if (!v) return;
     const onLoaded = () => {
       setDuration(v.duration);
-      if (!initial?.pre) setPre(p => ({ ...p, end: v.duration }));
+      if (!initial?.pre) setPre((p: PreEdit) => ({ ...p, end: v.duration }));
     };
     const onTime = () => setTime(v.currentTime);
     v.addEventListener("loadedmetadata", onLoaded);
@@ -70,7 +71,7 @@ export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps
     setPlaying(!playing);
   };
 
-  const setPatch = (patch: Partial<PreEdit>) => setPre(p => ({ ...p, ...patch }));
+  const setPatch = (patch: Partial<PreEdit>) => setPre((p: PreEdit) => ({ ...p, ...patch }));
 
   const TOOL_GROUPS = [
     {
