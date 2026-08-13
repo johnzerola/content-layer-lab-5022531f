@@ -10,15 +10,18 @@
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [k: string]: JsonValue };
 
-export type CleanerMode = "smart" | "subtitle" | "text" | "watermark" | "logo" | "object" | "passerby";
+export type CleanerMode =
+  "smart" | "subtitle" | "text" | "watermark" | "logo" | "object" | "passerby";
 export type CleanerPreset = "fast" | "quality" | "max";
 
 export type CleanerStatus =
   | "queued"
+  | "uploaded"
   | "uploading"
   | "analyzing"
   | "detecting"
   | "tracking"
+  | "processing"
   | "inpainting"
   | "refining"
   | "encoding"
@@ -27,9 +30,11 @@ export type CleanerStatus =
 
 export const CLEANER_STAGES: CleanerStatus[] = [
   "queued",
+  "uploaded",
   "analyzing",
   "detecting",
   "tracking",
+  "processing",
   "inpainting",
   "refining",
   "encoding",
@@ -38,10 +43,12 @@ export const CLEANER_STAGES: CleanerStatus[] = [
 
 export const STAGE_LABEL: Record<CleanerStatus, string> = {
   queued: "na fila",
+  uploaded: "enviado",
   uploading: "enviando",
   analyzing: "analisando",
   detecting: "detectando",
   tracking: "rastreando",
+  processing: "processando",
   inpainting: "reconstruindo",
   refining: "refinando",
   encoding: "codificando",
@@ -76,9 +83,9 @@ export const PRESET_LABEL: Record<CleanerPreset, string> = {
 };
 
 export const PRESET_HINT: Record<CleanerPreset, string> = {
-  fast: "STTN / contexto temporal curto — prévia rápida",
-  quality: "ProPainter, contexto padrão — equilíbrio recomendado",
-  max: "ProPainter + segundo passe de refino e validação temporal",
+  fast: "reconstrução temporal local — prévia rápida",
+  quality: "ProPainter oficial em 960 px — equilíbrio recomendado",
+  max: "DiffuEraser oficial + prior ProPainter — maior qualidade",
 };
 
 /** Retângulo/polígono normalizado (0..1) desenhado pelo usuário ou detectado. */
@@ -129,7 +136,7 @@ export interface CleanerMetrics {
   device?: string;
   /** número de frames processados */
   frames?: number;
-  /** engine que efetivamente processou (propainter, sttn, lama, temporal-fill) */
+  /** engine efetiva (diffueraser-official, propainter-official ou temporal-fill) */
   engine?: string;
   /** número de passes executados */
   passes?: number;

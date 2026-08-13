@@ -16,6 +16,15 @@ dist-ssr
 .nitro
 *.local
 
+# Python worker artifacts and AI model data
+__pycache__/
+*.py[cod]
+backend/.venv/
+backend/vendor/
+backend/models/
+backend/data/
+backend/storage/
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars

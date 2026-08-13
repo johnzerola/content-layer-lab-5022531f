@@ -1,66 +1,104 @@
-# Subir o worker GPU do CleanerIA (passo a passo)
+# CleanerIA: deploy de producao
 
-Sem esse worker, a rota `/limpar-ia` fica "offline" e a remoção de legenda
-dinâmica não acontece — só resta o modo leve do navegador, que falha com
-legenda karaokê.
+## Capacidade
 
-Escolha um provedor com GPU NVIDIA (mínimo 16 GB de VRAM para ProPainter;
-24 GB recomendado para 1080p).
+O preset `fast` funciona em CPU. `quality` exige uma GPU NVIDIA e os tres
+pesos oficiais do ProPainter. `max` exige GPU com mais VRAM e todos os modelos
+do DiffuEraser. A API informa a capacidade real em `/v1/health`; a interface
+nao oferece um preset cujo motor nao esteja pronto.
 
-## Opção A — RunPod (mais simples)
+Recomendacao minima:
 
-1. Crie a conta em runpod.io e vá em **Pods → Deploy**.
-2. GPU: RTX 4090 ou A5000. Template: **RunPod PyTorch 2.x (CUDA 12)**.
-3. Em *Expose HTTP Ports* coloque `8000`. Disco: 60 GB.
-4. Abra o terminal do pod e rode:
+- ProPainter: NVIDIA com 24 GB de VRAM;
+- DiffuEraser: NVIDIA com 40 GB de VRAM;
+- 70 GB livres para imagem, modelos e arquivos temporarios;
+- Docker Engine, Compose plugin, Caddy e NVIDIA Container Toolkit para GPU.
 
-```bash
-apt-get update && apt-get install -y ffmpeg git redis-server
-git clone <URL_DO_SEU_REPO> app && cd app/backend
-pip install -r requirements.txt
-python scripts/download_weights.py --all      # baixa ProPainter/STTN/LaMa
-export CLEANER_WORKER_SECRET="<gere-uma-senha-longa>"
-export USE_CELERY=0                            # começa sem fila
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
+## Limites padrao
 
-5. Teste: abra `https://<pod-id>-8000.proxy.runpod.net/v1/health` — deve
-   responder com a GPU e a lista de engines.
+| Controle | Padrao |
+| --- | ---: |
+| arquivo | 2 GB |
+| duracao | 3.600 segundos |
+| resolucao | 3840x2160 |
+| FPS | 60 |
+| quota do worker CPU | 50 GB |
+| espaco livre reservado | 10 GB |
+| retencao dos arquivos | 72 horas |
+| jobs pesados simultaneos | 1 |
+| requisicoes por IP | 120/minuto |
 
-Com fila (recomendado para vários jobs ao mesmo tempo):
+Todos os valores sao configuraveis pelas variaveis documentadas em
+`.env.example`. O limite e aplicado no navegador, no servidor do app, no Caddy
+e novamente durante o streaming do arquivo no worker.
 
-```bash
-redis-server --daemonize yes
-export USE_CELERY=1 REDIS_URL=redis://localhost:6379/0
-celery -A app.workers.tasks.celery_app worker --loglevel=info --concurrency=1 &
-uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
+## Deploy CPU seguro
 
-## Opção B — Docker em qualquer VPS com GPU
+Execute a partir de `backend/` depois que o SSH por chave estiver funcionando:
 
 ```bash
-cd backend
-docker build -t cleaner-worker .
-docker run --gpus all -p 8000:8000 \
-  -e CLEANER_WORKER_SECRET="<mesma-senha>" \
-  -v $PWD/models:/app/models \
-  cleaner-worker
+VPS_HOST=104.234.186.50 \
+APP_ORIGIN=https://seu-app.example \
+CLEANER_PUBLIC_HOST=cleaner-104-234-186-50.nip.io \
+bash scripts/deploy_cpu_vps.sh
 ```
 
-## Conectar no app
+O script:
 
-Depois que `/v1/health` responder, me passe a URL pública e eu configuro:
+1. preserva o segredo existente ou gera um segredo forte sem imprimi-lo;
+2. sobe a nova versao em `127.0.0.1:8096`;
+3. valida o health check antes da troca;
+4. configura Caddy com HTTPS e limite de corpo;
+5. fecha o container CleanerIA antigo publicado em `8095` somente apos sucesso.
 
-- `CLEANER_WORKER_URL` = `https://<sua-url>` (sem barra no fim)
-- `CLEANER_WORKER_SECRET` = a mesma senha do worker
-- `VITE_VIDEO_CLEANER_API_URL` = a mesma URL
+## Modelos GPU
 
-O worker manda o progresso de volta em
-`POST {PUBLIC_SITE_URL}/api/public/cleaner-callback`, assinado com HMAC-SHA256
-no header `x-signature`.
+Deploy completo, com teste de GPU/VRAM, download pinado, health check e troca
+atomica do proxy:
 
-## Custo aproximado
+```bash
+VPS_HOST=104.234.186.50 \
+APP_ORIGIN=https://seu-app.example \
+CLEANER_PUBLIC_HOST=cleaner-104-234-186-50.nip.io \
+bash scripts/deploy_gpu_vps.sh
+```
 
-RTX 4090 sob demanda custa cerca de US$ 0,40–0,70 por hora. Um vídeo vertical
-de 1 minuto em 1080p leva de 2 a 6 minutos no preset `quality`. Desligue o pod
-quando não estiver usando.
+Para uma instalacao manual:
+
+```bash
+mkdir -p data/models data/max-models data/storage
+python3 -m pip install "huggingface-hub==0.23.4"
+python3 scripts/install_propainter.py --weights-only --weights-dir data/models
+python3 scripts/install_diffueraser.py --models-only --models-root data/max-models
+docker compose -f docker-compose.gpu.yml up -d --build
+```
+
+Nao habilite `quality` enquanto `ai_ready` for falso, nem `max` enquanto
+`max_ready` for falso. O worker nao faz downgrade silencioso de qualidade.
+
+## Variaveis do app
+
+```env
+CLEANER_WORKER_URL=https://cleaner-104-234-186-50.nip.io
+CLEANER_WORKER_PUBLIC_URL=https://cleaner-104-234-186-50.nip.io
+CLEANER_WORKER_SECRET=mesmo valor de backend/.env
+PUBLIC_SITE_URL=https://seu-app.example
+CLEANER_MAX_UPLOAD_GB=2
+```
+
+O segredo nunca recebe prefixo `VITE_`. O navegador recebe somente um token
+temporario e restrito ao upload daquele UUID.
+
+## Checklist
+
+- `/docs` e `/openapi.json` retornam 404 em producao;
+- portas do worker escutam somente em `127.0.0.1`;
+- apenas `22`, `80` e `443` precisam estar publicas;
+- download sem token ou com token de upload retorna 401;
+- callback fora da origem permitida e recusado;
+- `npm audit --omit=dev` retorna zero vulnerabilidades;
+- a migracao Supabase mais recente foi aplicada;
+- a senha root exposta anteriormente foi trocada e SSH usa chave.
+
+O ProPainter usa a licenca NTU S-Lab 1.0, restrita a uso nao comercial sem
+autorizacao adicional. Use a remocao somente em conteudo proprio ou autorizado.

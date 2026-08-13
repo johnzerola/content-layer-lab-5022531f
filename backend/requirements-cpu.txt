@@ -1,19 +1,20 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 
-fastapi==0.104.1
-uvicorn==0.24.0
-python-multipart==0.0.6
-opencv-python-headless==4.8.1.78
+fastapi==0.141.1
+uvicorn==0.52.1
+python-multipart==0.0.32
+opencv-contrib-python==4.10.0.84
 numpy==1.26.2
 torch==2.1.1+cpu
 torchvision==0.16.1+cpu
 celery==5.3.4
 redis==5.0.1
-requests==2.31.0
-pydantic==2.5.2
+requests==2.34.2
+pydantic==2.13.4
+yt-dlp==2026.7.4
 scipy==1.11.4
-pillow==10.1.0
+pillow==12.3.0
 
 # OCR (CPU) — versões disponíveis para Python 3.10
-paddlepaddle==2.6.2
-paddleocr==2.7.3
+paddlepaddle==3.3.1
+paddleocr==3.7.0

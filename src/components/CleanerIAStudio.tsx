@@ -59,7 +59,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [protectSubject, setProtectSubject] = useState(true);
   const [verifyPass, setVerifyPass] = useState(true);
   const [masks, setMasks] = useState<CleanerRegion[]>([]);
-  const [health, setHealth] = useState<{ online: boolean; reason?: string } | null>(null);
+  const [health, setHealth] = useState<{
+    online: boolean;
+    ai_ready?: boolean;
+    max_ready?: boolean;
+    reason?: string;
+  } | null>(null);
   const [polling, setPolling] = useState(false);
   const [tool, setTool] = useState<Tool>("rect");
   const [selected, setSelected] = useState<string | null>(null);
@@ -87,16 +92,31 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     let alive = true;
     const check = () =>
       getHealth()
-        .then((h) => alive && setHealth(h as { online: boolean; reason?: string }))
-        .catch((e) => alive && setHealth({ online: false, reason: e instanceof Error ? e.message : "sem resposta" }));
+        .then(
+          (h) =>
+            alive &&
+            setHealth(
+              h as { online: boolean; ai_ready?: boolean; max_ready?: boolean; reason?: string },
+            ),
+        )
+        .catch(
+          (e) =>
+            alive &&
+            setHealth({ online: false, reason: e instanceof Error ? e.message : "sem resposta" }),
+        );
     check();
     const timer = window.setInterval(check, 30_000);
     return () => {
       alive = false;
       window.clearInterval(timer);
     };
-  }, []);
+  }, [getHealth]);
 
+  useEffect(() => {
+    if (job || !health?.online) return;
+    if (health.ai_ready === false && preset !== "fast") setPreset("fast");
+    else if (preset === "max" && health.max_ready === false) setPreset("quality");
+  }, [health, job, preset]);
 
   useEffect(() => {
     if (!polling || !job?.id) return;
@@ -118,7 +138,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       }
     }, 2500);
     return () => window.clearInterval(timer);
-  }, [polling, job?.id]);
+  }, [polling, job?.id, onComplete, refreshJob]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -144,8 +164,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
   const hitTest = (p: { x: number; y: number }, m: CleanerRegion) => {
     if (m.kind === "rect") {
-      return p.x >= (m.x ?? 0) && p.x <= (m.x ?? 0) + (m.w ?? 0) &&
-             p.y >= (m.y ?? 0) && p.y <= (m.y ?? 0) + (m.h ?? 0);
+      return (
+        p.x >= (m.x ?? 0) &&
+        p.x <= (m.x ?? 0) + (m.w ?? 0) &&
+        p.y >= (m.y ?? 0) &&
+        p.y <= (m.y ?? 0) + (m.h ?? 0)
+      );
     }
     if (m.kind === "poly" && m.points && m.points.length > 2) {
       // teste de ponto em polígono via ray-casting simples
@@ -155,10 +179,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         const pi = pts[i];
         const pj = pts[j];
         if (!pi || !pj) continue;
-        const xi = pi.x, yi = pi.y;
-        const xj = pj.x, yj = pj.y;
-        const intersect = ((yi > p.y) !== (yj > p.y)) &&
-          (p.x < (xj - xi) * (p.y - yi) / (yj - yi) + xi);
+        const xi = pi.x,
+          yi = pi.y;
+        const xj = pj.x,
+          yj = pj.y;
+        const intersect = yi > p.y !== yj > p.y && p.x < ((xj - xi) * (p.y - yi)) / (yj - yi) + xi;
         if (intersect) inside = !inside;
       }
       return inside;
@@ -214,7 +239,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       id: rid(),
       kind: "rect",
       role: tool === "protect" ? "protect" : "remove",
-      x: p.x, y: p.y, w: 0, h: 0,
+      x: p.x,
+      y: p.y,
+      w: 0,
+      h: 0,
       grow: tool === "protect" ? 0 : 0.008,
       track: true,
       enabled: true,
@@ -318,6 +346,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             xhr.open("POST", url);
             xhr.timeout = 15 * 60 * 1000;
             xhr.setRequestHeader("x-job-token", upload.token);
+            xhr.setRequestHeader("x-file-size", String(item.file.size));
             xhr.upload.onprogress = (ev) => {
               if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
             };
@@ -342,11 +371,13 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             await send(proxyUrl);
           } catch (second) {
             throw new Error(
-              `${first instanceof Error && first.message === "rede-bloqueada"
-                ? `sua rede não alcança ${new URL(secureUrl).host}`
-                : first instanceof Error
-                  ? first.message
-                  : "falha"} — via servidor também falhou (${second instanceof Error ? second.message : "erro"})`,
+              `${
+                first instanceof Error && first.message === "rede-bloqueada"
+                  ? `sua rede não alcança ${new URL(secureUrl).host}`
+                  : first instanceof Error
+                    ? first.message
+                    : "falha"
+              } — via servidor também falhou (${second instanceof Error ? second.message : "erro"})`,
             );
           }
         }
@@ -359,7 +390,6 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       setUploading(false);
     }
   };
-
 
   const handleDetect = async () => {
     // Primeiro salva as máscaras atuais para garantir persistência antes da detecção
@@ -436,7 +466,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             } disabled:opacity-60`}
           >
             <span className="block text-sm font-display font-bold">{MODE_LABEL[m]}</span>
-            <span className="block text-[10px] leading-tight text-muted-foreground">{MODE_HINT[m]}</span>
+            <span className="block text-[10px] leading-tight text-muted-foreground">
+              {MODE_HINT[m]}
+            </span>
           </button>
         ))}
       </aside>
@@ -450,7 +482,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           onPointerUp={onUp}
           onDoubleClick={() => tool === "poly" && finishPolygon()}
           className={`panel relative aspect-video overflow-hidden rounded-2xl border border-border/60 bg-black touch-none z-0 ${
-            tool === "select" ? "cursor-default" : tool === "erase" ? "cursor-pointer" : "cursor-crosshair"
+            tool === "select"
+              ? "cursor-default"
+              : tool === "erase"
+                ? "cursor-pointer"
+                : "cursor-crosshair"
           }`}
         >
           <video
@@ -465,11 +501,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
           {job?.status !== "completed" &&
             [...visible, ...(draft ? [draft] : [])].map((m) => {
-              const baseClasses = m.role === "protect"
-                ? "border-emerald-400 bg-emerald-400/10"
-                : selected === m.id
-                  ? "border-primary bg-primary/30 ring-2 ring-primary ring-offset-1 ring-offset-black z-20"
-                  : "border-primary/80 bg-primary/20 hover:bg-primary/30 z-10";
+              const baseClasses =
+                m.role === "protect"
+                  ? "border-emerald-400 bg-emerald-400/10"
+                  : selected === m.id
+                    ? "border-primary bg-primary/30 ring-2 ring-primary ring-offset-1 ring-offset-black z-20"
+                    : "border-primary/80 bg-primary/20 hover:bg-primary/30 z-10";
 
               if (m.kind === "poly" && m.points) {
                 const pts = m.points.map((pt) => `${pt.x * 100}% ${pt.y * 100}%`).join(",");
@@ -556,19 +593,23 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
         {/* Ferramentas */}
         <div className="flex flex-wrap items-center gap-2">
-          {([
-            ["rect", "Retângulo", Square],
-            ["poly", "Polígono", Pentagon],
-            ["brush", "Pincel", PenTool],
-            ["protect", "Proteger", Shield],
-            ["erase", "Apagar", Eraser],
-            ["select", "Selecionar", MousePointer2],
-          ] as const).map(([id, label, Icon]) => (
+          {(
+            [
+              ["rect", "Retângulo", Square],
+              ["poly", "Polígono", Pentagon],
+              ["brush", "Pincel", PenTool],
+              ["protect", "Proteger", Shield],
+              ["erase", "Apagar", Eraser],
+              ["select", "Selecionar", MousePointer2],
+            ] as const
+          ).map(([id, label, Icon]) => (
             <button
               key={id}
               onClick={() => setTool(id)}
               className={`flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                tool === id ? "border-primary bg-primary/15 text-primary" : "border-border/60 bg-surface/40"
+                tool === id
+                  ? "border-primary bg-primary/15 text-primary"
+                  : "border-border/60 bg-surface/40"
               }`}
             >
               <Icon className="size-3.5" /> {label}
@@ -583,8 +624,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 text-xs">
             <span>Clique para adicionar pontos. Duplo-clique ou Enter fecha o polígono.</span>
             <div className="ml-auto flex gap-2">
-              <Button size="sm" variant="outline" onClick={finishPolygon}>Fechar</Button>
-              <Button size="sm" variant="ghost" onClick={cancelPolygon}>Cancelar</Button>
+              <Button size="sm" variant="outline" onClick={finishPolygon}>
+                Fechar
+              </Button>
+              <Button size="sm" variant="ghost" onClick={cancelPolygon}>
+                Cancelar
+              </Button>
             </div>
           </div>
         )}
@@ -619,7 +664,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                   className={`absolute h-4 cursor-pointer rounded ${
                     m.role === "protect" ? "bg-emerald-500/70" : "bg-primary/70"
                   } ${selected === m.id ? "ring-2 ring-primary" : ""}`}
-                  style={{ left: `${from}%`, width: `${Math.max(2, to - from)}%`, top: `${(i % 3) * 18 + 2}px` }}
+                  style={{
+                    left: `${from}%`,
+                    width: `${Math.max(2, to - from)}%`,
+                    top: `${(i % 3) * 18 + 2}px`,
+                  }}
                 />
               );
             })}
@@ -633,14 +682,18 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setMasks((p) => p.map((m) => (m.id === sel.id ? { ...m, from: time } : m)))}
+                onClick={() =>
+                  setMasks((p) => p.map((m) => (m.id === sel.id ? { ...m, from: time } : m)))
+                }
               >
                 Início aqui
               </Button>
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setMasks((p) => p.map((m) => (m.id === sel.id ? { ...m, to: time } : m)))}
+                onClick={() =>
+                  setMasks((p) => p.map((m) => (m.id === sel.id ? { ...m, to: time } : m)))
+                }
               >
                 Fim aqui
               </Button>
@@ -664,7 +717,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                   type="checkbox"
                   checked={sel.track !== false}
                   onChange={(e) =>
-                    setMasks((p) => p.map((m) => (m.id === sel.id ? { ...m, track: e.target.checked } : m)))
+                    setMasks((p) =>
+                      p.map((m) => (m.id === sel.id ? { ...m, track: e.target.checked } : m)),
+                    )
                   }
                 />
                 rastrear (optical flow)
@@ -684,26 +739,52 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               onClick={() => {
                 setHealth(null);
                 getHealth()
-                  .then((h) => setHealth(h as { online: boolean; reason?: string }))
+                  .then((h) =>
+                    setHealth(
+                      h as {
+                        online: boolean;
+                        ai_ready?: boolean;
+                        max_ready?: boolean;
+                        reason?: string;
+                      },
+                    ),
+                  )
                   .catch((e) => setHealth({ online: false, reason: String(e) }));
               }}
-              title="verificar novamente"
+              title={
+                health?.online && !health.ai_ready
+                  ? "worker online; ProPainter ainda não está pronto"
+                  : "verificar novamente"
+              }
               className={`flex items-center gap-1.5 text-[10px] font-bold uppercase ${
-                health === null ? "text-muted-foreground" : health.online ? "text-emerald-500" : "text-destructive"
+                health === null
+                  ? "text-muted-foreground"
+                  : health.online && health.ai_ready
+                    ? "text-emerald-500"
+                    : health.online
+                      ? "text-amber-500"
+                      : "text-destructive"
               }`}
             >
               <span
                 className={`size-1.5 rounded-full ${
                   health === null
                     ? "animate-pulse bg-muted-foreground"
-                    : health.online
+                    : health.online && health.ai_ready
                       ? "animate-pulse bg-emerald-500"
-                      : "bg-destructive"
+                      : health.online
+                        ? "bg-amber-500"
+                        : "bg-destructive"
                 }`}
               />
-              {health === null ? "verificando…" : health.online ? "gpu online" : "offline"}
+              {health === null
+                ? "verificando…"
+                : health.online && health.ai_ready
+                  ? "IA pronta"
+                  : health.online
+                    ? "modo básico"
+                    : "offline"}
             </button>
-
           </div>
 
           <div className="space-y-2">
@@ -712,9 +793,22 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               <button
                 key={p}
                 onClick={() => !job && setPreset(p)}
-                disabled={!!job}
+                disabled={
+                  !!job ||
+                  (p === "quality" && health?.online === true && health.ai_ready === false) ||
+                  (p === "max" && health?.online === true && health.max_ready === false)
+                }
+                title={
+                  p === "max" && health?.online && !health.max_ready
+                    ? "DiffuEraser não está pronto no worker"
+                    : p === "quality" && health?.online && !health.ai_ready
+                      ? "ProPainter não está pronto no worker"
+                      : undefined
+                }
                 className={`w-full rounded-lg border p-2.5 text-left text-xs transition ${
-                  preset === p ? "border-primary bg-primary/10" : "border-border/60 bg-background/40"
+                  preset === p
+                    ? "border-primary bg-primary/10"
+                    : "border-border/60 bg-background/40"
                 } disabled:opacity-60`}
               >
                 <span className="block font-semibold">{PRESET_LABEL[p]}</span>
@@ -722,7 +816,6 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               </button>
             ))}
           </div>
-
 
           <div className="space-y-2 rounded-lg border border-border/60 bg-background/40 p-3">
             <span className="mono-label">Precisão</span>
@@ -766,7 +859,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           </div>
 
           {!job ? (
-            <Button className="w-full shadow-glow" onClick={startUpload} disabled={!health?.online || uploading}>
+            <Button
+              className="w-full shadow-glow"
+              onClick={startUpload}
+              disabled={!health?.online || uploading}
+            >
               <Upload className="mr-2 size-4" /> Enviar para GPU
             </Button>
           ) : job.status === "completed" ? (
@@ -779,7 +876,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             </a>
           ) : (
             <div className="space-y-2">
-              <Button variant="outline" className="w-full" onClick={handleDetect} disabled={polling}>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleDetect}
+                disabled={polling}
+              >
                 <Target className="mr-2 size-4" /> Detectar
               </Button>
               <Button className="w-full shadow-glow" onClick={handleProcess} disabled={polling}>
@@ -805,7 +907,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                   key={m.id}
                   onClick={() => setSelected(m.id)}
                   className={`flex cursor-pointer items-center justify-between rounded-lg border p-2 text-xs ${
-                    selected === m.id ? "border-primary bg-primary/10" : "border-border/50 bg-background/50"
+                    selected === m.id
+                      ? "border-primary bg-primary/10"
+                      : "border-border/50 bg-background/50"
                   }`}
                 >
                   <span className="truncate">{m.label || m.id}</span>
@@ -828,7 +932,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             </div>
           )}
           {masks.length > 0 && (
-            <Button variant="ghost" size="sm" className="w-full text-[10px] uppercase tracking-widest" onClick={() => setMasks([])}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-[10px] uppercase tracking-widest"
+              onClick={() => setMasks([])}
+            >
               Limpar todas
             </Button>
           )}
@@ -851,11 +960,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                   text <= 0.02,
                 ]);
               if (sharp !== null)
-                rows.push([
-                  "Nitidez vs. entorno",
-                  `${sharp.toFixed(2)}x`,
-                  sharp >= 0.7,
-                ]);
+                rows.push(["Nitidez vs. entorno", `${sharp.toFixed(2)}x`, sharp >= 0.7]);
               if (temporal !== null)
                 rows.push([
                   "Estabilidade no tempo",
@@ -863,11 +968,16 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                   temporal >= 0.7,
                 ]);
               if (typeof m["engine"] === "string") rows.push(["Motor", String(m["engine"]), true]);
-              if (typeof m["device"] === "string") rows.push(["Dispositivo", String(m["device"]), true]);
+              if (typeof m["device"] === "string")
+                rows.push(["Dispositivo", String(m["device"]), true]);
               return rows.map(([label, value, ok]) => (
                 <div key={label} className="flex items-center justify-between gap-2">
                   <span className="text-muted-foreground">{label}</span>
-                  <span className={ok ? "font-semibold text-emerald-500" : "font-semibold text-amber-500"}>
+                  <span
+                    className={
+                      ok ? "font-semibold text-emerald-500" : "font-semibold text-amber-500"
+                    }
+                  >
                     {value}
                   </span>
                 </div>
@@ -877,23 +987,25 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
               <div className="mt-2 space-y-1">
                 <p className="mono-label">Trechos limpos</p>
                 <div className="flex flex-wrap gap-1">
-                  {((job as unknown as { segments: Array<Record<string, number>> }).segments || []).map(
-                    (seg, i) => {
-                      const bad =
-                        (seg["residual_text"] ?? 0) > 0.02 || (seg["sharpness_ratio"] ?? 1) < 0.7;
-                      return (
-                        <span
-                          key={i}
-                          title={`${seg["from"]}s – ${seg["to"]}s`}
-                          className={`rounded px-1.5 py-0.5 text-[9px] font-mono ${
-                            bad ? "bg-amber-500/20 text-amber-500" : "bg-emerald-500/15 text-emerald-500"
-                          }`}
-                        >
-                          {Math.round(seg["from"] ?? 0)}s
-                        </span>
-                      );
-                    },
-                  )}
+                  {(
+                    (job as unknown as { segments: Array<Record<string, number>> }).segments || []
+                  ).map((seg, i) => {
+                    const bad =
+                      (seg["residual_text"] ?? 0) > 0.02 || (seg["sharpness_ratio"] ?? 1) < 0.7;
+                    return (
+                      <span
+                        key={i}
+                        title={`${seg["from"]}s – ${seg["to"]}s`}
+                        className={`rounded px-1.5 py-0.5 text-[9px] font-mono ${
+                          bad
+                            ? "bg-amber-500/20 text-amber-500"
+                            : "bg-emerald-500/15 text-emerald-500"
+                        }`}
+                      >
+                        {Math.round(seg["from"] ?? 0)}s
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}

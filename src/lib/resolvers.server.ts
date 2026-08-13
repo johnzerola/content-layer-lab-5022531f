@@ -6,6 +6,7 @@
 
 export interface ResolverHit {
   videoUrl: string;
+  headers?: Record<string, string>;
   title?: string;
   thumbnail?: string;
   source: string;

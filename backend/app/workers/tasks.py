@@ -9,6 +9,9 @@ import hashlib
 import hmac
 import json
 import os
+from pathlib import Path
+import shutil
+import time
 from typing import Dict, List, Optional
 
 import cv2
@@ -16,29 +19,52 @@ import numpy as np
 import requests
 from celery import Celery
 
+from ..config import get_settings
 from ..engines.inpainting import (
     TemporalFillEngine,
-    build_engine,
-    cuda_available,
     device_name,
     empty_cache,
-    passes_for,
     process_windowed,
+)
+from ..engines.diffueraser_official import (
+    DiffuEraserUnavailable,
+    diffueraser_status,
+    run_diffueraser,
+)
+from ..engines.propainter_official import (
+    ProPainterUnavailable,
+    propainter_status,
+    run_propainter,
 )
 from ..services import mask as mask_svc
 from ..services import protect as protect_svc
 from ..services import tracking
 from ..services import verify
 from ..services.scene import detect_scenes
-from ..services.text_detect import detect_text_boxes, frame_text_mask, text_pixel_mask
-from ..services.watermark import detect_watermarks
-from ..utils.video import RawWriter, mux_audio, probe, read_chunk, read_frames
+from ..services.text_detect import detect_text_boxes, frame_text_mask
+from ..services.watermark import detect_watermarks, frame_watermark_mask
+from ..security import callback_signature, validate_callback_url
+from ..storage import job_dir as safe_job_dir, read_state, write_state
+from ..utils.video import (
+    RawWriter,
+    masks_to_video,
+    mux_audio,
+    normalize_video,
+    probe,
+    read_chunk,
+    read_frames,
+)
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 celery_app = Celery("cleaner_tasks", broker=REDIS_URL, backend=REDIS_URL)
 
-WORKER_SECRET = os.getenv("CLEANER_WORKER_SECRET", "default_secret")
-STORAGE_DIR = os.getenv("CLEANER_STORAGE", "storage")
+SETTINGS = get_settings()
+WORKER_SECRET = SETTINGS.worker_secret
+STORAGE_DIR = str(SETTINGS.storage_dir)
+
+
+class JobCancelled(RuntimeError):
+    pass
 
 
 def sign_payload(payload: dict, secret: str) -> str:
@@ -50,10 +76,22 @@ def _notify(callback_url: Optional[str], payload: dict) -> None:
     if not callback_url:
         return
     try:
-        requests.post(callback_url, json=payload,
-                      headers={"x-signature": sign_payload(payload, WORKER_SECRET)}, timeout=5)
+        callback_url = validate_callback_url(callback_url, SETTINGS.callback_origins)
+        body = json.dumps(payload, sort_keys=True)
+        timestamp = str(int(time.time()))
+        requests.post(
+            callback_url,
+            data=body,
+            headers={
+                "content-type": "application/json",
+                "x-callback-timestamp": timestamp,
+                "x-signature": callback_signature(WORKER_SECRET, timestamp, body),
+            },
+            timeout=5,
+            allow_redirects=False,
+        )
     except Exception as exc:  # pragma: no cover
-        print(f"[callback] {exc}")
+        print(f"[callback] delivery failed: {type(exc).__name__}")
 
 
 def auto_detect(job_id: str, mode: str, samples: int = 12) -> List[Dict]:
@@ -103,66 +141,372 @@ def auto_detect(job_id: str, mode: str, samples: int = 12) -> List[Dict]:
     return []
 
 
-def _regions_roi(regions, width, height):
-    """ROI onde a limpeza pode acontecer (união das regiões `remove`)."""
-    roi = np.zeros((height, width), np.uint8)
-    any_remove = False
-    for region in regions:
-        if region.get("role") == "protect":
-            continue
-        any_remove = True
-        roi = np.maximum(roi, mask_svc.region_to_mask(region, width, height))
-    if not any_remove:
-        roi[:] = 255
-    return roi
-
-
-def _protect_static(regions, width, height):
-    prot = np.zeros((height, width), np.uint8)
-    for region in regions:
-        if region.get("role") == "protect":
-            prot = np.maximum(prot, mask_svc.region_to_mask(region, width, height))
-    return prot
-
-
-def _window_masks(frames, regions, info, mode, dynamic, key_step, roi, static_protect,
-                  auto_protect: bool):
-    """Máscara por frame da janela.
-
-    Em modo texto/legenda a máscara é recalculada em frames-chave e
-    interpolada por optical flow — é isso que acompanha legenda que muda
-    durante o vídeo. Fora disso, usa a geometria marcada pelo usuário.
-    """
+def _window_masks(
+    frames,
+    regions,
+    info,
+    mode,
+    dynamic,
+    key_step,
+    frame_offset: int,
+    auto_protect: bool,
+):
+    """Build frame-accurate masks for one absolute video window."""
     n = len(frames)
     h, w = info.height, info.width
-    base = roi.copy()
+    base_masks, protect_masks = mask_svc.build_masks_window(
+        regions, w, h, frame_offset, n, info.fps
+    )
+    fixed_watermark_masks = np.zeros_like(base_masks)
+    if mode in ("watermark", "logo"):
+        fixed_regions = []
+        for region in regions:
+            region_id = str(region.get("id", ""))
+            label = str(region.get("label", "")).lower()
+            automatically_moving = region_id.startswith(("wt_", "mv_"))
+            is_fixed = mode == "logo" or (
+                not automatically_moving
+                and ("persistente" in label or not region_id.startswith("wm_"))
+            )
+            if is_fixed:
+                fixed_regions.append(region)
+        if fixed_regions:
+            fixed_watermark_masks, _ = mask_svc.build_masks_window(
+                fixed_regions, w, h, frame_offset, n, info.fps
+            )
 
-    if mode in ("subtitle", "text", "smart") and dynamic:
+    if mode in ("subtitle", "text", "smart", "watermark", "logo") and dynamic:
         keys = list(range(0, n, max(1, key_step)))
         if keys[-1] != n - 1:
             keys.append(n - 1)
-        key_masks = [
-            frame_text_mask(frames[k], roi=base, subtitle_only=(mode == "subtitle"))
-            for k in keys
-        ]
+        key_masks = []
+        for key in keys:
+            base = base_masks[key]
+            if mode in ("watermark", "logo"):
+                detected = frame_watermark_mask(frames[key], roi=base)
+                detected = np.maximum(detected, fixed_watermark_masks[key])
+                if detected.max() == 0:
+                    detected = base.copy()
+            else:
+                detected = frame_text_mask(
+                    frames[key], roi=base, subtitle_only=(mode == "subtitle")
+                )
+                if mode == "smart":
+                    detected = np.maximum(
+                        detected, frame_watermark_mask(frames[key], roi=base)
+                    )
+            key_masks.append(detected)
         masks = tracking.interpolate_keyframes(frames, keys, key_masks)
     else:
-        masks = [base.copy() for _ in range(n)]
+        masks = [base.copy() for base in base_masks]
 
-    protect = static_protect.copy()
-    if auto_protect:
-        auto = protect_svc.sampled_protect_mask(frames, step=max(2, n // 6))
-        if auto is not None:
-            protect = np.maximum(protect, auto)
+    # Person protection must not preserve an overlay crossing a person.
+    if auto_protect and mode == "object":
+        automatic = protect_svc.sampled_protect_mask(frames, step=max(2, n // 6))
+        if automatic is not None:
+            protect_masks = np.maximum(protect_masks, automatic[None, ...])
 
-    inv = cv2.bitwise_not(protect) if protect.max() > 0 else None
     out = np.zeros((n, h, w), np.uint8)
-    for i, m in enumerate(masks):
-        m = cv2.bitwise_and(m, base)
-        if inv is not None:
-            m = cv2.bitwise_and(m, inv)
-        out[i] = mask_svc.refine(m)
+    for index, current in enumerate(masks):
+        current = cv2.bitwise_and(current, base_masks[index])
+        if protect_masks[index].max() > 0:
+            current = cv2.bitwise_and(current, cv2.bitwise_not(protect_masks[index]))
+        out[index] = mask_svc.refine(current)
     return out
+
+
+def _write_mask_sequence(
+    input_path: str,
+    mask_dir: str,
+    regions: List[Dict],
+    info,
+    mode: str,
+    dynamic: bool,
+    key_step: int,
+    auto_protect: bool,
+    on_progress=None,
+) -> int:
+    target = Path(mask_dir)
+    if target.exists():
+        shutil.rmtree(target)
+    target.mkdir(parents=True, exist_ok=True)
+    total = max(1, info.frames)
+    core = 72
+    overlap = 8
+    written = 0
+    start = 0
+    while start < total:
+        context_start = max(0, start - overlap)
+        read_len = min(total, start + core + overlap) - context_start
+        frames = read_chunk(input_path, context_start, read_len)
+        if not frames:
+            break
+        masks = _window_masks(
+            frames,
+            regions,
+            info,
+            mode,
+            dynamic,
+            key_step,
+            context_start,
+            auto_protect,
+        )
+        masks = tracking.stabilize(masks) if len(masks) > 2 else masks
+        offset = start - context_start
+        core_len = min(core, total - start, len(frames) - offset)
+        for local in range(offset, offset + core_len):
+            output = target / f"{written:06d}.png"
+            if not cv2.imwrite(str(output), masks[local]):
+                raise RuntimeError(f"falha ao gravar mascara {output}")
+            written += 1
+        if on_progress:
+            on_progress(written / total)
+        start += core_len
+        if core_len <= 0:
+            break
+    if written == 0:
+        raise RuntimeError("nenhuma mascara foi gerada")
+    return written
+
+
+def _audit_video(video_path: str, mask_dir: str, fps: float) -> tuple[List[Dict], dict]:
+    segments: List[Dict] = []
+    worst = {"residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0}
+    chunk_frames: List[np.ndarray] = []
+    chunk_masks: List[np.ndarray] = []
+    start_frame = 0
+
+    def flush() -> None:
+        nonlocal start_frame
+        if not chunk_frames:
+            return
+        mask_array = np.asarray(chunk_masks, dtype=np.uint8)
+        _, metrics = verify.audit_window(chunk_frames, mask_array)
+        coverage = float(np.mean([(mask > 0).mean() for mask in chunk_masks]))
+        segments.append({
+            "from": round(start_frame / fps, 3),
+            "to": round((start_frame + len(chunk_frames)) / fps, 3),
+            "coverage": round(coverage, 5),
+            **metrics,
+        })
+        worst["residual_text"] = max(worst["residual_text"], metrics["residual_text"])
+        worst["sharpness_ratio"] = min(worst["sharpness_ratio"], metrics["sharpness_ratio"])
+        worst["temporal_consistency"] = min(
+            worst["temporal_consistency"], metrics["temporal_consistency"]
+        )
+        start_frame += len(chunk_frames)
+        chunk_frames.clear()
+        chunk_masks.clear()
+
+    for index, frame in enumerate(read_frames(video_path)):
+        mask = cv2.imread(str(Path(mask_dir) / f"{index:06d}.png"), cv2.IMREAD_GRAYSCALE)
+        if mask is None:
+            break
+        chunk_frames.append(frame)
+        chunk_masks.append(mask)
+        if len(chunk_frames) >= 48:
+            flush()
+    flush()
+    return segments, worst
+
+
+def _run_official_pipeline(
+    input_path: str,
+    output_path: str,
+    job_dir: str,
+    regions: List[Dict],
+    info,
+    mode: str,
+    preset: str,
+    dynamic: bool,
+    key_step: int,
+    auto_protect: bool,
+    verify_on: bool,
+    emit,
+    cancel_file: Optional[str] = None,
+) -> tuple[List[Dict], dict, int]:
+    mask_dir = os.path.join(job_dir, "masks")
+    run_dir = os.path.join(job_dir, "propainter-run")
+    emit(18, "gerando mascaras temporais", "tracking")
+    frames = _write_mask_sequence(
+        input_path,
+        mask_dir,
+        regions,
+        info,
+        mode,
+        dynamic,
+        key_step,
+        auto_protect,
+        lambda ratio: emit(18 + ratio * 14, "gerando mascaras temporais", "tracking"),
+    )
+    emit(34, "iniciando ProPainter oficial", "inpainting")
+    video_only = run_propainter(
+        input_path,
+        mask_dir,
+        run_dir,
+        info.width,
+        info.height,
+        info.fps,
+        preset,
+        lambda stage: emit(36, stage, "inpainting"),
+        cancel_file,
+    )
+    normalized_video = normalize_video(
+        video_only,
+        os.path.join(job_dir, "propainter-native.mp4"),
+        info.width,
+        info.height,
+        info.fps,
+    )
+    emit(91, "validando resultado", "refining")
+    if verify_on:
+        segments, metrics = _audit_video(normalized_video, mask_dir, info.fps)
+    else:
+        segments = []
+        metrics = {"residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0}
+    emit(96, "remontando audio", "encoding")
+    mux_audio(normalized_video, input_path, output_path, info.has_audio)
+    return segments, metrics, frames
+
+
+def _run_diffusion_pipeline(
+    input_path: str,
+    output_path: str,
+    job_dir: str,
+    regions: List[Dict],
+    info,
+    mode: str,
+    dynamic: bool,
+    key_step: int,
+    auto_protect: bool,
+    verify_on: bool,
+    emit,
+    cancel_file: Optional[str] = None,
+) -> tuple[List[Dict], dict, int]:
+    mask_dir = os.path.join(job_dir, "masks")
+    mask_video = os.path.join(job_dir, "masks.mp4")
+    run_dir = os.path.join(job_dir, "diffueraser-run")
+    emit(18, "gerando mascaras temporais", "tracking")
+    frames = _write_mask_sequence(
+        input_path,
+        mask_dir,
+        regions,
+        info,
+        mode,
+        dynamic,
+        key_step,
+        auto_protect,
+        lambda ratio: emit(18 + ratio * 12, "gerando mascaras temporais", "tracking"),
+    )
+    masks_to_video(mask_dir, mask_video, info.fps)
+    emit(32, "iniciando DiffuEraser oficial", "inpainting")
+    video_only = run_diffueraser(
+        input_path,
+        mask_video,
+        run_dir,
+        info.duration,
+        lambda stage: emit(34, stage, "inpainting"),
+        cancel_file,
+    )
+    normalized_video = normalize_video(
+        video_only,
+        os.path.join(job_dir, "diffueraser-native.mp4"),
+        info.width,
+        info.height,
+        info.fps,
+    )
+    emit(92, "validando resultado", "refining")
+    if verify_on:
+        segments, metrics = _audit_video(normalized_video, mask_dir, info.fps)
+    else:
+        segments = []
+        metrics = {"residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0}
+    emit(96, "remontando audio", "encoding")
+    mux_audio(normalized_video, input_path, output_path, info.has_audio)
+    return segments, metrics, frames
+
+
+def _run_classic_pipeline(
+    input_path: str,
+    tmp_path: str,
+    output_path: str,
+    regions: List[Dict],
+    info,
+    cuts: List[int],
+    mode: str,
+    dynamic: bool,
+    key_step: int,
+    auto_protect: bool,
+    verify_on: bool,
+    emit,
+) -> tuple[List[Dict], dict, int, str]:
+    engine = TemporalFillEngine(14)
+    core = 20
+    overlap = 5
+    total = max(1, info.frames)
+    writer = RawWriter(tmp_path, info.width, info.height, info.fps)
+    segments: List[Dict] = []
+    written = 0
+    start = 0
+    worst = {"residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0}
+    emit(20, f"reconstrucao temporal classica ({device_name()})", "inpainting")
+    try:
+        while start < total:
+            context_start = max(0, start - overlap)
+            read_len = min(total, start + core + overlap) - context_start
+            frames = read_chunk(input_path, context_start, read_len)
+            if not frames:
+                break
+            end = min(total, start + core)
+            for cut in cuts:
+                if start < cut < end:
+                    end = cut
+                    break
+            core_len = end - start
+            masks = _window_masks(
+                frames,
+                regions,
+                info,
+                mode,
+                dynamic,
+                key_step,
+                context_start,
+                auto_protect,
+            )
+            masks = tracking.stabilize(masks) if len(masks) > 2 else masks
+            result = process_windowed(engine, list(frames), masks, len(frames), 0)
+            metrics = {"residual_text": 0.0, "sharpness_ratio": 1.0, "temporal_consistency": 1.0}
+            if verify_on:
+                _, metrics = verify.audit_window(result, masks)
+            offset = start - context_start
+            for index in range(offset, offset + core_len):
+                if index < len(result):
+                    writer.write(result[index])
+                    written += 1
+            selected = masks[offset:offset + core_len]
+            coverage = float(np.mean([(mask > 0).mean() for mask in selected])) if len(selected) else 0.0
+            segments.append({
+                "from": round(start / info.fps, 3),
+                "to": round(end / info.fps, 3),
+                "coverage": round(coverage, 5),
+                **metrics,
+            })
+            worst["residual_text"] = max(worst["residual_text"], metrics["residual_text"])
+            worst["sharpness_ratio"] = min(worst["sharpness_ratio"], metrics["sharpness_ratio"])
+            worst["temporal_consistency"] = min(
+                worst["temporal_consistency"], metrics["temporal_consistency"]
+            )
+            emit(
+                min(92.0, 20 + (written / total) * 70),
+                f"reconstruindo fundo ({written}/{total} frames)",
+                "inpainting",
+            )
+            start = end
+    finally:
+        writer.close()
+    emit(95, "remontando audio", "encoding")
+    mux_audio(tmp_path, input_path, output_path, info.has_audio)
+    return segments, worst, written, engine.name
 
 
 def run_pipeline(
@@ -180,18 +524,28 @@ def run_pipeline(
     key_step = int(opts.get("key_step", 4))
     verify_on = bool(opts.get("verify", True))
 
-    job_dir = os.path.join(STORAGE_DIR, job_id)
-    input_path = os.path.join(job_dir, "input.mp4")
-    tmp_path = os.path.join(job_dir, "video_only.mp4")
-    output_path = os.path.join(job_dir, "output.mp4")
+    job_path = safe_job_dir(SETTINGS.storage_dir, job_id)
+    cancel_path = job_path / ".cancel"
+    cancel_path.unlink(missing_ok=True)
+    job_dir = str(job_path)
+    input_path = str(job_path / "input.mp4")
+    tmp_path = str(job_path / "video_only.mp4")
+    output_path = str(job_path / "output.mp4")
+    callback_seq = int(read_state(job_path).get("callback_seq", 0))
 
     def emit(progress: float, stage: str, status: str = "processing", **extra) -> None:
+        nonlocal callback_seq
+        if cancel_path.exists():
+            raise JobCancelled("job cancelado")
+        callback_seq += 1
         if progress_cb:
             progress_cb(progress, stage)
-        _notify(callback_url, {
+        payload = {
             "job_id": job_id, "status": status, "stage": stage,
-            "progress": round(progress, 1), **extra,
-        })
+            "progress": round(progress, 1), "callback_seq": callback_seq, **extra,
+        }
+        write_state(job_path, {**read_state(job_path), **payload})
+        _notify(callback_url, payload)
 
     try:
         if not os.path.exists(input_path):
@@ -211,98 +565,75 @@ def run_pipeline(
         if not regions:
             raise ValueError("nenhuma área para remover foi detectada ou marcada")
 
-        roi = _regions_roi(regions, info.width, info.height)
-        static_protect = _protect_static(regions, info.width, info.height)
+        official = propainter_status()
+        diffusion = diffueraser_status()
+        allow_fallback = os.getenv("CLEANER_ALLOW_CLASSIC_FALLBACK", "0") == "1"
+        if preset == "max" and diffusion.ready:
+            segments, aggregate, written = _run_diffusion_pipeline(
+                input_path,
+                output_path,
+                job_dir,
+                regions,
+                info,
+                mode,
+                dynamic,
+                key_step,
+                auto_protect,
+                verify_on,
+                emit,
+                str(cancel_path),
+            )
+            engine_name = "diffueraser-official"
+            pass_count = 2
+        elif preset == "max" and not allow_fallback:
+            raise DiffuEraserUnavailable(
+                "preset max solicitado, mas DiffuEraser oficial nao esta pronto: "
+                + ", ".join(diffusion.missing)
+            )
+        elif preset in ("quality", "max") and official.ready:
+            segments, aggregate, written = _run_official_pipeline(
+                input_path,
+                output_path,
+                job_dir,
+                regions,
+                info,
+                mode,
+                preset,
+                dynamic,
+                key_step,
+                auto_protect,
+                verify_on,
+                emit,
+                str(cancel_path),
+            )
+            engine_name = "propainter-official"
+            pass_count = 1
+        else:
+            if preset == "quality" and not allow_fallback:
+                raise ProPainterUnavailable(
+                    "preset de IA solicitado, mas ProPainter oficial nao esta pronto: "
+                    + ", ".join(official.missing)
+                )
+            segments, aggregate, written, engine_name = _run_classic_pipeline(
+                input_path,
+                tmp_path,
+                output_path,
+                regions,
+                info,
+                cuts,
+                mode,
+                dynamic,
+                key_step,
+                auto_protect,
+                verify_on,
+                emit,
+            )
+            pass_count = 1
 
-        engine = build_engine(preset)
-        n_passes = passes_for(preset)
-        core = 64 if cuda_available() else 20
-        overlap = 12 if cuda_available() else 5
-        total = max(1, info.frames)
-
-        emit(20, f"reconstruindo fundo ({device_name()})", "inpainting")
-        writer = RawWriter(tmp_path, info.width, info.height, info.fps)
-        segments: List[Dict] = []
-        written = 0
-        start = 0
-        worst_temporal = 1.0
-        worst_sharp = 1.0
-        worst_text = 0.0
-
-        while start < total:
-            ctx_a = max(0, start - overlap)
-            read_len = min(total, start + core + overlap) - ctx_a
-            frames = read_chunk(input_path, ctx_a, read_len)
-            if not frames:
-                break
-            # não atravessa corte de cena dentro da janela de contexto
-            end = min(total, start + core)
-            for cut in cuts:
-                if start < cut < end:
-                    end = cut
-                    break
-            core_len = end - start
-
-            masks = _window_masks(frames, regions, info, mode, dynamic, key_step,
-                                  roi, static_protect, auto_protect)
-            masks = tracking.stabilize(masks) if len(masks) > 2 else masks
-
-            result = list(frames)
-            for _ in range(n_passes):
-                result = process_windowed(engine, result, masks, len(result), 0)
-
-            metrics = {"residual_text": 0.0, "sharpness_ratio": 1.0,
-                       "temporal_consistency": 1.0}
-            if verify_on:
-                need, metrics = verify.audit_window(result, masks)
-                if need:
-                    emit(min(94.0, 20 + (written / total) * 70),
-                         "reprocessando trecho com resíduo", "refining")
-                    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
-                    grown = np.array([cv2.dilate(m, k) for m in masks], dtype=np.uint8)
-                    if static_protect.max() > 0:
-                        invp = cv2.bitwise_not(static_protect)
-                        grown = np.array([cv2.bitwise_and(m, invp) for m in grown],
-                                         dtype=np.uint8)
-                    retry = process_windowed(TemporalFillEngine(14), list(frames), grown,
-                                             len(frames), 0)
-                    retry = process_windowed(engine, retry, grown, len(retry), 0)
-                    _, m2 = verify.audit_window(retry, grown)
-                    if (m2["residual_text"] <= metrics["residual_text"]
-                            and m2["sharpness_ratio"] >= metrics["sharpness_ratio"] * 0.95):
-                        result, masks, metrics = retry, grown, m2
-
-            offset = start - ctx_a
-            for i in range(offset, offset + core_len):
-                if i < len(result):
-                    writer.write(result[i])
-                    written += 1
-
-            covered = float(np.mean([(m > 0).mean() for m in masks[offset:offset + core_len]])) \
-                if core_len > 0 else 0.0
-            segments.append({
-                "from": round(start / info.fps, 3),
-                "to": round(end / info.fps, 3),
-                "coverage": round(covered, 5),
-                **metrics,
-            })
-            worst_temporal = min(worst_temporal, metrics["temporal_consistency"])
-            worst_sharp = min(worst_sharp, metrics["sharpness_ratio"])
-            worst_text = max(worst_text, metrics["residual_text"])
-
-            emit(min(92.0, 20 + (written / total) * 70),
-                 f"reconstruindo fundo ({written}/{total} frames)", "inpainting")
-            empty_cache()
-            start = end
-
-        writer.close()
-        empty_cache()
-
-        emit(95, "remontando áudio", "encoding")
-        mux_audio(tmp_path, input_path, output_path, info.has_audio)
-
+        callback_seq += 1
         result_payload = {
             "job_id": job_id,
+            "callback_seq": callback_seq,
             "status": "completed",
             "progress": 100,
             "stage": "concluído",
@@ -310,12 +641,13 @@ def run_pipeline(
             "detections": regions,
             "segments": segments,
             "metrics": {
-                "temporal_consistency": round(worst_temporal, 3),
-                "sharpness_ratio": round(worst_sharp, 3),
-                "residual_text": round(worst_text, 4),
+                "temporal_consistency": round(aggregate["temporal_consistency"], 3),
+                "sharpness_ratio": round(aggregate["sharpness_ratio"], 3),
+                "residual_text": round(aggregate["residual_text"], 4),
                 "device": device_name(),
                 "frames": written,
-                "engine": engine.name,
+                "engine": engine_name,
+                "passes": pass_count,
                 "dynamic_masks": dynamic,
                 "subject_protection": auto_protect,
             },
@@ -325,14 +657,18 @@ def run_pipeline(
                 "has_audio": info.has_audio,
             },
         }
+        write_state(job_path, {**read_state(job_path), **result_payload})
         _notify(callback_url, result_payload)
         return result_payload
 
     except Exception as exc:
         empty_cache()
         print(f"[pipeline] falhou: {exc}")
-        _notify(callback_url, {"job_id": job_id, "status": "failed",
-                               "progress": 0, "error": str(exc)})
+        callback_seq += 1
+        failure = {"job_id": job_id, "callback_seq": callback_seq, "status": "failed",
+                   "progress": 0, "error": str(exc)[:1000]}
+        write_state(job_path, {**read_state(job_path), **failure})
+        _notify(callback_url, failure)
         raise
 
 

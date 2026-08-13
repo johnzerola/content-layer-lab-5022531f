@@ -87,10 +87,7 @@ export function CaptionStudio({ style, onChange, cues, fonts, onAddFont }: Props
   const end = useCues[0]?.end ?? 3;
 
   const [fontFiles, setFontFiles] = useState(0);
-  const allFonts = useMemo(
-    () => [...BUILTIN_FONTS, ...(fonts ?? []).map((f) => f.name)],
-    [fonts, fontFiles],
-  );
+  const allFonts = [...BUILTIN_FONTS, ...(fonts ?? []).map((f) => f.name)];
 
   const preset = useCallback(
     (id: string) => {

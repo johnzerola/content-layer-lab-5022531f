@@ -104,3 +104,44 @@ def mux_audio(video_only: str, original: str, output: str, has_audio: bool) -> N
         os.remove(video_only)
     except OSError:
         pass
+
+
+def normalize_video(
+    source: str,
+    destination: str,
+    width: int,
+    height: int,
+    fps: float,
+) -> str:
+    """Return a video at the source video's exact display size and frame rate."""
+    current = probe(source)
+    if current.width == width and current.height == height and abs(current.fps - fps) < 0.02:
+        return source
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-i", source,
+            "-vf", f"scale={width}:{height}:flags=lanczos",
+            "-r", f"{fps:.6f}",
+            "-c:v", "libx264", "-preset", "slow", "-crf", "16",
+            "-pix_fmt", "yuv420p", destination,
+        ],
+        check=True,
+    )
+    return destination
+
+
+def masks_to_video(mask_dir: str, destination: str, fps: float) -> str:
+    """Encode numbered PNG masks losslessly enough for official model input."""
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-framerate", f"{fps:.6f}",
+            "-i", os.path.join(mask_dir, "%06d.png"),
+            "-c:v", "libx264", "-preset", "medium", "-crf", "0",
+            "-pix_fmt", "yuv420p", "-r", f"{fps:.6f}",
+            destination,
+        ],
+        check=True,
+    )
+    return destination

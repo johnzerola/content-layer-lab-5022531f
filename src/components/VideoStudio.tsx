@@ -211,15 +211,22 @@ export function VideoStudio({
     end: value.clip?.end ?? duration,
   });
   const { pre, start, end } = hist.state;
+  const setHistory = hist.set;
 
   const setPre = useCallback(
     (next: PreEdit | ((v: PreEdit) => PreEdit), label = "edição") =>
-      hist.set((d) => ({ ...d, pre: typeof next === "function" ? next(d.pre) : next }), label),
-    [hist],
+      setHistory((d) => ({ ...d, pre: typeof next === "function" ? next(d.pre) : next }), label),
+    [setHistory],
   );
   const set = (p: Partial<PreEdit>, label = "ajuste") => setPre((v) => ({ ...v, ...p }), label);
-  const setStart = (s: number) => hist.set((d) => ({ ...d, start: s }), "entrada");
-  const setEnd = (e: number) => hist.set((d) => ({ ...d, end: e }), "saída");
+  const setStart = useCallback(
+    (s: number) => setHistory((d) => ({ ...d, start: s }), "entrada"),
+    [setHistory],
+  );
+  const setEnd = useCallback(
+    (e: number) => setHistory((d) => ({ ...d, end: e }), "saída"),
+    [setHistory],
+  );
 
   const [tab, setTab] = useState<Tab>("trim");
   const [view, setView] = useState<"out" | "src">("out");
@@ -254,7 +261,10 @@ export function VideoStudio({
   const dragRef = useRef<Drag | null>(null);
 
   /** recorte mostrado agora: segue os keyframes quando existirem */
-  const crop = cropAt(pre, time) ?? pre.crop ?? { x: 0, y: 0, w: 1, h: 1 };
+  const crop = useMemo(
+    () => cropAt(pre, time) ?? pre.crop ?? { x: 0, y: 0, w: 1, h: 1 },
+    [pre, time],
+  );
 
   /** tolerância para considerar que o playhead está "em cima" de um keyframe */
   const SNAP = 0.2;
@@ -572,7 +582,7 @@ export function VideoStudio({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [toggle, seek, time, start, end, split, addKey, undo, redo, onClose]);
+  }, [toggle, seek, time, start, end, split, addKey, undo, redo, onClose, setStart, setEnd]);
 
   const cropPx = {
     w: Math.round((crop.w || 1) * (width || 0)),

@@ -362,7 +362,7 @@ function Home() {
   }, []);
 
   /** Carrega um template salvo como ativo (e lembra a escolha). */
-  const useTemplate = useCallback((t: Template) => {
+  const applyTemplate = useCallback((t: Template) => {
     setActive(migrate(structuredClone(t)));
     try {
       localStorage.setItem(ACTIVE_KEY, t.id);
@@ -541,14 +541,17 @@ function Home() {
         return;
       }
       setLinkMsg(`baixando de ${res.source ?? "origem"}...`);
-      const dl = await fetch(`/api/public/media-proxy?u=${encodeURIComponent(res.videoUrl)}`);
+      const dl = await fetch(
+        res.proxyUrl ?? `/api/public/media-proxy?u=${encodeURIComponent(res.videoUrl)}`,
+      );
       if (!dl.ok) {
         setLinkBlocked(true);
         setLinkMsg("a origem bloqueou o download desse arquivo");
         return;
       }
       const blob = await dl.blob();
-      const urlExt = new URL(res.videoUrl).pathname.match(VIDEO_EXT_RE)?.[1]?.toLowerCase() ?? "mp4";
+      const urlExt =
+        res.ext ?? new URL(res.videoUrl).pathname.match(VIDEO_EXT_RE)?.[1]?.toLowerCase() ?? "mp4";
       const base =
         (res.title ?? "video").replace(VIDEO_EXT_RE, "").replace(/[^\w\-. ]+/g, "").trim().slice(0, 60) ||
         "video";
@@ -697,7 +700,7 @@ function Home() {
         setClipBusy(false);
       }
     },
-    [clipBusy, clipMinLen, clipMaxLen, clipMax, clipMinScore],
+    [clipBusy, clipMinLen, clipMaxLen, clipMax, clipMinScore, setItems, setSelectedId],
   );
 
   /** Transcreve o áudio e gera legendas com tempo por palavra. */
@@ -738,7 +741,7 @@ function Home() {
         setCapBusyId(null);
       }
     },
-    [capBusyId, capLang],
+    [capBusyId, capLang, setItems],
   );
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
@@ -793,7 +796,7 @@ function Home() {
     const start = clipStart + Math.min(v.trimStart, Math.max(0, clipDur - 0.5));
     const effDur = Math.max(0.2, clipDur - (start - clipStart) - v.trimEnd);
     return { start, end: start + effDur };
-  }, [previewVariation?.trimStart, previewVariation?.trimEnd, selected?.duration, selected?.clip?.start, selected?.clip?.end]);
+  }, [previewVariation, selected?.duration, selected?.clip?.start, selected?.clip?.end]);
 
   // placa de fundo real (mediana temporal) usada no preview do LimpaVídeo
   const [previewPlate, setPreviewPlate] = useState<{
@@ -823,7 +826,7 @@ function Home() {
       alive = false;
       clearTimeout(timer);
     };
-  }, [mode, selected?.id, selRegionsKey]);
+  }, [mode, selected?.file, selected?.regions, selRegionsKey]);
 
   const previewDrawOpts = useMemo(
     () =>
@@ -855,14 +858,7 @@ function Home() {
             }
           : undefined,
     [
-      previewVariation?.mirror,
-      previewVariation?.brightness,
-      previewVariation?.saturation,
-      previewVariation?.zoom,
-      previewVariation?.noise,
-      previewVariation?.rotate,
-      previewVariation?.border,
-      previewVariation?.borderColor,
+      previewVariation,
       previewCues,
       previewPlate,
       selected?.preEdit,
@@ -1382,7 +1378,7 @@ function Home() {
                 value={templates.some((t) => t.id === active.id) ? active.id : ""}
                 onChange={(e) => {
                   const t = templates.find((x) => x.id === e.target.value);
-                  if (t) useTemplate(t);
+                    if (t) applyTemplate(t);
 
                 }}
               >
@@ -2504,7 +2500,7 @@ function Home() {
           onClose={() => setLibraryOpen(false)}
           onChangeList={setTemplates}
           onUse={(t) => {
-            useTemplate(t);
+            applyTemplate(t);
             setLibraryOpen(false);
           }}
 

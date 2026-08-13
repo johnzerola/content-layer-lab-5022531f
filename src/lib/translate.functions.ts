@@ -5,7 +5,7 @@ import { createServerFn } from "@tanstack/react-start";
  * para que os tempos por palavra continuem válidos (estilo Clipzi).
  */
 export const translateWords = createServerFn({ method: "POST" })
-  .inputValidator((input: { words: string[]; language: string }) => {
+  .validator((input: { words: string[]; language: string }) => {
     if (!Array.isArray(input?.words) || input.words.length === 0) throw new Error("nada para traduzir");
     if (input.words.length > 1200) throw new Error("Trecho grande demais para traduzir de uma vez.");
     if (!input?.language) throw new Error("idioma ausente");

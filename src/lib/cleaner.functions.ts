@@ -1,19 +1,40 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
 import type { CleanerJob, CleanerRegion } from "@/lib/cleaner";
 import { cleanerRegionSchema } from "@/lib/cleaner.schemas";
 import {
   appOrigin,
   jobToken,
   workerPublicBase,
-  workerCancel,
+  workerDelete,
   workerDetect,
   workerHealth,
   workerProcess,
   workerStatus,
 } from "@/lib/cleaner.server";
+
+const configuredMaxUploadGb = Number(process.env["CLEANER_MAX_UPLOAD_GB"] ?? "2");
+const maxUploadBytes =
+  Math.max(0.05, Number.isFinite(configuredMaxUploadGb) ? configuredMaxUploadGb : 2) * 1024 ** 3;
+
+async function requireOwnedJob(
+  supabase: SupabaseClient<Database>,
+  userId: string,
+  id: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from("cleaner_jobs")
+    .select("id")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("Job nao encontrado");
+}
 
 export const cleanerHealth = createServerFn({ method: "GET" }).handler(async () => {
   const health = await workerHealth();
@@ -22,12 +43,14 @@ export const cleanerHealth = createServerFn({ method: "GET" }).handler(async () 
 
 export const createCleanerJob = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         filename: z.string().min(1),
-        size: z.number().nonnegative().default(0),
-        mode: z.enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"]).default("subtitle"),
+        size: z.number().positive().max(maxUploadBytes, "Video excede o limite permitido"),
+        mode: z
+          .enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"])
+          .default("subtitle"),
         preset: z.enum(["fast", "quality", "max"]).default("quality"),
       })
       .parse(d),
@@ -51,7 +74,9 @@ export const createCleanerJob = createServerFn({ method: "POST" })
     const base = workerPublicBase();
     return {
       job: row as unknown as CleanerJob,
-      upload: base ? { url: `${base}/v1/jobs/${row.id}/upload`, token: jobToken(row.id) } : null,
+      upload: base
+        ? { url: `${base}/v1/jobs/${row.id}/upload`, token: jobToken(row.id, "upload") }
+        : null,
     };
   });
 
@@ -69,17 +94,22 @@ export const listCleanerJobs = createServerFn({ method: "GET" })
 
 export const deleteCleanerJob = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .validator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    await workerCancel(data.id).catch(() => null);
-    const { error } = await context.supabase.from("cleaner_jobs").delete().eq("id", data.id);
+    await requireOwnedJob(context.supabase, context.userId, data.id);
+    await workerDelete(data.id);
+    const { error } = await context.supabase
+      .from("cleaner_jobs")
+      .delete()
+      .eq("id", data.id)
+      .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
 
 export const detectCleanerJob = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         id: z.string().uuid(),
@@ -89,10 +119,13 @@ export const detectCleanerJob = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
-    await context.supabase
+    await requireOwnedJob(context.supabase, context.userId, data.id);
+    const { error: updateError } = await context.supabase
       .from("cleaner_jobs")
       .update({ status: "detecting", stage: "detectando", progress: 0.05, mode: data.mode })
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .eq("user_id", context.userId);
+    if (updateError) throw new Error(updateError.message);
 
     const out = await workerDetect(data.id, data.mode, (data.roi as CleanerRegion) ?? null);
 
@@ -105,6 +138,7 @@ export const detectCleanerJob = createServerFn({ method: "POST" })
         progress: 0.1,
       })
       .eq("id", data.id)
+      .eq("user_id", context.userId)
       .select("*")
       .single();
     if (error) throw new Error(error.message);
@@ -113,21 +147,23 @@ export const detectCleanerJob = createServerFn({ method: "POST" })
 
 export const saveCleanerMasks = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z.object({ id: z.string().uuid(), masks: z.array(cleanerRegionSchema) }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    await requireOwnedJob(context.supabase, context.userId, data.id);
     const { error } = await context.supabase
       .from("cleaner_jobs")
       .update({ masks: data.masks as unknown as never })
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
 
 export const processCleanerJob = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .inputValidator((d: unknown) =>
+  .validator((d: unknown) =>
     z
       .object({
         id: z.string().uuid(),
@@ -139,13 +175,18 @@ export const processCleanerJob = createServerFn({ method: "POST" })
       .parse(d),
   )
   .handler(async ({ data, context }) => {
+    await requireOwnedJob(context.supabase, context.userId, data.id);
+    const callbackUrl = `${appOrigin()}/api/public/cleaner-callback`;
+    if (!callbackUrl.startsWith("https://")) {
+      throw new Error("PUBLIC_SITE_URL HTTPS nao configurada");
+    }
     await workerProcess({
       jobId: data.id,
       mode: data.mode,
       preset: data.preset,
       masks: data.masks as CleanerRegion[],
       options: data.options,
-      callbackUrl: `${appOrigin()}/api/public/cleaner-callback`,
+      callbackUrl,
     });
 
     const { data: row, error } = await context.supabase
@@ -162,6 +203,7 @@ export const processCleanerJob = createServerFn({ method: "POST" })
         result_url: null,
       })
       .eq("id", data.id)
+      .eq("user_id", context.userId)
       .select("*")
       .single();
     if (error) throw new Error(error.message);
@@ -170,11 +212,12 @@ export const processCleanerJob = createServerFn({ method: "POST" })
 
 export const refreshCleanerJob = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .validator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    let patch: Record<string, any> = {};
+    await requireOwnedJob(context.supabase, context.userId, data.id);
+    let patch: Record<string, unknown> = {};
     try {
-      const s = (await workerStatus(data.id)) as Record<string, any>;
+      const s = await workerStatus(data.id);
       patch = {
         status: s["status"],
         stage: s["stage"],
@@ -191,8 +234,13 @@ export const refreshCleanerJob = createServerFn({ method: "POST" })
     }
     const q = context.supabase.from("cleaner_jobs");
     const { data: row, error } = Object.keys(patch).length
-      ? await q.update(patch as never).eq("id", data.id).select("*").single()
-      : await q.select("*").eq("id", data.id).single();
+      ? await q
+          .update(patch as never)
+          .eq("id", data.id)
+          .eq("user_id", context.userId)
+          .select("*")
+          .single()
+      : await q.select("*").eq("id", data.id).eq("user_id", context.userId).single();
     if (error) throw new Error(error.message);
     return row as unknown as CleanerJob;
   });

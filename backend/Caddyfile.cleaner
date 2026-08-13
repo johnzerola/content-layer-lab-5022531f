@@ -1,0 +1,20 @@
+{$CLEANER_PUBLIC_HOST} {
+    encode zstd gzip
+
+    request_body {
+        max_size {$CLEANER_MAX_UPLOAD_GB}GB
+    }
+
+    @private_docs path /docs* /redoc* /openapi.json
+    respond @private_docs 404
+
+    reverse_proxy 127.0.0.1:8095
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "no-referrer"
+        -Server
+    }
+}

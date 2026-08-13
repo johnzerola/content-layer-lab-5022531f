@@ -72,6 +72,40 @@ def build_masks(
     return masks
 
 
+def build_masks_window(
+    regions: Sequence[Dict],
+    width: int,
+    height: int,
+    start_frame: int,
+    frame_count: int,
+    fps: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Build remove/protect masks for an absolute frame window.
+
+    Returning both layers keeps time-ranged protect regions accurate and avoids
+    flattening a moving job into one mask that applies for the entire video.
+    """
+    removes = np.zeros((frame_count, height, width), dtype=np.uint8)
+    protects = np.zeros_like(removes)
+    window_end = start_frame + frame_count
+    for region in regions:
+        if region.get("enabled") is False:
+            continue
+        first = int(float(region.get("from") or region.get("from_time") or 0) * fps)
+        end_value = region.get("to", region.get("to_time"))
+        last = int(float(end_value) * fps) if end_value is not None else window_end
+        local_first = max(0, first - start_frame)
+        local_last = min(frame_count, last - start_frame)
+        if local_last <= local_first:
+            continue
+        target = protects if region.get("role") == "protect" else removes
+        region_mask = region_to_mask(region, width, height)
+        target[local_first:local_last] = np.maximum(
+            target[local_first:local_last], region_mask[None, ...]
+        )
+    return removes, protects
+
+
 def refine(mask: np.ndarray, feather: int = 3) -> np.ndarray:
     """Fecha buracos, remove ruído e suaviza a borda mantendo binário."""
     k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))

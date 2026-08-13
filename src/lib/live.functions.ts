@@ -92,7 +92,7 @@ async function fromProfile(handle: string): Promise<LiveCheck | null> {
  * e devolve o playlist HLS para o monitor gravar.
  */
 export const checkXLive = createServerFn({ method: "POST" })
-  .inputValidator((input: { target: string }) => {
+  .validator((input: { target: string }) => {
     const target = String(input?.target ?? "").trim();
     if (!target) throw new Error("informe o @ ou o link da live");
     return { target: target.slice(0, 300) };

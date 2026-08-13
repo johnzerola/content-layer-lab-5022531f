@@ -12,15 +12,28 @@ services:
     container_name: cleaner-cpu-worker
     restart: unless-stopped
     environment:
+      CLEANER_ENV: production
       CLEANER_WORKER_SECRET: ${CLEANER_WORKER_SECRET:?defina no .env}
       CLEANER_STORAGE: /app/storage
       CLEANER_DEVICE: cpu
       USE_CELERY: "0"
-      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      CORS_ORIGINS: ${CORS_ORIGINS:?defina no .env}
+      CLEANER_CALLBACK_ORIGINS: ${CLEANER_CALLBACK_ORIGINS:?defina no .env}
+      CLEANER_ALLOWED_HOSTS: ${CLEANER_ALLOWED_HOSTS:?defina no .env}
+      CLEANER_MAX_UPLOAD_GB: ${CLEANER_MAX_UPLOAD_GB:-2}
+      CLEANER_MAX_DURATION_SECONDS: ${CLEANER_MAX_DURATION_SECONDS:-3600}
+      CLEANER_MAX_WIDTH: ${CLEANER_MAX_WIDTH:-3840}
+      CLEANER_MAX_HEIGHT: ${CLEANER_MAX_HEIGHT:-2160}
+      CLEANER_MAX_FPS: ${CLEANER_MAX_FPS:-60}
+      CLEANER_STORAGE_QUOTA_GB: ${CLEANER_STORAGE_QUOTA_GB:-50}
+      CLEANER_MIN_FREE_GB: ${CLEANER_MIN_FREE_GB:-10}
+      CLEANER_RETENTION_HOURS: ${CLEANER_RETENTION_HOURS:-72}
+      CLEANER_MAX_CONCURRENT_JOBS: "1"
+      CLEANER_RATE_LIMIT_PER_MINUTE: ${CLEANER_RATE_LIMIT_PER_MINUTE:-120}
       OMP_NUM_THREADS: "2"
       MKL_NUM_THREADS: "2"
     ports:
-      - "127.0.0.1:8095:8000"
+      - "127.0.0.1:${CLEANER_BIND_PORT:-8095}:8000"
     volumes:
       - ./data/storage:/app/storage
       - ./data/models:/app/models
@@ -34,6 +47,8 @@ services:
           pids: 512
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL
     networks:
       - cleaner-net
     logging:

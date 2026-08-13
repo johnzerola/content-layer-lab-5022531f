@@ -1,9 +1,16 @@
 import { createServerFn } from "@tanstack/react-start";
+import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { mediaProxyTicket, workerResolveMedia } from "@/lib/cleaner.server";
+import { safeRemoteUrl } from "@/lib/remote-url";
 
 export interface ResolvedVideo {
   ok: boolean;
   /** URL direta do arquivo de vídeo (para baixar via proxy) */
   videoUrl?: string;
+  /** Proxy assinado, curto e preparado com os headers exigidos pela origem. */
+  proxyUrl?: string;
+  ext?: string;
   title?: string;
   thumbnail?: string;
   source?: string;
@@ -14,34 +21,6 @@ export interface ResolvedVideo {
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
-
-function isPrivateHost(host: string) {
-  const h = host.toLowerCase();
-  if (h === "localhost" || h.endsWith(".localhost") || h.endsWith(".internal") || h === "0.0.0.0") return true;
-  if (/^\[?::1\]?$/.test(h)) return true;
-  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (!m) return false;
-  const [a, b] = [Number(m[1]), Number(m[2])];
-  return (
-    a === 10 ||
-    a === 127 ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    (a === 169 && b === 254)
-  );
-}
-
-export function safeRemoteUrl(raw: string): URL | null {
-  let u: URL;
-  try {
-    u = new URL(raw);
-  } catch {
-    return null;
-  }
-  if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-  if (isPrivateHost(u.hostname)) return null;
-  return u;
-}
 
 function pickMeta(html: string, keys: string[]) {
   for (const key of keys) {
@@ -61,7 +40,8 @@ function pickMeta(html: string, keys: string[]) {
  * direta do arquivo de vídeo, sem precisar de upload manual.
  */
 export const resolveVideoLink = createServerFn({ method: "POST" })
-  .inputValidator((input: { url: string }) => {
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .validator((input: { url: string }) => {
     if (!input?.url || typeof input.url !== "string") throw new Error("link inválido");
     return { url: input.url.trim() };
   })
@@ -85,9 +65,37 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
     } = await import("./resolvers.server");
     const platform = platformOf(host);
 
+    // O worker usa yt-dlp atualizado e e a fonte principal para posts publicos.
+    // Mantemos os resolvedores abaixo como fallback enquanto o worker antigo
+    // ainda nao tiver recebido esta versao.
+    if (platform !== host && !cobaltConfigured()) {
+      try {
+        const media = await workerResolveMedia(target.toString());
+        const ticket = mediaProxyTicket(media.url, media.headers);
+        return {
+          ok: true,
+          videoUrl: media.url,
+          proxyUrl: `/api/public/media-proxy?t=${encodeURIComponent(ticket)}`,
+          ...(media.title ? { title: media.title } : {}),
+          ...(media.thumbnail ? { thumbnail: media.thumbnail } : {}),
+          source: media.source ?? platform,
+          ext: media.ext ?? "mp4",
+        };
+      } catch {
+        // Tenta Cobalt, API publica oficial ou OpenGraph na sequencia.
+      }
+    }
+
     // 1) já é um arquivo de vídeo?
     if (/\.(mp4|mov|m4v|webm|mkv|ogv|3gp|avi|mpeg|mpg|ts)(\?|$)/i.test(target.pathname + target.search)) {
-      return { ok: true, videoUrl: target.toString(), title: target.pathname.split("/").pop() ?? "video", source: host };
+      const ticket = mediaProxyTicket(target.toString());
+      return {
+        ok: true,
+        videoUrl: target.toString(),
+        proxyUrl: `/api/public/media-proxy?t=${encodeURIComponent(ticket)}`,
+        title: target.pathname.split("/").pop() ?? "video",
+        source: host,
+      };
     }
 
     // 2) resolvers específicos por plataforma
@@ -104,7 +112,7 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       kwai: resolveOpenGraph,
       dailymotion: resolveOpenGraph,
     };
-    const chain = [byPlatform[platform], resolveWithCobalt, resolveOpenGraph].filter(Boolean) as ((
+    const chain = [resolveWithCobalt, byPlatform[platform], resolveOpenGraph].filter(Boolean) as ((
       u: string,
     ) => Promise<import("./resolvers.server").ResolverHit | null>)[];
 
@@ -112,9 +120,11 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       try {
         const hit = await fn(target.toString());
         if (hit?.videoUrl && safeRemoteUrl(hit.videoUrl)) {
+          const ticket = mediaProxyTicket(hit.videoUrl, hit.headers);
           return {
             ok: true,
             videoUrl: hit.videoUrl,
+            proxyUrl: `/api/public/media-proxy?t=${encodeURIComponent(ticket)}`,
             ...(hit.title ? { title: hit.title } : {}),
             ...(hit.thumbnail ? { thumbnail: hit.thumbnail } : {}),
             source: hit.source || host,
@@ -133,7 +143,14 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
     }
     const headType = head?.headers.get("content-type") ?? "";
     if (headType.startsWith("video/")) {
-      return { ok: true, videoUrl: target.toString(), title: target.pathname.split("/").pop() ?? "video", source: host };
+      const ticket = mediaProxyTicket(target.toString());
+      return {
+        ok: true,
+        videoUrl: target.toString(),
+        proxyUrl: `/api/public/media-proxy?t=${encodeURIComponent(ticket)}`,
+        title: target.pathname.split("/").pop() ?? "video",
+        source: host,
+      };
     }
 
 
@@ -172,9 +189,11 @@ export const resolveVideoLink = createServerFn({ method: "POST" })
       const cleaned = raw.replace(/\\u0026/g, "&").replace(/\\\//g, "/").replace(/&amp;/g, "&");
       const abs = safeRemoteUrl(cleaned.startsWith("http") ? cleaned : new URL(cleaned, target).toString());
       if (abs && !isPlayerPage(abs)) {
+        const ticket = mediaProxyTicket(abs.toString());
         return {
           ok: true,
           videoUrl: abs.toString(),
+          proxyUrl: `/api/public/media-proxy?t=${encodeURIComponent(ticket)}`,
           ...(title ? { title } : {}),
           ...(thumbnail ? { thumbnail } : {}),
           source: host,

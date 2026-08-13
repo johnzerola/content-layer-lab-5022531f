@@ -19,7 +19,10 @@ export const Route = createFileRoute("/limpar-ia")({
         content:
           "Remova legendas, textos, logos e marcas d'água de vídeos com inpainting temporal em GPU. Reconstrução real do fundo, sem blur.",
       },
-      { property: "og:title", content: "CleanerIA — Remoção profissional de legendas, textos e marcas" },
+      {
+        property: "og:title",
+        content: "CleanerIA — Remoção profissional de legendas, textos e marcas",
+      },
       {
         property: "og:description",
         content:
@@ -39,6 +42,9 @@ interface UploadItem {
   w: number;
   h: number;
 }
+
+const MAX_UPLOAD_BYTES = 2 * 1024 ** 3;
+const MAX_DURATION_SECONDS = 3600;
 
 function LimparIAPage() {
   const [item, setItem] = useState<UploadItem | null>(null);
@@ -67,6 +73,10 @@ function LimparIAPage() {
       toast.error("Selecione um arquivo de vídeo.");
       return;
     }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      toast.error("O video excede o limite de 2 GB.");
+      return;
+    }
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
     video.muted = true;
@@ -86,6 +96,14 @@ function LimparIAPage() {
       });
       w = video.videoWidth || w;
       h = video.videoHeight || h;
+      if (video.duration > MAX_DURATION_SECONDS) {
+        toast.error("A duracao maxima e de 60 minutos.");
+        return;
+      }
+      if (w > 3840 || h > 2160) {
+        toast.error("A resolucao maxima e 3840x2160.");
+        return;
+      }
 
       const canvas = document.createElement("canvas");
       canvas.width = 160;
@@ -152,10 +170,12 @@ function LimparIAPage() {
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary">
             <Sparkles className="size-3.5" /> CleanerIA
           </div>
-          <h1 className="font-display text-3xl font-bold md:text-5xl">Remoção profissional de elementos</h1>
+          <h1 className="font-display text-3xl font-bold md:text-5xl">
+            Remoção profissional de elementos
+          </h1>
           <p className="mx-auto max-w-2xl text-muted-foreground">
-            Legendas, textos, logos e marcas d'água são removidos reconstruindo o fundo com contexto temporal.
-            Sem blur, sem mosaico, sem crop.
+            Legendas, textos, logos e marcas d'água são removidos reconstruindo o fundo com contexto
+            temporal. Sem blur, sem mosaico, sem crop.
           </p>
         </div>
 
@@ -175,8 +195,12 @@ function LimparIAPage() {
           <div className="mx-auto mb-4 grid size-16 place-items-center rounded-2xl bg-primary/10">
             <Upload className="size-7 text-primary" />
           </div>
-          <p className="font-display text-lg font-semibold">Arraste um vídeo ou clique para upload</p>
-          <p className="mt-1 text-sm text-muted-foreground">MP4, MOV, WebM, MKV — até 4 GB</p>
+          <p className="font-display text-lg font-semibold">
+            Arraste um vídeo ou clique para upload
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            MP4, MOV, WebM, MKV - ate 2 GB e 60 minutos
+          </p>
         </div>
 
         {history.length > 0 && (

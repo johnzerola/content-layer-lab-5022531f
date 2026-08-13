@@ -5,7 +5,7 @@ import { createServerFn } from "@tanstack/react-start";
  * Retorna apenas o texto — os tempos são calculados no cliente por segmento.
  */
 export const transcribeChunk = createServerFn({ method: "POST" })
-  .inputValidator((input: { audio: string; language?: string }) => {
+  .validator((input: { audio: string; language?: string }) => {
     if (!input?.audio || typeof input.audio !== "string") throw new Error("áudio ausente");
     return input;
   })

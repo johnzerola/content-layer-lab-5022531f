@@ -72,7 +72,8 @@ function StoragePage() {
     setSel((prev) => {
       const next = new Set(prev);
       const k = key(id, v);
-      next.has(k) ? next.delete(k) : next.add(k);
+      if (next.has(k)) next.delete(k);
+      else next.add(k);
       return next;
     });
 

@@ -102,17 +102,17 @@ export function ImportPanel({
             </Button>
           </div>
           <p className="mt-2 font-mono text-[10px] leading-relaxed text-muted-foreground">
-            {flow.linkHint} youtube / instagram / facebook exigem um serviço de resolução próprio (COBALT_API_URL).
+            {flow.linkHint} usa o arquivo original público disponibilizado pela plataforma, quando existente.
           </p>
           {linkMsg && <p className="mt-2 font-mono text-[11px] text-muted-foreground">{linkMsg}</p>}
           {linkBlocked && (
             <div className="mx-auto mt-3 max-w-xl rounded-lg border border-border bg-muted/30 p-3 text-left">
               <p className="font-mono text-[11px] uppercase tracking-wider text-primary">como importar mesmo assim</p>
               <ol className="mt-2 space-y-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
-                <li>1. baixe o vídeo pelo próprio app ou por um downloader</li>
+                <li>1. confirme que o post é público e que você tem permissão para usar o vídeo</li>
                 <li>2. arraste o arquivo aqui em cima, ou use "{flow.filesLabel}"</li>
                 <li>3. links diretos de arquivo (.mp4, .mov, .webm, .mkv, .m4v...) importam normalmente</li>
-                <li>4. para automatizar youtube/instagram, hospede uma instância cobalt e me peça para ligar a chave</li>
+                <li>4. conteúdo privado, live, playlist ou protegido por DRM não pode ser importado</li>
               </ol>
             </div>
           )}
