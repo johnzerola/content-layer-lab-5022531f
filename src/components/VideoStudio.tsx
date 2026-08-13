@@ -50,7 +50,7 @@ export function VideoStudio({
   width,
   height,
   duration: initialDuration,
-  captions,
+  captions: initialCaptions,
   onCaptionsChange,
   texts,
   onTextsChange,
@@ -67,7 +67,7 @@ export function VideoStudio({
   const [pre, setPre] = useState<PreEdit>(initial?.pre || defaultPreEdit());
   const [compare, setCompare] = useState(false);
 
-  const [captions, setCaptions] = useState<CaptionCue[]>(initialCaptions || []);
+  const [localCaptions, setLocalCaptions] = useState<CaptionCue[]>(initialCaptions || []);
   const [transcribing, setTranscribing] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
