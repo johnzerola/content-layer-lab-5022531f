@@ -1542,6 +1542,7 @@ export function VideoStudio({
 
 
 
+
             <div className="border-t border-border p-4 bg-surface/80 backdrop-blur-sm">
               <p className="font-mono text-[10px] leading-relaxed text-muted-foreground opacity-60">
                 Atalhos: <kbd className="rounded bg-muted px-1 text-foreground">espaço</kbd> play · 
