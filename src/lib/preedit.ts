@@ -78,7 +78,12 @@ export interface PreEdit {
   grayscale: number;
   /** px */
   blur: number;
+  /** 0..150 (%) */
+  voiceLevel?: number;
+  /** 0..150 (%) */
+  musicLevel?: number;
 }
+
 
 export function defaultPreEdit(): PreEdit {
   return {
