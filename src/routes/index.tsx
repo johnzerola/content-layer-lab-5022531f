@@ -136,12 +136,29 @@ function Dashboard() {
                         input.onchange = (e: any) => {
                             const files = Array.from(e.target.files || []);
                             if (files.length > 0) {
-                                setItems(p => [...p, ...files.map(f => ({
-                                    id: Math.random().toString(36).slice(2),
-                                    file: f,
-                                    status: 'pendente',
-                                    mode: mode === 'cleaner' ? 'limpar' : mode
-                                }))]);
+                                Promise.all(files.map(f => {
+                                  return new Promise<{id: string, file: File, w: number, h: number, duration: number, status: string, mode: string}>((resolve) => {
+                                    const video = document.createElement('video');
+                                    video.preload = 'metadata';
+                                    video.onloadedmetadata = () => {
+                                      resolve({
+                                        id: Math.random().toString(36).slice(2),
+                                        file: f,
+                                        w: video.videoWidth,
+                                        h: video.videoHeight,
+                                        duration: video.duration,
+                                        status: 'pendente',
+                                        mode: mode === 'cleaner' ? 'limpar' : mode
+                                      });
+                                    };
+                                    video.src = URL.createObjectURL(f);
+                                  });
+                                })).then(newItems => {
+                                  setItems(p => [...p, ...newItems]);
+                                  if (!selectedId && newItems.length > 0) {
+                                    setSelectedId(newItems[0].id);
+                                  }
+                                });
                             }
                         };
                         input.click();
@@ -179,7 +196,10 @@ function Dashboard() {
                           <Settings2 className="size-4 mr-2" /> Layout
                         </Button>
                       )}
-                      <Button variant="secondary" className="flex-1 rounded-xl h-11" onClick={() => setStudioId(selectedId)}>
+                      <Button variant="secondary" className="flex-1 rounded-xl h-11" onClick={() => {
+                        console.log('Ajustar clicked for ID:', selectedId || items[0]?.id);
+                        setStudioId(selectedId || items[0]?.id);
+                      }}>
                         <Scissors className="size-4 mr-2" /> Ajustar
                       </Button>
                     </div>
