@@ -16,6 +16,7 @@ import {
   Volume2,
   ZoomIn,
   ZoomOut,
+  X,
 } from "lucide-react";
 import type { FrameKey, Segment, Transition } from "@/lib/preedit";
 import type { CaptionCue } from "@/lib/captions";
