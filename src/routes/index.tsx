@@ -19,7 +19,9 @@ import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
 import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { CloudPanel } from "@/components/CloudPanel";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
+import { AudioSplitterStudio } from "@/components/AudioSplitterStudio";
 import { getCleanerHealth } from "@/lib/cleaner.functions";
+
 
 import { 
   createTemplate, 
@@ -36,7 +38,7 @@ export const Route = createFileRoute("/")({
 function Dashboard() {
   const [items, setItems] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [mode, setMode] = useState<"lote" | "clip" | "limpar" | "cleaner">("lote");
+  const [mode, setMode] = useState<"lote" | "clip" | "limpar" | "cleaner" | "audio">("lote");
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [active, setActive] = useState(createTemplate());
@@ -149,7 +151,7 @@ function Dashboard() {
                                         h: video.videoHeight,
                                         duration: video.duration,
                                         status: 'pendente',
-                                        mode: mode === 'cleaner' ? 'limpar' : mode
+                                        mode: mode === 'cleaner' ? 'limpar' : (mode === 'audio' ? 'audio' : mode)
                                       });
                                     };
                                     video.src = URL.createObjectURL(f as Blob);
@@ -185,7 +187,12 @@ function Dashboard() {
                     item={items.find(it => it.id === selectedId) || items[0]}
                     onComplete={() => {}}
                   />
+                ) : mode === 'audio' ? (
+                  <AudioSplitterStudio
+                    file={items.find(it => it.id === selectedId)?.file || items[0].file}
+                  />
                 ) : (
+
                   <div className="panel p-4 flex flex-col items-center gap-4">
                     <div className="relative aspect-[9/16] w-full max-w-[320px] overflow-hidden rounded-xl bg-black shadow-2xl flex items-center justify-center">
                       <TemplateCanvas template={active} previewFile={items.find(it => it.id === selectedId)?.file || items[0].file} />

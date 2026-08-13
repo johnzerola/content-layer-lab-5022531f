@@ -7,7 +7,7 @@
  * exportável em JSON para depurar renderizações lentas ou travadas.
  */
 
-export type JobTool = "lote" | "clip" | "limpar" | "limpar-ia" | "live";
+export type JobTool = "lote" | "clip" | "limpar" | "limpar-ia" | "live" | "audio";
 export type JobStatus = "na fila" | "processando" | "pronto" | "erro" | "cancelado";
 
 export interface JobStep {
@@ -43,7 +43,9 @@ export const TOOL_LABEL: Record<JobTool, string> = {
   limpar: "LimpaVídeo",
   "limpar-ia": "CleanerIA",
   live: "Monitora Live",
+  audio: "AudioSplit",
 };
+
 
 /** sem progresso por esse tempo enquanto processa = provavelmente travado */
 export const STALL_MS = 75_000;
