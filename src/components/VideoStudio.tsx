@@ -29,12 +29,34 @@ interface VideoStudioProps {
   onSave: (data: { pre: PreEdit; clip: { start: number; end: number } | null }) => void;
   onClose: () => void;
   initial?: { pre: PreEdit; clip: { start: number; end: number } | null };
+  width?: number;
+  height?: number;
+  duration?: number;
+  captions?: any[];
+  onCaptionsChange?: (cues: any[]) => void;
+  texts?: { headline: string; name: string; handle: string; cta: string };
+  onTextsChange?: (t: { headline: string }) => void;
 }
 
-export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps) {
+export function VideoStudio({
+  file,
+  onSave,
+  onClose,
+  initial,
+  width,
+  height,
+  duration: initialDuration,
+  captions,
+  onCaptionsChange,
+  texts,
+  onTextsChange,
+}: VideoStudioProps) {
   const [url] = useState(() => URL.createObjectURL(file));
-  const [duration, setDuration] = useState(0);
-  const [time, setTime] = useState(0);
+  const [duration, setDuration] = useState(initialDuration || 0);
+  const [clip, setClip] = useState<{ start: number; end: number }>(
+    initial?.clip || { start: 0, end: initialDuration || 0 },
+  );
+  const [time, setTime] = useState(clip.start);
   const [playing, setPlaying] = useState(false);
   const [tab, setTab] = useState("trim");
   const [view, setView] = useState<"src" | "out">("out");
@@ -48,7 +70,7 @@ export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps
     if (!v) return;
     const onLoaded = () => {
       setDuration(v.duration);
-      if (!initial?.pre) setPre((p: PreEdit) => ({ ...p, end: v.duration }));
+      if (!initial?.clip) setClip((c) => ({ ...c, end: v.duration }));
     };
     const onTime = () => setTime(v.currentTime);
     v.addEventListener("loadedmetadata", onLoaded);
@@ -112,7 +134,7 @@ export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps
                                             
                                             continua</Button>
             <Button variant="ghost" size="icon" onClick={onClose}><X className="size-4" /></Button>
-            <Button size="sm" onClick={() => onSave({ pre, clip: { start: pre.start, end: pre.end } })}>Concluir</Button>
+            <Button size="sm" onClick={() => onSave({ pre, clip })}>Concluir</Button>
           </div>
         </header>
 
@@ -156,7 +178,7 @@ export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps
                   <StagePreview
                     videoRef={videoRef}
                     pre={pre}
-                    clip={{ start: pre.start, end: pre.end }}
+                    clip={clip}
                     bypass={compare}
                     className="h-full"
                   />
@@ -176,13 +198,13 @@ export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps
                 duration={duration}
                 time={time}
                 playing={playing}
-                start={pre.start}
-                end={pre.end}
+                start={clip.start}
+                end={clip.end}
                 transIn={pre.transIn}
                 transOut={pre.transOut}
                 onSeek={seek}
                 onTogglePlay={toggle}
-                onTrim={(s, e) => setPatch({ start: s, end: e })}
+                onTrim={(s, e) => setClip({ start: s, end: e })}
                 keys={pre.keys}
                 segments={pre.segments}
                 onKeysChange={keys => setPatch({ keys })}
@@ -197,12 +219,12 @@ export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps
               {tab === "trim" && (
                 <div className="space-y-4">
                   <div className="space-y-2">
-                    <span className="text-[11px] font-bold text-muted-foreground uppercase">Início: {pre.start.toFixed(2)}s</span>
-                    <Slider value={[pre.start]} max={duration} step={0.1} onValueChange={([v]) => setPatch({ start: v ?? 0 })} />
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase">Início: {clip.start.toFixed(2)}s</span>
+                    <Slider value={[clip.start]} max={duration} step={0.1} onValueChange={([v]) => setClip(c => ({ ...c, start: v ?? 0 }))} />
                   </div>
                   <div className="space-y-2">
-                    <span className="text-[11px] font-bold text-muted-foreground uppercase">Fim: {pre.end.toFixed(2)}s</span>
-                    <Slider value={[pre.end]} max={duration} step={0.1} onValueChange={([v]) => setPatch({ end: v ?? duration })} />
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase">Fim: {clip.end.toFixed(2)}s</span>
+                    <Slider value={[clip.end]} max={duration} step={0.1} onValueChange={([v]) => setClip(c => ({ ...c, end: v ?? duration }))} />
                   </div>
                 </div>
               )}
