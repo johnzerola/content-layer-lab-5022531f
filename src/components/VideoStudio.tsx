@@ -1517,9 +1517,6 @@ export function VideoStudio({
               </div>
             </ScrollArea>
 
-              </div>
-            </ScrollArea>
-
             <div className="border-t border-border p-4 bg-surface/80 backdrop-blur-sm">
               <p className="font-mono text-[10px] leading-relaxed text-muted-foreground opacity-60">
                 Atalhos: <kbd className="rounded bg-muted px-1 text-foreground">espaço</kbd> play · 
@@ -1530,12 +1527,12 @@ export function VideoStudio({
               </p>
             </div>
           </aside>
-
         </div>
       </div>
     </div>
   );
 }
+
 
 
 
