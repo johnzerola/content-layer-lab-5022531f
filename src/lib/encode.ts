@@ -111,14 +111,14 @@ async function pickAudioCodec(channels: number, sampleRate: number): Promise<"aa
 }
 
 async function decodeAudio(
-  file: File,
+  file: File | string,
   segments: { start: number; end: number }[],
   speed: number,
   pitchCents = 0,
   eqDb = 0,
 ) {
   try {
-    const buf = await file.arrayBuffer();
+    const buf = typeof file === "string" ? await (await fetch(file)).arrayBuffer() : await file.arrayBuffer();
     const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ac = new Ctx();
     const decoded = await ac.decodeAudioData(buf);
