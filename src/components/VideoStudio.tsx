@@ -952,13 +952,19 @@ export function VideoStudio({
 
             <ScrollArea className="flex-1">
               <div className="space-y-6 p-4">
-
-            {tab === "camera" && (
-              <p className="font-mono text-[11px] text-muted-foreground">
-                A câmera virtual usa o palco à esquerda. Escolha pessoas, pontos de enquadramento e transições
-                direto lá.
-              </p>
-            )}
+                {tab === "camera" && (
+                  <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border py-12 text-center">
+                    <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
+                      <Sparkles className="size-6 text-primary" />
+                    </div>
+                    <div className="max-w-[200px] space-y-1">
+                      <p className="font-display text-sm font-bold">IA Motion Ativa</p>
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">
+                        O enquadramento está sendo controlado pela câmera virtual. Use o palco ao lado para ajustes manuais.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
             {tab === "trim" && (
               <div className="space-y-4">
