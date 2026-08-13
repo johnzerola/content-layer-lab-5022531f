@@ -212,7 +212,21 @@ function Dashboard() {
                          </div>
                        ))}
                     </div>
-                    <Button className="w-full shadow-glow h-11" onClick={() => setRunning(true)}>
+                    <Button 
+                      className="w-full shadow-glow h-11" 
+                      disabled={running || items.length === 0}
+                      onClick={() => {
+                        if (mode === 'cleaner' || mode === 'limpar') {
+                          // Se estivermos no modo cleaner, o processamento individual já é lidado pelo CleanerIAStudio
+                          // mas o botão "Processar Tudo" pode disparar para todos os itens da fila
+                          toast.info("Iniciando processamento em lote para limpeza...");
+                          setRunning(true);
+                          // Lógica de lote...
+                        } else {
+                          setRunning(true);
+                        }
+                      }}
+                    >
                        <Sparkles className="size-4 mr-2" />
                        Processar Tudo
                     </Button>
