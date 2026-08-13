@@ -1410,17 +1410,22 @@ export function VideoStudio({
 
                   <div className="grid grid-cols-1 gap-3">
                     <Button
-                      variant="outline"
+                      variant={pre.voiceLevel !== 100 || pre.musicLevel !== 100 ? "default" : "outline"}
                       className="h-auto flex-col items-start gap-1 py-4 text-left"
                       onClick={separateAudioTracks}
                       disabled={separating}
                     >
                       <div className="flex items-center gap-2 font-semibold">
-                        <Sparkles className="h-4 w-4 text-primary" />
-                        <span>Separar com IA</span>
+                        <Sparkles className={cn("h-4 w-4", separating ? "animate-spin" : "text-primary")} />
+                        <span>{separating ? "Processando..." : "Separar com IA"}</span>
                       </div>
-                      <span className="text-[10px] opacity-70">Detecta vozes e instrumentos de forma independente</span>
+                      <span className="text-[10px] opacity-70">
+                        {pre.voiceLevel !== 100 || pre.musicLevel !== 100 
+                          ? "Trilhas separadas e prontas para mixagem" 
+                          : "Detecta vozes e instrumentos de forma independente"}
+                      </span>
                     </Button>
+
                   </div>
 
                   <div className="space-y-4 pt-4 border-t">
