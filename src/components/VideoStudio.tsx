@@ -29,6 +29,7 @@ import {
   Undo2,
   X,
 } from "lucide-react";
+import { AudioSplitterStudio } from "@/components/AudioSplitterStudio";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -1612,10 +1613,8 @@ export function VideoStudio({
                     <p className="font-mono text-[10px] text-muted-foreground leading-relaxed">
                       Separe voz e música deste vídeo para ajustar volumes de forma independente.
                     </p>
-                    <import { AudioSplitterStudio } from "@/components/AudioSplitterStudio"; />
-                    {/* JSX cannot import inside a block, so I will add the component call below */}
                     <div className="mt-2">
-                      <AudioSplitterStudio_Wrapper 
+                      <AudioSplitterStudio 
                         file={file} 
                         onComplete={(vBlob, mBlob, vUrl, mUrl) => {
                           set({ 
