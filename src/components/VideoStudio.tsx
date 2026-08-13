@@ -94,7 +94,7 @@ export function VideoStudio({
     const tid = toast.loading("Gerando legendas com IA...");
     try {
       const res = await generateCaptions(file, { clip });
-      setCaptions(res);
+      setLocalCaptions(res);
       onCaptionsChange?.(res);
       toast.success("Legendas geradas com sucesso!", { id: tid });
     } catch (err) {
@@ -204,7 +204,7 @@ export function VideoStudio({
                     clip={clip}
                     bypass={compare}
                     className="h-full"
-                    cues={captions}
+                    cues={localCaptions}
                   />
                 )}
               </div>
@@ -231,7 +231,7 @@ export function VideoStudio({
                 onTrim={(s, e) => setClip({ start: s, end: e })}
                 keys={pre.keys}
                 segments={pre.segments}
-                cues={captions}
+                cues={localCaptions}
                 onKeysChange={keys => setPatch({ keys })}
                 onAddKey={() => {}}
               />
@@ -255,7 +255,7 @@ export function VideoStudio({
               )}
               {tab === "captions" && (
                 <div className="space-y-4">
-                  {!captions.length ? (
+                  {!localCaptions?.length ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center space-y-4">
                       <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center">
                         <Wand2 className="size-6 text-primary" />
@@ -290,7 +290,7 @@ export function VideoStudio({
                           ...p,
                           captionStyle: { ...p.captionStyle, ...patch }
                         }))}
-                        cues={captions}
+                        cues={localCaptions}
                       />
                     </div>
                   )}
