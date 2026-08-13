@@ -25,7 +25,7 @@ import { StagePreview } from "./editor/StagePreview";
 import { CaptionStudio } from "./CaptionStudio";
 import { toast } from "sonner";
 import { type Template, createTemplate } from "@/lib/template";
-import { type PreEdit, defaultPreEdit } from "@/lib/preedit";
+import { type PreEdit, defaultPreEdit, splitAt, keptSegments, LAYOUTS, CROP_PRESETS, cropForRatio } from "@/lib/preedit";
 import { generateCaptions, type CaptionCue } from "@/lib/captions";
 
 interface VideoStudioProps {
@@ -152,10 +152,7 @@ export function VideoStudio({
             <h2 className="text-sm font-black uppercase tracking-tighter">Editor Profissional</h2>
           </div>
           <div className="flex items-center gap-2">
-             <Button variant="ghost" size="sm" onClick={() => setPre(defaultPreEdit())}><RotateCcw className="mr-1 size-3" /> '''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''
-                                        
-                                            
-                                            nada aqui funciona</Button>
+            <Button variant="ghost" size="sm" onClick={() => setPre(defaultPreEdit())}><RotateCcw className="mr-1 size-3" /> Resetar</Button>
             <Button variant="ghost" size="icon" onClick={onClose}><X className="size-4" /></Button>
             <Button size="sm" onClick={() => onSave({ pre, clip })}>Concluir</Button>
           </div>
@@ -233,7 +230,23 @@ export function VideoStudio({
                 segments={pre.segments}
                 cues={localCaptions}
                 onKeysChange={keys => setPatch({ keys })}
-                onAddKey={() => {}}
+                onAddKey={() => {
+                  const nt = Number(time.toFixed(2));
+                  const newKeys = [...pre.keys, { t: nt, crop: pre.crop || { x: 0, y: 0, w: 1, h: 1 } }].sort((a, b) => a.t - b.t);
+                  setPatch({ keys: newKeys });
+                  toast.success("Keyframe adicionado no tempo atual");
+                }}
+                onSplit={() => {
+                  const nt = Number(time.toFixed(2));
+                  const newSegs = splitAt(pre.segments.length ? pre.segments : keptSegments(pre, clip, duration), nt);
+                  setPatch({ segments: newSegs });
+                  toast.success("Clipe dividido");
+                }}
+                onDeleteSegment={idx => {
+                  const next = [...pre.segments];
+                  next.splice(idx, 1);
+                  setPatch({ segments: next });
+                }}
               />
             </div>
           </div>
@@ -305,6 +318,80 @@ export function VideoStudio({
                   <div className="space-y-2">
                     <span className="text-[11px] font-bold text-muted-foreground uppercase">Desfoque</span>
                     <Slider value={[pre.blur]} min={0} max={10} step={0.1} onValueChange={([v]) => setPatch({ blur: v ?? 0 })} />
+                  </div>
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase">Contraste</span>
+                    <Slider value={[pre.contrast]} min={0} max={2} step={0.01} onValueChange={([v]) => setPatch({ contrast: v ?? 1 })} />
+                  </div>
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase">Saturação</span>
+                    <Slider value={[pre.saturation]} min={0} max={2} step={0.01} onValueChange={([v]) => setPatch({ saturation: v ?? 1 })} />
+                  </div>
+                  <div className="space-y-2">
+                    <span className="text-[11px] font-bold text-muted-foreground uppercase">Hue</span>
+                    <Slider value={[pre.hue]} min={-180} max={180} step={1} onValueChange={([v]) => setPatch({ hue: v ?? 0 })} />
+                  </div>
+                </div>
+              )}
+              {tab === "layout" && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    {LAYOUTS.map(l => (
+                      <button
+                        key={l.id}
+                        onClick={() => setPatch({ layout: l.id })}
+                        className={`p-2 rounded-lg border text-left transition ${
+                          pre.layout === l.id ? "border-primary bg-primary/10" : "border-border hover:bg-muted"
+                        }`}
+                      >
+                        <div className="text-[10px] font-bold uppercase">{l.label}</div>
+                        <div className="text-[8px] text-muted-foreground leading-tight">{l.hint}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {tab === "camera" && (
+                <div className="space-y-4">
+                  <div className="flex flex-col gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setPatch({ flipH: !pre.flipH })}
+                      className={pre.flipH ? "border-primary text-primary" : ""}
+                    >
+                      Espelhar Horizontal
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setPatch({ rotate: ((pre.rotate + 90) % 360) as any })}
+                    >
+                      Rotacionar 90°
+                    </Button>
+                  </div>
+                  <div className="pt-4 border-t border-border">
+                    <p className="text-[10px] text-muted-foreground uppercase font-bold mb-2">Presets de Recorte</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {CROP_PRESETS.map(p => (
+                        <Button
+                          key={p.id}
+                          variant="ghost"
+                          size="sm"
+                          className="text-[10px]"
+                          onClick={() => {
+                            if (!videoRef.current || !p.ratio) {
+                              setPatch({ crop: null });
+                              return;
+                            }
+                            const newCrop = cropForRatio(p.ratio, videoRef.current.videoWidth, videoRef.current.videoHeight);
+                            setPatch({ crop: newCrop });
+                          }}
+                        >
+                          {p.label}
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
