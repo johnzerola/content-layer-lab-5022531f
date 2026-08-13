@@ -118,13 +118,37 @@ function Dashboard() {
                 <h3 className="text-xl font-bold mb-2">Importe seu vídeo</h3>
                 <p className="text-muted-foreground mb-8 max-w-sm">Cole um link ou arraste arquivos para começar a processar com a inteligência do {current?.brand}.</p>
                 
-                <div className="w-full max-w-lg flex gap-2">
-                    <input 
-                      type="text" 
-                      placeholder="Cole o link do vídeo (YouTube, Insta, TikTok)..." 
-                      className="flex-1 rounded-xl border border-border bg-background px-4 py-3 font-mono text-sm outline-none focus:border-primary" 
-                    />
-                    <Button size="lg" className="px-8 shadow-glow">Importar</Button>
+                <div className="w-full max-w-lg flex flex-col gap-4">
+                    <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          placeholder="Cole o link do vídeo (YouTube, Insta, TikTok)..." 
+                          className="flex-1 rounded-xl border border-border bg-background px-4 py-3 font-mono text-sm outline-none focus:border-primary transition shadow-sm" 
+                        />
+                        <Button size="lg" className="px-8 shadow-glow h-[46px]">Importar</Button>
+                    </div>
+                    <div className="relative group cursor-pointer" onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.multiple = true;
+                        input.accept = 'video/*';
+                        input.onchange = (e: any) => {
+                            const files = Array.from(e.target.files || []);
+                            if (files.length > 0) {
+                                setItems(p => [...p, ...files.map(f => ({
+                                    id: Math.random().toString(36).slice(2),
+                                    file: f,
+                                    status: 'pendente',
+                                    mode: mode === 'cleaner' ? 'limpar' : mode
+                                }))]);
+                            }
+                        };
+                        input.click();
+                    }}>
+                        <div className="rounded-xl border border-dashed border-border/60 bg-surface-2/30 p-4 transition group-hover:border-primary/40 group-hover:bg-primary/5">
+                            <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground group-hover:text-primary transition">Ou clique para selecionar arquivos</p>
+                        </div>
+                    </div>
                 </div>
 
                 <div className="mt-8 pt-8 border-t border-border w-full flex flex-col items-center gap-4">
