@@ -78,8 +78,12 @@ export const startCleanerJob = createServerFn({ method: "POST" })
         "Authorization": `Bearer ${secret}`,
       },
       body: JSON.stringify({
-        regions: data.regions,
-        options: data.options,
+        mode: data.options.mode,
+        preset: data.options.preset || "quality",
+        masks: data.regions,
+        options: {
+          upscale: data.options.upscale,
+        },
       }),
     });
 
