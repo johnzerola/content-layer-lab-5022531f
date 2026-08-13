@@ -5,6 +5,8 @@ import { cleanerRegionSchema } from "./cleaner.schemas";
 export const getCleanerHealth = createServerFn({ method: "GET" })
   .handler(async () => {
     const workerUrl = process.env['CLEANER_WORKER_URL'];
+    const publicWorkerUrl = process.env['CLEANER_WORKER_PUBLIC_URL'] || workerUrl;
+    
     if (!workerUrl) return { status: "offline", reason: "CLEANER_WORKER_URL missing" };
 
     try {
@@ -24,7 +26,8 @@ export const getCleanerHealth = createServerFn({ method: "GET" })
         return { 
           status: data.online ? "online" : "offline", 
           gpu: data.gpu || "none",
-          cpu: data.cpu || "none"
+          cpu: data.cpu || "none",
+          uploadUrl: publicWorkerUrl ? `${publicWorkerUrl}/v1/media/upload` : null
         };
       } catch {
         return { status: "offline", reason: "Invalid JSON response" };
@@ -32,6 +35,42 @@ export const getCleanerHealth = createServerFn({ method: "GET" })
     } catch (err) {
       return { status: "offline", reason: "Connection failed" };
     }
+  });
+
+export const confirmCleanerUpload = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({
+    fileName: z.string(),
+  }).parse(data))
+  .handler(async ({ data }) => {
+    const workerUrl = process.env['CLEANER_WORKER_URL'];
+    const secret = process.env['CLEANER_WORKER_SECRET'];
+    
+    if (!workerUrl || !secret) throw new Error("Config missing");
+
+    const resp = await fetch(`${workerUrl}/v1/media/exists?file=${encodeURIComponent(data.fileName)}`, {
+      headers: { "X-Service-Token": secret }
+    });
+
+    if (!resp.ok) return { exists: false };
+    const result = await resp.json();
+    return { exists: result.exists, videoUrl: result.url };
+  });
+
+export const cleanupCleanerRemoteJob = createServerFn({ method: "POST" })
+  .validator((data: unknown) => z.object({
+    jobId: z.string(),
+  }).parse(data))
+  .handler(async ({ data }) => {
+    const workerUrl = process.env['CLEANER_WORKER_URL'];
+    const secret = process.env['CLEANER_WORKER_SECRET'];
+    if (!workerUrl || !secret) return;
+
+    await fetch(`${workerUrl}/v1/jobs/${data.jobId}`, {
+      method: "DELETE",
+      headers: { "X-Service-Token": secret }
+    }).catch(() => {});
+    
+    return { success: true };
   });
 
 export const startCleanerJob = createServerFn({ method: "POST" })
@@ -52,8 +91,6 @@ export const startCleanerJob = createServerFn({ method: "POST" })
       throw new Error("Cleaner configuration missing");
     }
 
-    // O worker usa um fluxo de duas etapas: 1. Criar Job/Upload, 2. Processar.
-    // Primeiro, tentamos resolver a URL para ver se já é conhecida ou criar um novo job de importação.
     const resolveEndpoint = `${workerUrl}/v1/media/resolve`;
     const resolveResp = await fetch(resolveEndpoint, {
       method: "POST",
@@ -73,7 +110,6 @@ export const startCleanerJob = createServerFn({ method: "POST" })
 
     const { job_id } = await resolveResp.json();
 
-    // Agora iniciamos o processamento
     const processEndpoint = `${workerUrl}/v1/jobs/${job_id}/process`;
     const processResp = await fetch(processEndpoint, {
       method: "POST",
@@ -100,4 +136,3 @@ export const startCleanerJob = createServerFn({ method: "POST" })
 
     return { job_id };
   });
-
