@@ -78,12 +78,12 @@ function Dashboard() {
   const openStudio = async (id: string) => setStudioId(id);
   const togglePlatform = (id: string) => {};
   const useTemplate = (t: any) => setActive(t);
-  const commit = (t: any, msg: string) => ({ list: templates, template: t });
+  const commit = (t: any, msg?: string) => t;
   const buildSnapshot = () => ({ items: [], templates: [], mode: "lote" });
   const restoreSnapshot = (s: any) => {};
 
   return (
-    <AppShell mode={mode} onModeChange={setMode}>
+    <AppShell mode={mode} onMode={setMode} count={items.length} onLibrary={() => setLibraryOpen(true)} onCloud={() => setCloudOpen(true)}>
       <div className="mx-auto max-w-7xl p-6">
         {mode !== "clip" ? (
           <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
@@ -261,7 +261,7 @@ function Dashboard() {
             height={studioItem.h}
             duration={studioItem.duration}
             value={{
-              pre: studioItem.preEdit ?? defaultPreEdit(),
+              pre: studioItem.preEdit ?? { trim: { start: 0, end: studioItem.duration }, crop: { x: 0, y: 0, w: 1, h: 1 }, speed: 1, mirror: false },
               clip: studioItem.clip ?? null,
             }}
             captions={studioItem.captions}
