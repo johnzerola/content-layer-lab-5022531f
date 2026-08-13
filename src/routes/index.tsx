@@ -161,32 +161,30 @@ function Dashboard() {
           ) : (
             <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
               {/* Preview e Ajustes */}
-              <div className="space-y-6">
-                <div className="panel p-4 flex flex-col items-center gap-4">
-                  <div className="relative aspect-[9/16] w-full max-w-[320px] overflow-hidden rounded-xl bg-black shadow-2xl flex items-center justify-center">
-                    {mode === 'limpar' || mode === 'cleaner' ? (
-                      <CleanerIAStudio 
-                        item={items.find(it => it.id === selectedId) || items[0]} 
-                        onComplete={() => {}} 
-                      />
-                    ) : (
+              <div className="min-w-0 space-y-6">
+                {mode === 'limpar' || mode === 'cleaner' ? (
+                  <CleanerIAStudio
+                    item={items.find(it => it.id === selectedId) || items[0]}
+                    onComplete={() => {}}
+                  />
+                ) : (
+                  <div className="panel p-4 flex flex-col items-center gap-4">
+                    <div className="relative aspect-[9/16] w-full max-w-[320px] overflow-hidden rounded-xl bg-black shadow-2xl flex items-center justify-center">
                       <TemplateCanvas template={active} previewFile={items.find(it => it.id === selectedId)?.file || items[0].file} />
-                    )}
-                  </div>
-                  
-                  <div className="flex gap-2 w-full max-w-[320px]">
-                    {mode === 'lote' && (
-                      <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={() => setEditing(true)}>
-                        <Settings2 className="size-4 mr-2" /> Layout
-                      </Button>
-                    )}
-                    {items.length > 0 && (
+                    </div>
+
+                    <div className="flex gap-2 w-full max-w-[320px]">
+                      {mode === 'lote' && (
+                        <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={() => setEditing(true)}>
+                          <Settings2 className="size-4 mr-2" /> Layout
+                        </Button>
+                      )}
                       <Button variant="secondary" className="flex-1 rounded-xl h-11" onClick={() => setStudioId(selectedId)}>
                         <Scissors className="size-4 mr-2" /> Ajustar
                       </Button>
-                    )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Fila Lateral */}
