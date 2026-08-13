@@ -186,7 +186,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         toast.success("Limpeza concluída com sucesso!");
         const resultUrl = `${health?.uploadUrl?.replace("/v1/media/upload", "")}/outputs/${job.job_id}.mp4`;
         
-        onComplete(resultUrl);
+        onComplete(resultUrl || "");
         
         // Cleanup pós download (simulado aqui após 10s do onComplete)
         setTimeout(() => {
