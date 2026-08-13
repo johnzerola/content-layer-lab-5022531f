@@ -1539,12 +1539,17 @@ export function VideoStudio({
                   <Slider value={[pre.blur]} min={0} max={8} step={0.1} onValueChange={([v]) => set({ blur: v ?? 0 }, "cor")} />
                 </Field>
               </div>
-            )}
+            </ScrollArea>
 
-            <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
-              Atalhos: espaço reproduz · setas andam quadro a quadro · I/O marcam entrada e saída · S divide ·
-              K grava keyframe · Ctrl+Z desfaz.
-            </p>
+            <div className="border-t border-border p-4 bg-surface/80 backdrop-blur-sm">
+              <p className="font-mono text-[10px] leading-relaxed text-muted-foreground opacity-60">
+                Atalhos: <kbd className="rounded bg-muted px-1 text-foreground">espaço</kbd> play · 
+                <kbd className="rounded bg-muted px-1 text-foreground">setas</kbd> quadro a quadro · 
+                <kbd className="rounded bg-muted px-1 text-foreground">I</kbd>/<kbd className="rounded bg-muted px-1 text-foreground">O</kbd> entrada/saída · 
+                <kbd className="rounded bg-muted px-1 text-foreground">S</kbd> dividir ·
+                <kbd className="rounded bg-muted px-1 text-foreground">K</kbd> keyframe.
+              </p>
+            </div>
           </aside>
         </div>
       </div>
