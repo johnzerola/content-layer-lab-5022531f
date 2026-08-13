@@ -142,10 +142,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           </div>
           
           <div className="space-y-2">
-            <p className="text-[10px] font-mono uppercase text-muted-foreground">Modo de reconstrução</p>
+            <p className="text-[10px] font-mono uppercase text-muted-foreground">Modo Inteligente</p>
             <div className="grid grid-cols-2 gap-2">
-              <Button variant="outline" size="sm" className="h-8 text-[10px] uppercase">Automático</Button>
-              <Button variant="secondary" size="sm" className="h-8 text-[10px] uppercase">Manual</Button>
+              <Button variant="secondary" size="sm" className="h-8 text-[10px] uppercase">Smart (Auto)</Button>
+              <Button variant="outline" size="sm" className="h-8 text-[10px] uppercase">Manual</Button>
             </div>
           </div>
 
