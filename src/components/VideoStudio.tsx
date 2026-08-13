@@ -204,7 +204,7 @@ export function VideoStudio({
                     clip={clip}
                     bypass={compare}
                     className="h-full"
-                    cues={localCaptions}
+                    captions={localCaptions}
                   />
                 )}
               </div>
