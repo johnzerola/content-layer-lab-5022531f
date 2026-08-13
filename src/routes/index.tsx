@@ -2561,6 +2561,7 @@ function Home() {
             </section>
           </div>
         )}
+      </div>
 
         {mode === "clip" && items.length > 0 && (
           <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
