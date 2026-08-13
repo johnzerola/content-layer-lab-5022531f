@@ -22,6 +22,7 @@ import {
   confirmCleanerUpload,
   createCleanerJob,
   detectCleanerJob,
+  prepareCleanerUpload,
   processCleanerJob,
   refreshCleanerJob,
   saveCleanerMasks,
@@ -65,6 +66,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     online: boolean;
     ai_ready?: boolean;
     max_ready?: boolean;
+    cuda?: boolean;
+    gpu?: string;
     reason?: string;
   } | null>(null);
   const [polling, setPolling] = useState(false);
@@ -84,6 +87,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const confirmUpload = useServerFn(confirmCleanerUpload);
   const createJob = useServerFn(createCleanerJob);
   const detectJob = useServerFn(detectCleanerJob);
+  const prepareUpload = useServerFn(prepareCleanerUpload);
   const processJob = useServerFn(processCleanerJob);
   const refreshJob = useServerFn(refreshCleanerJob);
   const saveMasks = useServerFn(saveCleanerMasks);
@@ -99,7 +103,14 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
           (h) =>
             alive &&
             setHealth(
-              h as { online: boolean; ai_ready?: boolean; max_ready?: boolean; reason?: string },
+              h as {
+                online: boolean;
+                ai_ready?: boolean;
+                max_ready?: boolean;
+                cuda?: boolean;
+                gpu?: string;
+                reason?: string;
+              },
             ),
         )
         .catch(
@@ -323,10 +334,19 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
     setInputReady(false);
     try {
       const headers = await cloudAuthHeaders();
-      const { job: newJob, upload } = (await createJob({
-        data: { filename: item.file.name, size: item.file.size, mode, preset },
-        headers,
-      })) as { job: CleanerJob; upload?: { url: string; token: string } };
+      let newJob: CleanerJob;
+      let upload: { url: string; token: string } | undefined;
+      if (job?.id && !inputReady) {
+        newJob = job;
+        ({ upload } = (await prepareUpload({ data: { id: job.id }, headers })) as {
+          upload: { url: string; token: string };
+        });
+      } else {
+        ({ job: newJob, upload } = (await createJob({
+          data: { filename: item.file.name, size: item.file.size, mode, preset },
+          headers,
+        })) as { job: CleanerJob; upload?: { url: string; token: string } });
+      }
       setJob(newJob);
 
       if (upload) {
@@ -464,7 +484,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       });
       setPolling(true);
       setJob((prev) => (prev ? { ...prev, status: "inpainting", progress: 1 } : prev));
-      toast.success("Reconstrução iniciada na GPU.");
+      toast.success("Reconstrução iniciada no motor de IA.");
     } catch (e) {
       toast.error(`Erro ao iniciar: ${e instanceof Error ? e.message : "desconhecido"}`);
     }
@@ -805,6 +825,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 ? "verificando…"
                 : health.online && health.ai_ready
                   ? "IA pronta"
+                  : health.online && health.cuda === false
+                    ? "modo CPU"
                   : health.online
                     ? "modo básico"
                     : "offline"}
@@ -1046,6 +1068,16 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             <div className="text-[11px] leading-relaxed">
               <p className="font-bold uppercase tracking-tight">Backend offline</p>
               <p className="opacity-80">{health.reason || "worker GPU não configurado"}</p>
+            </div>
+          </div>
+        )}
+
+        {health?.online && health.cuda === false && (
+          <div className="flex items-start gap-2 rounded-xl bg-amber-500/10 p-4 text-amber-600">
+            <AlertCircle className="mt-0.5 size-4 shrink-0" />
+            <div className="text-[11px] leading-relaxed">
+              <p className="font-bold uppercase">Processamento em CPU</p>
+              <p className="opacity-80">O motor está disponível, mas vídeos podem demorar mais.</p>
             </div>
           </div>
         )}

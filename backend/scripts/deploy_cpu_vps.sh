@@ -38,6 +38,16 @@ SECRET=""
 if [[ -f .env ]]; then
   SECRET=$(sed -n 's/^CLEANER_WORKER_SECRET=//p' .env | head -n1)
 fi
+if [[ ${#SECRET} -lt 32 ]]; then
+  for container in $(docker ps -q); do
+    candidate=$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$container" 2>/dev/null \
+      | sed -n 's/^CLEANER_WORKER_SECRET=//p' | head -n1)
+    if [[ ${#candidate} -ge 32 && "$candidate" != "default_secret" ]]; then
+      SECRET=$candidate
+      break
+    fi
+  done
+fi
 if [[ ${#SECRET} -lt 32 || "$SECRET" == "default_secret" ]]; then
   SECRET=$(head -c 48 /dev/urandom | base64 | tr -d '\n')
 fi

@@ -117,6 +117,21 @@ export const confirmCleanerUpload = createServerFn({ method: "POST" })
     return row as unknown as CleanerJob;
   });
 
+export const prepareCleanerUpload = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .validator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireOwnedJob(context.supabase, context.userId, data.id);
+    const base = workerPublicBase();
+    if (!base) throw new Error("worker offline");
+    return {
+      upload: {
+        url: `${base}/v1/jobs/${data.id}/upload`,
+        token: jobToken(data.id, "upload"),
+      },
+    };
+  });
+
 export const deleteCleanerJob = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .validator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
