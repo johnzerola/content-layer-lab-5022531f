@@ -5,9 +5,6 @@ import {
   Pause,
   StepBack,
   StepForward,
-  Undo2,
-  Redo2,
-  RotateCcw,
   X,
   Type,
   Subtitles,
@@ -15,54 +12,22 @@ import {
   AudioLines,
   Camera,
   LayoutTemplate,
-  Grid3X3,
-  Shield,
-  Eye,
+  RotateCcw,
+  Undo2,
+  Redo2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { EditorTimeline } from "./EditorTimeline";
 import { StagePreview } from "./StagePreview";
 import { toast } from "sonner";
-
-// Local minimal types to decouple from template.ts for now
-interface PreEdit {
-  start: number;
-  end: number;
-  brightness: number;
-  contrast: number;
-  saturation: number;
-  blur: number;
-  rotate: number;
-  flipH: boolean;
-  flipV: boolean;
-  crop: { x: number; y: number; w: number; h: number };
-  keys: any[];
-  segments: any[];
-  captions: any[];
-}
-
-const defaultPre = (): PreEdit => ({
-  start: 0,
-  end: 0,
-  brightness: 1,
-  contrast: 1,
-  saturation: 1,
-  blur: 0,
-  rotate: 0,
-  flipH: false,
-  flipV: false,
-  crop: { x: 0, y: 0, w: 1, h: 1 },
-  keys: [],
-  segments: [],
-  captions: [],
-});
+import { type PreEdit, defaultPreEdit } from "@/lib/template";
 
 interface VideoStudioProps {
   file: File;
-  onSave: (data: { pre: any; clip: { start: number; end: number } | null }) => void;
+  onSave: (data: { pre: PreEdit; clip: { start: number; end: number } | null }) => void;
   onClose: () => void;
-  initial?: { pre: any; clip: { start: number; end: number } | null };
+  initial?: { pre: PreEdit; clip: { start: number; end: number } | null };
 }
 
 export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps) {
@@ -72,10 +37,8 @@ export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps
   const [playing, setPlaying] = useState(false);
   const [tab, setTab] = useState("trim");
   const [view, setView] = useState<"src" | "out">("out");
-  const [pre, setPre] = useState<PreEdit>(initial?.pre || defaultPre());
+  const [pre, setPre] = useState<PreEdit>(initial?.pre || defaultPreEdit());
   const [compare, setCompare] = useState(false);
-  const [thirds, setThirds] = useState(false);
-  const [safe, setSafe] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -143,6 +106,7 @@ export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps
             <h2 className="text-sm font-black uppercase tracking-tighter">Editor Profissional</h2>
           </div>
           <div className="flex items-center gap-2">
+             <Button variant="ghost" size="sm" onClick={() => setPre(defaultPreEdit())}><RotateCcw className="mr-1 size-3" /> Resetar</Button>
             <Button variant="ghost" size="icon" onClick={onClose}><X className="size-4" /></Button>
             <Button size="sm" onClick={() => onSave({ pre, clip: { start: pre.start, end: pre.end } })}>Concluir</Button>
           </div>
@@ -173,16 +137,26 @@ export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps
                 </div>
               </div>
 
-              <div className="relative flex-1 flex items-center justify-center bg-black/40 rounded-3xl border border-border/50 overflow-hidden">
-                <video
-                  ref={videoRef}
-                  src={url}
-                  className="max-h-full object-contain"
-                  style={{
-                    filter: `brightness(${pre.brightness}) contrast(${pre.contrast}) saturate(${pre.saturation}) blur(${pre.blur}px)`,
-                    transform: `rotate(${pre.rotate}deg) scaleX(${pre.flipH ? -1 : 1}) scaleY(${pre.flipV ? -1 : 1})`
-                  }}
-                />
+              <div className="relative flex-1 flex items-center justify-center bg-black/40 rounded-3xl border border-border/50 overflow-hidden shadow-2xl">
+                {view === "src" ? (
+                  <video
+                    ref={videoRef}
+                    src={url}
+                    className="max-h-full object-contain"
+                    style={{
+                      filter: `brightness(${pre.brightness}) contrast(${pre.contrast}) saturate(${pre.saturation}) blur(${pre.blur}px)`,
+                      transform: `rotate(${pre.rotate}deg) scaleX(${pre.flipH ? -1 : 1}) scaleY(${pre.flipV ? -1 : 1})`
+                    }}
+                  />
+                ) : (
+                  <StagePreview
+                    videoRef={videoRef}
+                    pre={pre}
+                    clip={{ start: pre.start, end: pre.end }}
+                    bypass={compare}
+                    className="h-full"
+                  />
+                )}
               </div>
 
               <div className="flex items-center justify-center gap-4 py-4">
@@ -200,12 +174,15 @@ export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps
                 playing={playing}
                 start={pre.start}
                 end={pre.end}
+                transIn={pre.transIn}
+                transOut={pre.transOut}
                 onSeek={seek}
                 onTogglePlay={toggle}
                 onTrim={(s, e) => setPatch({ start: s, end: e })}
                 keys={pre.keys}
                 segments={pre.segments}
                 onKeysChange={keys => setPatch({ keys })}
+                onAddKey={() => {}}
               />
             </div>
           </div>
@@ -217,11 +194,11 @@ export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <span className="text-[11px] font-bold text-muted-foreground uppercase">Início: {pre.start.toFixed(2)}s</span>
-                    <Slider value={[pre.start]} max={duration} step={0.1} onValueChange={([v]) => setPatch({ start: v })} />
+                    <Slider value={[pre.start]} max={duration} step={0.1} onValueChange={([v]) => setPatch({ start: v ?? 0 })} />
                   </div>
                   <div className="space-y-2">
                     <span className="text-[11px] font-bold text-muted-foreground uppercase">Fim: {pre.end.toFixed(2)}s</span>
-                    <Slider value={[pre.end]} max={duration} step={0.1} onValueChange={([v]) => setPatch({ end: v })} />
+                    <Slider value={[pre.end]} max={duration} step={0.1} onValueChange={([v]) => setPatch({ end: v ?? duration })} />
                   </div>
                 </div>
               )}
@@ -229,11 +206,11 @@ export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps
                 <div className="space-y-4">
                   <div className="space-y-2">
                     <span className="text-[11px] font-bold text-muted-foreground uppercase">Brilho</span>
-                    <Slider value={[pre.brightness]} min={0} max={2} step={0.01} onValueChange={([v]) => setPatch({ brightness: v })} />
+                    <Slider value={[pre.brightness]} min={0} max={2} step={0.01} onValueChange={([v]) => setPatch({ brightness: v ?? 1 })} />
                   </div>
                   <div className="space-y-2">
                     <span className="text-[11px] font-bold text-muted-foreground uppercase">Desfoque</span>
-                    <Slider value={[pre.blur]} min={0} max={10} step={0.1} onValueChange={([v]) => setPatch({ blur: v })} />
+                    <Slider value={[pre.blur]} min={0} max={10} step={0.1} onValueChange={([v]) => setPatch({ blur: v ?? 0 })} />
                   </div>
                 </div>
               )}
