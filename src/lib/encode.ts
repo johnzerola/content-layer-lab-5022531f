@@ -177,6 +177,63 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
   const W = t.canvasW ?? CANVAS_W;
   const H = t.canvasH ?? CANVAS_H;
   const v = opts.variation;
+  const pre = opts.pre;
+
+  const audio = await (async () => {
+    const segments = keptSegments(pre, opts.clip, opts.file.size ? undefined : 0); // fallback segments
+    // Simplificado: usa a lógica de decodeAudio existente
+    const baseAudio = await decodeAudio(opts.file, segments, v.speed, v.pitch, v.eq);
+    
+    if (pre?.audioTracks && (pre.audioTracks.voice || pre.audioTracks.music)) {
+      const Ctx = window.AudioContext ?? (window as any).webkitAudioContext;
+      const ac = new Ctx();
+      const dur = segmentsDuration(segments);
+      const outLen = Math.max(1, Math.floor((dur / v.speed) * 48000));
+      const off = new OfflineAudioContext(baseAudio?.channels ?? 2, outLen, 48000);
+      
+      // Original
+      if (baseAudio && pre.audioTracks.originalVolume > 0) {
+        const s = off.createBufferSource();
+        s.buffer = baseAudio.rendered;
+        const g = off.createGain();
+        g.gain.value = pre.audioTracks.originalVolume;
+        s.connect(g).connect(off.destination);
+        s.start(0);
+      }
+      
+      // Voz IA
+      if (pre.audioTracks.voice && pre.audioTracks.voiceVolume > 0) {
+        const vData = await decodeAudio(pre.audioTracks.voice, [{ start: 0, end: dur }], 1);
+        if (vData) {
+          const s = off.createBufferSource();
+          s.buffer = vData.rendered;
+          const g = off.createGain();
+          g.gain.value = pre.audioTracks.voiceVolume;
+          s.connect(g).connect(off.destination);
+          s.start(0);
+        }
+      }
+      
+      // Trilha IA
+      if (pre.audioTracks.music && pre.audioTracks.musicVolume > 0) {
+        const mData = await decodeAudio(pre.audioTracks.music, [{ start: 0, end: dur }], 1);
+        if (mData) {
+          const s = off.createBufferSource();
+          s.buffer = mData.rendered;
+          const g = off.createGain();
+          g.gain.value = pre.audioTracks.musicVolume;
+          s.connect(g).connect(off.destination);
+          s.start(0);
+        }
+      }
+      
+      const res = await off.startRendering();
+      void ac.close();
+      return { rendered: res, channels: res.numberOfChannels, sampleRate: res.sampleRate };
+    }
+    
+    return baseAudio;
+  })();
 
   const picked = await pickVideoCodec(W, H, bitrate, fps);
   if (!picked) throw new Error("Codificação de vídeo não suportada neste navegador");
@@ -374,7 +431,9 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     encoder.close();
 
     if (audio && audioCodec) {
-      const { rendered, channels, sampleRate } = audio;
+      const rendered = audio.rendered;
+      const channels = audio.channels;
+      const sampleRate = audio.sampleRate;
       const AudioEnc = window.AudioEncoder;
       if (AudioEnc) {
         const aenc = new AudioEnc({

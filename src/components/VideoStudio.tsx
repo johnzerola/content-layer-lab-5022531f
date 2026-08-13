@@ -1580,7 +1580,7 @@ export function VideoStudio({
                         max={1.5}
                         step={0.05}
                         disabled={!pre.audioTracks?.voice}
-                        onValueChange={([v]) => set({ audioTracks: { ...pre.audioTracks, voiceVolume: v ?? 1, voice: pre.audioTracks?.voice, music: pre.audioTracks?.music, musicVolume: pre.audioTracks?.musicVolume ?? 1, originalVolume: pre.audioTracks?.originalVolume ?? 1 } as NonNullable<PreEdit["audioTracks"]> }, "volume voz")}
+                        onValueChange={([v]) => set({ audioTracks: { ...pre.audioTracks, voiceVolume: v ?? 1, voice: pre.audioTracks?.voice, music: pre.audioTracks?.music, musicVolume: pre.audioTracks?.musicVolume ?? 1, originalVolume: pre.audioTracks?.originalVolume ?? 1 } }, "volume voz")}
                       />
                     </Field>
 
@@ -1591,14 +1591,14 @@ export function VideoStudio({
                         max={1.5}
                         step={0.05}
                         disabled={!pre.audioTracks?.music}
-                        onValueChange={([v]) => set({ audioTracks: { ...pre.audioTracks, musicVolume: v ?? 1, voice: pre.audioTracks?.voice, music: pre.audioTracks?.music, voiceVolume: pre.audioTracks?.voiceVolume ?? 1, originalVolume: pre.audioTracks?.originalVolume ?? 1 } as NonNullable<PreEdit["audioTracks"]> }, "volume trilha")}
+                        onValueChange={([v]) => set({ audioTracks: { ...pre.audioTracks, musicVolume: v ?? 1, voice: pre.audioTracks?.voice, music: pre.audioTracks?.music, voiceVolume: pre.audioTracks?.voiceVolume ?? 1, originalVolume: pre.audioTracks?.originalVolume ?? 1 } }, "volume trilha")}
                       />
                     </Field>
                   </div>
 
                   {pre.audioTracks?.voice && (
                     <div className="pt-2">
-                       <Button variant="ghost" size="sm" className="w-full text-[10px]" onClick={() => setPre((v) => ({ ...v, audioTracks: undefined }), "remover trilhas")}>
+                       <Button variant="ghost" size="sm" className="w-full text-[10px]" onClick={() => setPre((v) => { const next = { ...v }; delete next.audioTracks; return next; }, "remover trilhas")}>
                          Remover trilhas externas
                        </Button>
                     </div>
