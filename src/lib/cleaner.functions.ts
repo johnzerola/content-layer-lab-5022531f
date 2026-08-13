@@ -8,7 +8,9 @@ export const getCleanerHealth = createServerFn({ method: "GET" })
     if (!workerUrl) return { status: "offline", reason: "CLEANER_WORKER_URL missing" };
 
     try {
+      const secret = process.env['CLEANER_WORKER_SECRET'];
       const resp = await fetch(`${workerUrl}/v1/health`, {
+        headers: secret ? { "X-Service-Token": secret } : {},
         signal: AbortSignal.timeout(5000),
       });
       
