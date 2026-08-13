@@ -967,7 +967,17 @@ export function VideoStudio({
                   </div>
                 )}
 
-            {tab === "trim" && (
+              </div>
+            </ScrollArea>
+          </aside>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function VideoStudio_OLD({
+
               <div className="space-y-4">
                 <Field label={`Início · ${fmt(start)}`}>
                   <Slider
