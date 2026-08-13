@@ -49,7 +49,11 @@ export const startCleanerJob = createServerFn({ method: "POST" })
       throw new Error("Cleaner configuration missing");
     }
 
-    const resp = await fetch(`${workerUrl}/v1/jobs`, {
+    // O erro "Not Found" sugere que o endpoint /v1/jobs não existe.
+    // De acordo com a arquitetura ProPainter/FastAPI padrão, o endpoint costuma ser /jobs ou /v1/clean
+    const endpoint = `${workerUrl}/v1/clean`; 
+    
+    const resp = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
