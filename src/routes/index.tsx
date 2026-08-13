@@ -18,6 +18,8 @@ import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
 import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { CloudPanel } from "@/components/CloudPanel";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
+import { getCleanerHealth } from "@/lib/cleaner.functions";
+
 import { 
   createTemplate, 
   defaultCaptions,
@@ -56,8 +58,25 @@ function Dashboard() {
   const [clipMaxLen, setClipMaxLen] = useState(60);
   const [clipMax, setClipMax] = useState(5);
   const [clipMinScore, setClipMinScore] = useState(60);
+  const [cleanerStatus, setCleanerStatus] = useState<"online" | "offline" | "checking">("checking");
+
   
   const previewVideoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    async function checkHealth() {
+      try {
+        const res = await getCleanerHealth();
+        setCleanerStatus(res.status === "online" ? "online" : "offline");
+      } catch {
+        setCleanerStatus("offline");
+      }
+    }
+    checkHealth();
+    const timer = setInterval(checkHealth, 30000); // Check every 30s
+    return () => clearInterval(timer);
+  }, []);
+
 
   const selected = items.find((it) => it.id === selectedId);
   const studioItem = items.find((it) => it.id === studioId);
@@ -306,7 +325,20 @@ function Dashboard() {
         <div className="flex flex-wrap items-center justify-between gap-6 rounded-2xl border border-border bg-surface/40 p-6 backdrop-blur-sm">
           <div className="flex items-center gap-8">
             <div className="space-y-1">
+              <p className="mono-label text-muted-foreground">CleanerIA Status</p>
+              <div className="flex items-center gap-2">
+                <div className={`size-2 rounded-full ${
+                  cleanerStatus === "online" ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]" : 
+                  cleanerStatus === "offline" ? "bg-destructive" : "bg-muted-foreground animate-pulse"
+                }`} />
+                <span className="text-xs font-mono uppercase tracking-wider">
+                  {cleanerStatus === "online" ? "Motor Online" : cleanerStatus === "offline" ? "Motor Offline" : "Verificando..."}
+                </span>
+              </div>
+            </div>
+            <div className="space-y-1">
               <p className="mono-label text-muted-foreground">Template Ativo</p>
+
               <div className="flex items-center gap-2">
                 <Layout className="size-4 text-primary" />
                 <span className="text-sm font-semibold">{active.name}</span>
