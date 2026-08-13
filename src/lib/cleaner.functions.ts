@@ -4,7 +4,7 @@ import { cleanerRegionSchema } from "./cleaner.schemas";
 
 export const getCleanerHealth = createServerFn({ method: "GET" })
   .handler(async () => {
-    const workerUrl = process.env.CLEANER_WORKER_URL;
+    const workerUrl = process.env['CLEANER_WORKER_URL'];
     if (!workerUrl) return { status: "offline", reason: "CLEANER_WORKER_URL missing" };
 
     try {
@@ -33,17 +33,17 @@ export const getCleanerHealth = createServerFn({ method: "GET" })
   });
 
 export const startCleanerJob = createServerFn({ method: "POST" })
-  .input(z.object({
+  .validator((data: unknown) => z.object({
     videoUrl: z.string(),
     regions: z.array(cleanerRegionSchema),
     options: z.object({
       mode: z.enum(["auto", "manual"]),
       upscale: z.boolean().optional(),
     }),
-  }))
+  }).parse(data))
   .handler(async ({ data }) => {
-    const workerUrl = process.env.CLEANER_WORKER_URL;
-    const secret = process.env.CLEANER_WORKER_SECRET;
+    const workerUrl = process.env['CLEANER_WORKER_URL'];
+    const secret = process.env['CLEANER_WORKER_SECRET'];
 
     if (!workerUrl || !secret) {
       throw new Error("Cleaner configuration missing");
@@ -65,3 +65,4 @@ export const startCleanerJob = createServerFn({ method: "POST" })
 
     return resp.json();
   });
+
