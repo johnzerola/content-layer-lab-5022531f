@@ -5,14 +5,10 @@ import { cleanerRegionSchema } from "./cleaner.schemas";
 export const getCleanerHealth = createServerFn({ method: "GET" })
   .handler(async () => {
     const workerUrl = process.env['CLEANER_WORKER_URL'];
-    const publicWorkerUrl = process.env['CLEANER_WORKER_PUBLIC_URL'] || workerUrl;
-    
     if (!workerUrl) return { status: "offline", reason: "CLEANER_WORKER_URL missing" };
 
     try {
-      const secret = process.env['CLEANER_WORKER_SECRET'];
       const resp = await fetch(`${workerUrl}/v1/health`, {
-        headers: secret ? { "X-Service-Token": secret } : {},
         signal: AbortSignal.timeout(5000),
       });
       
@@ -26,8 +22,7 @@ export const getCleanerHealth = createServerFn({ method: "GET" })
         return { 
           status: data.online ? "online" : "offline", 
           gpu: data.gpu || "none",
-          cpu: data.cpu || "none",
-          uploadUrl: publicWorkerUrl ? `${publicWorkerUrl}/v1/media/upload` : null
+          cpu: data.cpu || "none"
         };
       } catch {
         return { status: "offline", reason: "Invalid JSON response" };
@@ -37,49 +32,12 @@ export const getCleanerHealth = createServerFn({ method: "GET" })
     }
   });
 
-export const confirmCleanerUpload = createServerFn({ method: "POST" })
-  .validator((data: unknown) => z.object({
-    fileName: z.string(),
-  }).parse(data))
-  .handler(async ({ data }) => {
-    const workerUrl = process.env['CLEANER_WORKER_URL'];
-    const secret = process.env['CLEANER_WORKER_SECRET'];
-    
-    if (!workerUrl || !secret) throw new Error("Config missing");
-
-    const resp = await fetch(`${workerUrl}/v1/media/exists?file=${encodeURIComponent(data.fileName)}`, {
-      headers: { "X-Service-Token": secret }
-    });
-
-    if (!resp.ok) return { exists: false };
-    const result = await resp.json();
-    return { exists: result.exists, videoUrl: result.url };
-  });
-
-export const cleanupCleanerRemoteJob = createServerFn({ method: "POST" })
-  .validator((data: unknown) => z.object({
-    jobId: z.string(),
-  }).parse(data))
-  .handler(async ({ data }) => {
-    const workerUrl = process.env['CLEANER_WORKER_URL'];
-    const secret = process.env['CLEANER_WORKER_SECRET'];
-    if (!workerUrl || !secret) return;
-
-    await fetch(`${workerUrl}/v1/jobs/${data.jobId}`, {
-      method: "DELETE",
-      headers: { "X-Service-Token": secret }
-    }).catch(() => {});
-    
-    return { success: true };
-  });
-
 export const startCleanerJob = createServerFn({ method: "POST" })
   .validator((data: unknown) => z.object({
     videoUrl: z.string(),
     regions: z.array(cleanerRegionSchema),
     options: z.object({
-      mode: z.enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"]),
-      preset: z.enum(["fast", "quality", "max"]).optional(),
+      mode: z.enum(["auto", "manual"]),
       upscale: z.boolean().optional(),
     }),
   }).parse(data))
@@ -91,48 +49,23 @@ export const startCleanerJob = createServerFn({ method: "POST" })
       throw new Error("Cleaner configuration missing");
     }
 
-    const resolveEndpoint = `${workerUrl}/v1/media/resolve`;
-    const resolveResp = await fetch(resolveEndpoint, {
+    // Fallback: Tentamos /v1/process se /v1/clean falhar, mas o padrão mais comum para ProPainter-API é /process
+    const endpoint = `${workerUrl}/process`; 
+    
+    const resp = await fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${secret}`,
-        "X-Service-Token": secret,
-        "X-Access-Key": secret,
       },
-      body: JSON.stringify({ url: data.videoUrl }),
+      body: JSON.stringify(data),
     });
 
-    if (!resolveResp.ok) {
-      const errorText = await resolveResp.text();
-      throw new Error(`Media resolution failed: ${errorText.slice(0, 100)}`);
+    if (!resp.ok) {
+      const errorText = await resp.text();
+      throw new Error(`Worker error: ${errorText.slice(0, 100)}`);
     }
 
-    const { job_id } = await resolveResp.json();
-
-    const processEndpoint = `${workerUrl}/v1/jobs/${job_id}/process`;
-    const processResp = await fetch(processEndpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${secret}`,
-        "X-Job-Token": secret,
-        "X-Access-Key": secret,
-      },
-      body: JSON.stringify({
-        mode: data.options.mode,
-        preset: data.options.preset || "quality",
-        masks: data.regions,
-        options: {
-          upscale: data.options.upscale,
-        },
-      }),
-    });
-
-    if (!processResp.ok) {
-      const errorText = await processResp.text();
-      throw new Error(`Process start failed: ${errorText.slice(0, 100)}`);
-    }
-
-    return { job_id };
+    return resp.json();
   });
+

@@ -328,7 +328,7 @@ function Dashboard() {
             width={studioItem.w}
             height={studioItem.h}
             duration={studioItem.duration}
-            initial={{
+            value={{
               pre: studioItem.preEdit ?? defaultPreEdit(),
               clip: studioItem.clip ?? null,
             }}
