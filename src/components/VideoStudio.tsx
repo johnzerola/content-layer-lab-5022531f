@@ -230,11 +230,17 @@ export function VideoStudio({
                 segments={pre.segments}
                 cues={localCaptions}
                 onKeysChange={keys => setPatch({ keys })}
-                onAddKey={() => {}}
+                onAddKey={() => {
+                  const nt = Number(time.toFixed(2));
+                  const newKeys = [...pre.keys, { t: nt, crop: pre.crop || { x: 0, y: 0, w: 1, h: 1 } }].sort((a, b) => a.t - b.t);
+                  setPatch({ keys: newKeys });
+                  toast.success("Keyframe adicionado no tempo atual");
+                }}
                 onSplit={() => {
                   const nt = Number(time.toFixed(2));
                   const newSegs = splitAt(pre.segments.length ? pre.segments : keptSegments(pre, clip, duration), nt);
                   setPatch({ segments: newSegs });
+                  toast.success("Clipe dividido");
                 }}
                 onDeleteSegment={idx => {
                   const next = [...pre.segments];
