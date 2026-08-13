@@ -46,10 +46,47 @@ bash scripts/deploy_cpu_vps.sh
 O script:
 
 1. preserva o segredo existente ou gera um segredo forte sem imprimi-lo;
-2. sobe a nova versao em `127.0.0.1:8096`;
-3. valida o health check antes da troca;
-4. configura Caddy com HTTPS e limite de corpo;
-5. fecha o container CleanerIA antigo publicado em `8095` somente apos sucesso.
+2. sobe a nova versao em um sandbox proprio (`/opt/content-layer-lab-cleaner-cpu`);
+3. publica somente em `127.0.0.1:18095`, atras do Caddy;
+4. usa container, rede, imagem, volume e arquivo Caddy dedicados ao projeto;
+5. valida o health check antes de expor por HTTPS.
+
+Ele nao para containers antigos nem reusa portas de outros projetos.
+
+## Deploy isolado na VPS compartilhada
+
+Use este formato quando a VPS ja roda outros servicos:
+
+```bash
+cd backend
+VPS_HOST=104.234.186.50 \
+VPS_SSH_USER=root \
+APP_ORIGIN=https://content-layer-lab.lovable.app \
+CLEANER_PUBLIC_HOST=content-layer-lab-cleaner-104-234-186-50.nip.io \
+CLEANER_BIND_PORT=18095 \
+REMOTE_DIR=/opt/content-layer-lab-cleaner-cpu \
+CADDY_SITE_FILE=content-layer-lab-cleaner.caddy \
+bash scripts/deploy_cpu_vps.sh
+```
+
+O Caddy publica `https://content-layer-lab-cleaner-104-234-186-50.nip.io` e
+encaminha apenas para `127.0.0.1:18095`. Nada escuta publicamente nessa porta.
+
+Depois copie o segredo da VPS:
+
+```bash
+ssh root@104.234.186.50 "sudo sed -n 's/^CLEANER_WORKER_SECRET=//p' /opt/content-layer-lab-cleaner-cpu/.env"
+```
+
+E configure no Lovable:
+
+```env
+CLEANER_WORKER_URL=https://content-layer-lab-cleaner-104-234-186-50.nip.io
+CLEANER_WORKER_PUBLIC_URL=https://content-layer-lab-cleaner-104-234-186-50.nip.io
+CLEANER_WORKER_SECRET=valor_da_vps
+PUBLIC_SITE_URL=https://content-layer-lab.lovable.app
+CLEANER_MAX_UPLOAD_GB=2
+```
 
 ## Modelos GPU
 

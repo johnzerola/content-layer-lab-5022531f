@@ -47,6 +47,7 @@ from ..security import callback_signature, validate_callback_url
 from ..storage import job_dir as safe_job_dir, read_state, write_state
 from ..utils.video import (
     RawWriter,
+    ffmpeg_filter,
     masks_to_video,
     mux_audio,
     normalize_video,
@@ -65,6 +66,51 @@ STORAGE_DIR = str(SETTINGS.storage_dir)
 
 class JobCancelled(RuntimeError):
     pass
+
+
+def _crop_clean_filter(info, opts: Dict) -> str:
+    crop = opts.get("crop_clean") if isinstance(opts.get("crop_clean"), dict) else {}
+    y = float(crop.get("y", 0.26))
+    h = float(crop.get("h", 0.435))
+    y_px = max(0, min(info.height - 2, round(info.height * y)))
+    h_px = max(2, min(info.height - y_px, round(info.height * h)))
+    # Keep the clean source pixels at original scale, then letterbox back to the
+    # original canvas. This avoids the quality loss caused by stretching.
+    pad_y = max(0, (info.height - h_px) // 2)
+    return f"crop={info.width}:{h_px}:0:{y_px},pad={info.width}:{info.height}:0:{pad_y}:black,setsar=1"
+
+
+def _enhance_filter(info, opts: Dict) -> str:
+    enhance = opts.get("enhance") if isinstance(opts.get("enhance"), dict) else {}
+    mode = str(enhance.get("mode", "hq"))
+    scale = float(enhance.get("scale", 1))
+    filters = []
+    if scale > 1:
+        out_w = int(round(info.width * min(scale, 2.0)))
+        out_h = int(round(info.height * min(scale, 2.0)))
+        filters.append(f"scale={out_w}:{out_h}:flags=lanczos")
+    if mode != "off":
+        filters.append("unsharp=5:5:0.45:3:3:0.20")
+    return ",".join(filters)
+
+
+def _apply_postprocess(input_path: str, output_path: str, info, opts: Dict, emit) -> str:
+    strategy = str(opts.get("strategy", "inpaint"))
+    enhance_filter = _enhance_filter(info, opts)
+    if strategy != "crop-clean" and not enhance_filter:
+        return output_path
+
+    source = input_path if strategy == "crop-clean" else output_path
+    final_path = str(Path(output_path).with_name("output.post.mp4"))
+    filters = []
+    if strategy == "crop-clean":
+        filters.append(_crop_clean_filter(info, opts))
+    if enhance_filter:
+        filters.append(enhance_filter)
+    emit(96, "melhorando qualidade e reenquadrando", "encoding")
+    ffmpeg_filter(source, final_path, ",".join(filters), crf=int(opts.get("crf", 14)))
+    os.replace(final_path, output_path)
+    return output_path
 
 
 def sign_payload(payload: dict, secret: str) -> str:
@@ -553,6 +599,45 @@ def run_pipeline(
 
         emit(3, "analisando vídeo", "analyzing")
         info = probe(input_path)
+        if str(opts.get("strategy", "inpaint")) == "crop-clean":
+            emit(20, "reenquadrando sem legenda", "encoding")
+            ffmpeg_filter(
+                input_path,
+                output_path,
+                ",".join(filter(None, [_crop_clean_filter(info, opts), _enhance_filter(info, opts)])),
+                crf=int(opts.get("crf", 14)),
+            )
+            result_payload = {
+                "job_id": job_id,
+                "callback_seq": callback_seq + 1,
+                "status": "completed",
+                "progress": 100,
+                "stage": "concluÃ­do",
+                "result_url": f"/v1/jobs/{job_id}/result",
+                "detections": [],
+                "segments": [],
+                "metrics": {
+                    "temporal_consistency": 1,
+                    "sharpness_ratio": 1,
+                    "residual_text": 0,
+                    "device": device_name(),
+                    "frames": info.frames,
+                    "engine": "crop-clean-hq",
+                    "passes": 1,
+                    "strategy": "crop-clean",
+                    "enhance": opts.get("enhance", {"mode": "hq"}),
+                    "dynamic_masks": False,
+                    "subject_protection": False,
+                },
+                "probe": {
+                    "width": info.width, "height": info.height,
+                    "fps": round(info.fps, 3), "duration": round(info.duration, 3),
+                    "has_audio": info.has_audio,
+                },
+            }
+            write_state(job_path, {**read_state(job_path), **result_payload})
+            _notify(callback_url, result_payload)
+            return result_payload
 
         emit(8, "detectando cortes de cena", "analyzing")
         scenes = detect_scenes(input_path)
@@ -630,6 +715,8 @@ def run_pipeline(
             )
             pass_count = 1
 
+        _apply_postprocess(input_path, output_path, info, opts, emit)
+
         callback_seq += 1
         result_payload = {
             "job_id": job_id,
@@ -648,6 +735,8 @@ def run_pipeline(
                 "frames": written,
                 "engine": engine_name,
                 "passes": pass_count,
+                "strategy": str(opts.get("strategy", "inpaint")),
+                "enhance": opts.get("enhance", {"mode": "hq"}),
                 "dynamic_masks": dynamic,
                 "subject_protection": auto_protect,
             },

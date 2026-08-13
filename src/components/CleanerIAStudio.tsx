@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { useServerFn } from "@tanstack/react-start";
 import {
   cleanerHealth,
+  cleanupCleanerRemoteJob,
   confirmCleanerUpload,
   createCleanerJob,
   detectCleanerJob,
@@ -48,7 +49,7 @@ type Props = {
 
 type Tool = "select" | "rect" | "poly" | "brush" | "protect" | "erase";
 
-const MODES: CleanerMode[] = ["smart", "subtitle", "watermark", "object", "passerby"];
+const MODES: CleanerMode[] = ["smart", "text", "watermark", "object", "passerby"];
 const PRESETS: CleanerPreset[] = ["fast", "quality", "max"];
 
 export function CleanerIAStudio({ item, onComplete }: Props) {
@@ -56,11 +57,13 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [inputReady, setInputReady] = useState(false);
-  const [mode, setMode] = useState<CleanerMode>("subtitle");
+  const [mode, setMode] = useState<CleanerMode>("smart");
   const [preset, setPreset] = useState<CleanerPreset>("quality");
   const [dynamicMask, setDynamicMask] = useState(true);
   const [protectSubject, setProtectSubject] = useState(true);
   const [verifyPass, setVerifyPass] = useState(true);
+  const [cropClean, setCropClean] = useState(true);
+  const [enhanceOutput, setEnhanceOutput] = useState(true);
   const [masks, setMasks] = useState<CleanerRegion[]>([]);
   const [health, setHealth] = useState<{
     online: boolean;
@@ -91,6 +94,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
   const processJob = useServerFn(processCleanerJob);
   const refreshJob = useServerFn(refreshCleanerJob);
   const saveMasks = useServerFn(saveCleanerMasks);
+  const cleanupRemoteJob = useServerFn(cleanupCleanerRemoteJob);
 
   const src = useMemo(() => URL.createObjectURL(item.file), [item.file]);
   useEffect(() => () => URL.revokeObjectURL(src), [src]);
@@ -327,7 +331,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
 
   const startUpload = async () => {
     if (!health?.online) {
-      toast.error("Motor de IA offline — configure o worker GPU.");
+      toast.error("Motor de IA offline — configure o processamento local.");
       return;
     }
     setUploading(true);
@@ -350,17 +354,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       setJob(newJob);
 
       if (upload) {
-        // Navegador bloqueia http:// dentro de página https (conteúdo misto):
-        // reescreve para o proxy HTTPS do worker antes de enviar.
-        const secureUrl =
-          typeof window !== "undefined" &&
-          window.location.protocol === "https:" &&
-          upload.url.startsWith("http://")
-            ? upload.url.replace(
-                /^http:\/\/(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?::\d+)?/,
-                (_m, a, b, c, d) => `https://cleaner-${a}-${b}-${c}-${d}.nip.io`,
-              )
-            : upload.url;
+        const verifyUpload = async () =>
+          (await confirmUpload({ data: { id: newJob.id }, headers })) as CleanerJob;
 
         const send = (url: string) =>
           new Promise<void>((resolve, reject) => {
@@ -368,20 +363,58 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             formData.append("file", item.file);
             const isProxy = url.includes("/api/public/cleaner-upload");
             const xhr = new XMLHttpRequest();
+            let settled = false;
+            let lastProgressAt = Date.now();
+            let lastProgress = 0;
+            const finish = (fn: () => void) => {
+              if (settled) return;
+              settled = true;
+              window.clearInterval(stallTimer);
+              fn();
+            };
+            const stallTimer = window.setInterval(async () => {
+              if (settled || Date.now() - lastProgressAt < 25_000) return;
+              try {
+                const remote = await verifyUpload();
+                if (remote?.id) {
+                  xhr.abort();
+                  finish(resolve);
+                  return;
+                }
+              } catch {
+                // Continua tentando ate o timeout do XHR.
+              }
+              if (lastProgress > 0) {
+                xhr.abort();
+                finish(() => reject(new Error("envio sem resposta; tentando rota alternativa")));
+              }
+            }, 5_000);
             xhr.open("POST", url);
-            xhr.timeout = 15 * 60 * 1000;
+            xhr.timeout = 2 * 60 * 1000;
             xhr.setRequestHeader("x-job-token", upload.token);
             xhr.setRequestHeader("x-file-size", String(item.file.size));
-            xhr.setRequestHeader("x-file-name", encodeURIComponent(item.file.name).slice(0, 500));
+            if (isProxy) {
+              xhr.setRequestHeader("x-file-name", encodeURIComponent(item.file.name).slice(0, 500));
+            }
             xhr.upload.onprogress = (ev) => {
-              if (ev.lengthComputable) setUploadProgress(Math.round((ev.loaded / ev.total) * 100));
+              if (!ev.lengthComputable) return;
+              const nextProgress = Math.round((ev.loaded / ev.total) * 100);
+              if (nextProgress === lastProgress) return;
+              lastProgress = nextProgress;
+              lastProgressAt = Date.now();
+              setUploadProgress(nextProgress);
             };
             xhr.onload = () =>
-              xhr.status >= 200 && xhr.status < 300
-                ? resolve()
-                : reject(new Error(`${xhr.status} ${xhr.responseText || "falha no envio"}`));
-            xhr.onerror = () => reject(new Error("rede-bloqueada"));
-            xhr.ontimeout = () => reject(new Error("tempo esgotado no envio"));
+              finish(() =>
+                xhr.status >= 200 && xhr.status < 300
+                  ? resolve()
+                  : reject(new Error(`${xhr.status} ${xhr.responseText || "falha no envio"}`)),
+              );
+            xhr.onerror = () => finish(() => reject(new Error("rede-bloqueada")));
+            xhr.ontimeout = () => finish(() => reject(new Error("tempo esgotado no envio")));
+            xhr.onabort = () => {
+              if (!settled) finish(() => reject(new Error("envio interrompido")));
+            };
             xhr.send(isProxy ? item.file : formData);
           });
 
@@ -389,11 +422,9 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
         const proxyUrl = `/api/public/cleaner-upload?job=${encodeURIComponent(newJob.id)}`;
 
         let confirmed: CleanerJob | null = null;
-        const verifyUpload = async () =>
-          (await confirmUpload({ data: { id: newJob.id }, headers })) as CleanerJob;
 
         try {
-          await send(secureUrl);
+          await send(upload.url);
         } catch (first) {
           try {
             confirmed = await verifyUpload();
@@ -461,7 +492,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       toast.error("O vídeo ainda não foi confirmado no motor. Reenvie o arquivo.");
       return;
     }
-    if (!masks.length) {
+    if (!masks.length && !cropClean) {
       toast.error("Marque ao menos uma área ou use Detectar.");
       return;
     }
@@ -477,6 +508,10 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             dynamic: dynamicMask,
             protect_subject: protectSubject,
             verify: verifyPass,
+            strategy: cropClean ? "crop-clean" : "inpaint",
+            crop_clean: { y: 0.26, h: 0.435 },
+            enhance: enhanceOutput ? { mode: "hq", scale: 1 } : { mode: "off" },
+            crf: enhanceOutput ? 14 : 16,
             key_step: dynamicMask ? 3 : 8,
           },
         },
@@ -870,8 +905,8 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 key: "dyn",
                 on: dynamicMask,
                 set: setDynamicMask,
-                title: "Legenda dinâmica",
-                hint: "Máscara recalculada quadro a quadro — acompanha legenda que muda durante o vídeo",
+                title: "Máscara dinâmica",
+                hint: "Máscara recalculada quadro a quadro — acompanha texto ou objeto que muda durante o vídeo",
               },
               {
                 key: "prot",
@@ -886,6 +921,20 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 set: setVerifyPass,
                 title: "Verificar resultado",
                 hint: "Confere texto residual e nitidez; reprocessa o trecho falho automaticamente",
+              },
+              {
+                key: "crop",
+                on: cropClean,
+                set: setCropClean,
+                title: "Legenda por recorte limpo",
+                hint: "Remove legendas dinÃ¢micas reenquadrando como no teste aprovado",
+              },
+              {
+                key: "enh",
+                on: enhanceOutput,
+                set: setEnhanceOutput,
+                title: "Melhorar qualidade",
+                hint: "Exporta em HQ com nitidez reforÃ§ada apÃ³s limpar o vÃ­deo",
               },
             ].map((o) => (
               <label key={o.key} className="flex cursor-pointer items-start gap-2 text-xs">
@@ -916,6 +965,12 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             <a
               href={job.result_url ?? "#"}
               download
+              onClick={() => {
+                const id = job.id;
+                window.setTimeout(() => {
+                  void cleanupRemoteJob({ data: { id } });
+                }, 15000);
+              }}
               className="block w-full rounded-lg bg-primary py-2 text-center text-sm font-semibold text-primary-foreground"
             >
               Baixar vídeo limpo
@@ -1067,7 +1122,7 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
             <AlertCircle className="mt-0.5 size-4 shrink-0" />
             <div className="text-[11px] leading-relaxed">
               <p className="font-bold uppercase tracking-tight">Backend offline</p>
-              <p className="opacity-80">{health.reason || "worker GPU não configurado"}</p>
+              <p className="opacity-80">{health.reason || "processamento local não configurado"}</p>
             </div>
           </div>
         )}

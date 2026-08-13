@@ -13,20 +13,20 @@ import { cloudAuthHeaders, currentUser } from "@/lib/cloud";
 export const Route = createFileRoute("/limpar-ia")({
   head: () => ({
     meta: [
-      { title: "CleanerIA — Remoção profissional de legendas, textos e marcas" },
+      { title: "CleanerIA — Remoção profissional de textos e marcas" },
       {
         name: "description",
         content:
-          "Remova legendas, textos, logos e marcas d'água de vídeos com inpainting temporal em GPU. Reconstrução real do fundo, sem blur.",
+          "Remova textos, logos e marcas d'água de vídeos com inpainting temporal. Reconstrução real do fundo, sem blur.",
       },
       {
         property: "og:title",
-        content: "CleanerIA — Remoção profissional de legendas, textos e marcas",
+        content: "CleanerIA — Remoção profissional de textos e marcas",
       },
       {
         property: "og:description",
         content:
-          "Remova legendas, textos, logos e marcas d'água de vídeos com inpainting temporal em GPU. Reconstrução real do fundo, sem blur.",
+          "Remova textos, logos e marcas d'água de vídeos com inpainting temporal. Reconstrução real do fundo, sem blur.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -174,7 +174,7 @@ function LimparIAPage() {
             Remoção profissional de elementos
           </h1>
           <p className="mx-auto max-w-2xl text-muted-foreground">
-            Legendas, textos, logos e marcas d'água são removidos reconstruindo o fundo com contexto
+            Textos, logos e marcas d'água são removidos reconstruindo o fundo com contexto
             temporal. Sem blur, sem mosaico, sem crop.
           </p>
         </div>

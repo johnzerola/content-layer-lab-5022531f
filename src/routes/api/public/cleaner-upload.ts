@@ -39,7 +39,8 @@ export const Route = createFileRoute("/api/public/cleaner-upload")({
               ...(fileName ? { "x-file-name": fileName.slice(0, 500) } : {}),
             },
             body: request.body,
-          });
+            duplex: "half",
+          } as RequestInit & { duplex: "half" });
           return new Response(await upstream.text(), {
             status: upstream.status,
             headers: { "Content-Type": upstream.headers.get("content-type") || "application/json" },

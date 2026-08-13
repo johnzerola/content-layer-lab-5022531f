@@ -1,12 +1,12 @@
-name: cleaner-gpu
+name: content-layer-lab-cleaner-gpu
 
 services:
   worker:
     build:
       context: .
       dockerfile: Dockerfile
-    image: cleaner-worker-gpu:latest
-    container_name: cleaner-gpu-worker
+    image: content-layer-lab-cleaner-worker-gpu:latest
+    container_name: content-layer-lab-cleaner-gpu-worker
     restart: unless-stopped
     environment:
       CLEANER_ENV: production
@@ -54,8 +54,15 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
+    networks:
+      - content-layer-lab-cleaner-net
     logging:
       driver: json-file
       options:
         max-size: "20m"
         max-file: "3"
+
+networks:
+  content-layer-lab-cleaner-net:
+    name: content-layer-lab-cleaner-gpu-net
+    driver: bridge

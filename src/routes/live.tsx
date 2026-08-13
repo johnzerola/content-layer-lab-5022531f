@@ -29,7 +29,7 @@ export const Route = createFileRoute("/live")({
       {
         name: "description",
         content:
-          "Monitore a transmissão ao vivo de um perfil do X, gere cortes automáticos pontuados por energia de fala e edite cada corte antes de baixar.",
+          "Monitore transmissões públicas do X, Kick, TikTok ou HLS direto, gere cortes automáticos pontuados por energia de fala e edite cada corte antes de baixar.",
       },
       { property: "og:title", content: "Monitora Live — cortes automáticos de lives" },
       {
@@ -249,7 +249,10 @@ function LivePage() {
             <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-4 py-3">
               <span className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
                 <Radio className="size-3.5" />
-                {info?.title ?? (info?.handle ? `@${info.handle}` : "aguardando transmissão")}
+              {info?.title ??
+                (info?.handle
+                  ? `${info.platform === "kick" ? "Kick" : info.platform === "tiktok" ? "TikTok" : "X"} · @${info.handle}`
+                  : "aguardando transmissão")}
               </span>
               <button
                 onClick={() => clipperRef.current?.cutNow()}
@@ -331,7 +334,7 @@ function LivePage() {
             <input
               value={target}
               onChange={(e) => setTarget(e.target.value)}
-              placeholder="@perfil, x.com/i/broadcasts/... ou .m3u8"
+              placeholder="x:@perfil, kick:canal, tiktok:@perfil, URL da live ou .m3u8"
               className="w-full rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary/50"
             />
             <label className="block text-sm">
@@ -380,7 +383,7 @@ function LivePage() {
           <div className="rounded-2xl border border-border bg-surface p-4 text-sm text-muted-foreground">
             <p className="mono-label mb-2">como funciona</p>
             <ol className="list-decimal space-y-1 pl-4">
-              <li>O sistema procura a live do perfil a cada intervalo escolhido.</li>
+              <li>O sistema procura live pública no X, Kick, TikTok ou HLS direto.</li>
               <li>Ao encontrar, começa a gravar e fecha um corte a cada {clipLen}s.</li>
               <li>Cada corte recebe um score por energia de fala e dinâmica.</li>
               <li>Você edita o recorte, escolhe vertical 9:16 e baixa.</li>

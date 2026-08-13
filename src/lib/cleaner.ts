@@ -1,17 +1,14 @@
 /**
  * AI Video Cleaner — tipos compartilhados entre o app (frontend + server fns)
- * e o worker Python com GPU (`worker/`).
+ * e o worker Python.
  *
  * O app NUNCA processa o vídeo: ele cria o job, envia o arquivo direto para o
- * worker, desenha/edita máscaras e acompanha o progresso real. Todo o
- * pipeline (detecção de texto, tracking temporal, ProPainter, refino,
- * validação e FFmpeg) roda no worker.
+ * worker, desenha/edita máscaras e acompanha o progresso real.
  */
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [k: string]: JsonValue };
 
-export type CleanerMode =
-  "smart" | "subtitle" | "text" | "watermark" | "logo" | "object" | "passerby";
+export type CleanerMode = "smart" | "text" | "watermark" | "logo" | "object" | "passerby";
 export type CleanerPreset = "fast" | "quality" | "max";
 
 export type CleanerStatus =
@@ -58,7 +55,6 @@ export const STAGE_LABEL: Record<CleanerStatus, string> = {
 
 export const MODE_LABEL: Record<CleanerMode, string> = {
   smart: "Smart",
-  subtitle: "Legenda",
   text: "Texto",
   watermark: "Marca d'água",
   logo: "Logo",
@@ -67,8 +63,7 @@ export const MODE_LABEL: Record<CleanerMode, string> = {
 };
 
 export const MODE_HINT: Record<CleanerMode, string> = {
-  smart: "detecta legenda, texto e marca d'água de uma vez",
-  subtitle: "detector de texto queimado + estabilização temporal da máscara",
+  smart: "detecta texto, marca d'água e objetos de uma vez",
   text: "qualquer texto sobreposto, em qualquer posição da tela",
   watermark: "detecta também alpha blending de marca semitransparente",
   logo: "blob de cor/forma persistente, inclusive logo animado",

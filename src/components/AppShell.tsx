@@ -44,8 +44,8 @@ const MODES: ModeDef[] = [
     tagline: "branding em massa",
     headline: "Um template, centenas de vídeos",
     description:
-      "Monte o layout uma vez — avatar, nome, headline, CTA e marca d'água — e aplique em todo o lote com variações antiduplicidade e legendas queimadas.",
-    chips: ["editor de template", "variações 3–5x", "legendas karaokê", "ZIP por plataforma"],
+      "Monte o layout uma vez — avatar, nome, headline, CTA e marca d'água — e aplique em todo o lote com variações antiduplicidade.",
+    chips: ["editor de template", "variações 3–5x", "branding automático", "ZIP por plataforma"],
     icon: Layers,
     badge: Sparkle,
   },
@@ -66,11 +66,11 @@ const MODES: ModeDef[] = [
   {
     id: "limpar",
     label: "Limpar vídeo",
-    hint: "remover legenda e marca",
+    hint: "remover texto e marca",
     brand: "LimpaVídeo",
     mark: "LV",
     tagline: "restauração de quadro",
-    headline: "Apague legendas e marcas d'água",
+    headline: "Apague textos e marcas d'água",
     description:
       "Detecção automática das áreas fixas + reconstrução por inpainting (Telea) para tirar texto e logo sem borrão, mantendo o enquadramento original.",
     chips: ["detecção automática", "inpainting HQ", "antes / depois", "sem zoom"],
@@ -86,8 +86,8 @@ const MODES: ModeDef[] = [
     tagline: "inpainting profissional",
     headline: "Remoção Profissional com ProPainter",
     description:
-      "Módulo de alta fidelidade que utiliza GPU externa para reconstrução temporal profunda. Ideal para vídeos complexos onde a restauração local não é suficiente.",
-    chips: ["ProPainter engine", "GPU backend", "temporal tracking", "4K support"],
+      "Módulo de alta fidelidade para reconstrução temporal profunda. Ideal para vídeos complexos onde a restauração local não é suficiente.",
+    chips: ["ProPainter engine", "processamento configurável", "temporal tracking", "4K support"],
     icon: Sparkle,
     badge: Wand2,
   },

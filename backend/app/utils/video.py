@@ -106,6 +106,30 @@ def mux_audio(video_only: str, original: str, output: str, has_audio: bool) -> N
         pass
 
 
+def ffmpeg_filter(
+    source: str,
+    destination: str,
+    vf: str,
+    crf: int = 14,
+    preset: str = "slow",
+) -> str:
+    """Render a filtered copy while preserving original audio."""
+    subprocess.run(
+        [
+            "ffmpeg", "-y", "-loglevel", "error",
+            "-i", source,
+            "-vf", vf,
+            "-c:v", "libx264", "-preset", preset, "-crf", str(crf),
+            "-pix_fmt", "yuv420p",
+            "-c:a", "copy",
+            "-movflags", "+faststart",
+            destination,
+        ],
+        check=True,
+    )
+    return destination
+
+
 def normalize_video(
     source: str,
     destination: str,

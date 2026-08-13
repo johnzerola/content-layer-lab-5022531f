@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REMOTE_DIR=${REMOTE_DIR:-/opt/cleaner-gpu}
+REMOTE_DIR=${REMOTE_DIR:-/opt/content-layer-lab-cleaner-gpu}
 HOST=${VPS_HOST:?defina VPS_HOST}
 USER=${VPS_SSH_USER:-root}
 APP_ORIGIN=${APP_ORIGIN:?defina APP_ORIGIN, por exemplo https://app.example.com}
 PUBLIC_HOST=${CLEANER_PUBLIC_HOST:?defina CLEANER_PUBLIC_HOST}
-BIND_PORT=${CLEANER_BIND_PORT:-8097}
+BIND_PORT=${CLEANER_BIND_PORT:-18096}
 MIN_VRAM_MB=${DIFFUERASER_MIN_VRAM_MB:-20000}
+CADDY_SITE_FILE=${CADDY_SITE_FILE:-content-layer-lab-cleaner.caddy}
 
 [[ "$APP_ORIGIN" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] || { echo "APP_ORIGIN invalida"; exit 2; }
 [[ "$PUBLIC_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || { echo "CLEANER_PUBLIC_HOST invalido"; exit 2; }
@@ -22,7 +23,7 @@ rsync -az --delete \
   ./Caddyfile.cleaner "$USER@$HOST:$REMOTE_DIR/"
 
 ssh "$USER@$HOST" \
-  "REMOTE_DIR='$REMOTE_DIR' APP_ORIGIN='$APP_ORIGIN' PUBLIC_HOST='$PUBLIC_HOST' BIND_PORT='$BIND_PORT' MIN_VRAM_MB='$MIN_VRAM_MB' bash -s" <<'REMOTE'
+  "REMOTE_DIR='$REMOTE_DIR' APP_ORIGIN='$APP_ORIGIN' PUBLIC_HOST='$PUBLIC_HOST' BIND_PORT='$BIND_PORT' MIN_VRAM_MB='$MIN_VRAM_MB' CADDY_SITE_FILE='$CADDY_SITE_FILE' bash -s" <<'REMOTE'
 set -euo pipefail
 cd "$REMOTE_DIR"
 
@@ -116,25 +117,18 @@ sed \
   -e "s/{\$CLEANER_PUBLIC_HOST}/$PUBLIC_HOST/g" \
   -e "s/{\$CLEANER_MAX_UPLOAD_GB}/2/g" \
   -e "s/127.0.0.1:8095/127.0.0.1:$BIND_PORT/g" \
-  Caddyfile.cleaner > /etc/caddy/conf.d/cleaner.caddy
+  Caddyfile.cleaner > "/etc/caddy/conf.d/$CADDY_SITE_FILE"
 
 if ! grep -Fq 'import /etc/caddy/conf.d/*.caddy' /etc/caddy/Caddyfile; then
   cp /etc/caddy/Caddyfile "/etc/caddy/Caddyfile.backup.$(date +%s)"
   printf '\nimport /etc/caddy/conf.d/*.caddy\n' >> /etc/caddy/Caddyfile
 fi
-caddy fmt --overwrite /etc/caddy/conf.d/cleaner.caddy
+caddy fmt --overwrite "/etc/caddy/conf.d/$CADDY_SITE_FILE"
 caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 systemctl reload caddy
 
 public_health=$(curl -fsS "https://$PUBLIC_HOST/v1/health")
 grep -q '"max_ready":true' <<<"$public_health" || { echo "health publico nao confirmou DiffuEraser"; exit 4; }
-
-for old_port in 8095 8096; do
-  [[ "$old_port" == "$BIND_PORT" ]] && continue
-  for container in $(docker ps --filter "publish=$old_port" -q); do
-    docker stop "$container"
-  done
-done
 
 echo "==> Deploy GPU concluido em https://$PUBLIC_HOST"
 echo "==> O segredo permanece somente em $REMOTE_DIR/.env"

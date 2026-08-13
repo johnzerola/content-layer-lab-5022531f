@@ -1,15 +1,15 @@
 # Sandbox isolado CPU — não interfere em serviços existentes da VPS.
-# Rede própria, porta 8095 apenas em 127.0.0.1 (exposta via túnel/reverse proxy se preciso),
+# Rede própria, porta apenas em 127.0.0.1 (exposta via reverse proxy se preciso),
 # volumes dedicados em ./data, limites de CPU/memória.
-name: cleaner-cpu
+name: content-layer-lab-cleaner-cpu
 
 services:
   worker:
     build:
       context: .
       dockerfile: Dockerfile.cpu
-    image: cleaner-worker-cpu:latest
-    container_name: cleaner-cpu-worker
+    image: content-layer-lab-cleaner-worker-cpu:latest
+    container_name: content-layer-lab-cleaner-cpu-worker
     restart: unless-stopped
     environment:
       CLEANER_ENV: production
@@ -50,7 +50,7 @@ services:
     cap_drop:
       - ALL
     networks:
-      - cleaner-net
+      - content-layer-lab-cleaner-net
     logging:
       driver: json-file
       options:
@@ -58,6 +58,6 @@ services:
         max-file: "3"
 
 networks:
-  cleaner-net:
-    name: cleaner-cpu-net
+  content-layer-lab-cleaner-net:
+    name: content-layer-lab-cleaner-cpu-net
     driver: bridge

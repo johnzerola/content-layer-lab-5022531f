@@ -22,10 +22,17 @@ export function appOrigin(): string {
 }
 
 function normalizeBase(url: string): string {
-  const clean = url.replace(/\/+$/, "");
-  const match = /^https?:\/\/(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?::\d+)?$/.exec(clean);
-  if (!match) return clean;
-  return `https://cleaner-${match[1]}-${match[2]}-${match[3]}-${match[4]}.nip.io`;
+  return url.replace(/\/+$/, "");
+}
+
+function compactWorkerError(body: string, status?: number): string {
+  const text = body.trim();
+  if (/^<!doctype html/i.test(text) || /<html[\s>]/i.test(text)) {
+    return status
+      ? `motor respondeu HTML em vez de API JSON (${status}); verifique CLEANER_WORKER_URL`
+      : "motor respondeu HTML em vez de API JSON; verifique CLEANER_WORKER_URL";
+  }
+  return text.slice(0, 400) || (status ? `worker ${status}` : "resposta vazia do motor");
 }
 
 export function workerBase(): string | null {
@@ -44,6 +51,30 @@ function secret(): string {
     throw new Error("CLEANER_WORKER_SECRET ausente ou fraco");
   }
   return value;
+}
+
+let legacyTokenCache: boolean | null = null;
+let legacyTokenCacheAt = 0;
+
+function legacyJobToken(jobId: string): string {
+  return createHmac("sha256", secret()).update(jobId).digest("hex");
+}
+
+async function usesLegacyWorkerToken(): Promise<boolean> {
+  if (process.env["CLEANER_WORKER_LEGACY_AUTH"] === "1") return true;
+  if (process.env["CLEANER_WORKER_LEGACY_AUTH"] === "0") return false;
+  if (legacyTokenCache !== null && Date.now() - legacyTokenCacheAt < 30_000) return legacyTokenCache;
+  const base = workerBase();
+  if (!base) return false;
+  try {
+    const response = await fetch(`${base}/v1/health`);
+    const body = (await response.json()) as { version?: unknown };
+    legacyTokenCache = body.version === "1.0.0";
+  } catch {
+    legacyTokenCache = false;
+  }
+  legacyTokenCacheAt = Date.now();
+  return legacyTokenCache;
 }
 
 export function jobToken(jobId: string, scope: JobTokenScope, ttlSeconds = 60 * 60): string {
@@ -145,14 +176,23 @@ async function call<T>(path: string, init: RequestInit & { jobId?: string } = {}
   if (!base) throw new Error("worker-offline");
   const headers = new Headers(init.headers);
   headers.set("content-type", "application/json");
-  if (init.jobId) headers.set("x-job-token", jobToken(init.jobId, "control"));
+  if (init.jobId) {
+    headers.set(
+      "x-job-token",
+      (await usesLegacyWorkerToken()) ? legacyJobToken(init.jobId) : jobToken(init.jobId, "control"),
+    );
+  }
   const response = await fetch(`${base}${path}`, { ...init, headers });
   if (!response.ok) {
     const responseBody = await response.text();
-    throw new Error(responseBody.slice(0, 400) || `worker ${response.status}`);
+    throw new Error(compactWorkerError(responseBody, response.status));
   }
   const responseBody = await response.text();
-  return (responseBody ? JSON.parse(responseBody) : {}) as T;
+  try {
+    return (responseBody ? JSON.parse(responseBody) : {}) as T;
+  } catch {
+    throw new Error(compactWorkerError(responseBody));
+  }
 }
 
 export async function workerHealth() {
@@ -164,10 +204,16 @@ export async function workerHealth() {
     if (!response.ok) {
       return {
         online: false as const,
-        reason: responseBody.slice(0, 100) || `worker ${response.status}`,
+        reason: compactWorkerError(responseBody, response.status),
       };
     }
-    return { online: true as const, ...(JSON.parse(responseBody) as Record<string, unknown>) };
+    try {
+      const parsed = JSON.parse(responseBody) as Record<string, unknown>;
+      legacyTokenCache = parsed["version"] === "1.0.0";
+      return { online: true as const, ...parsed };
+    } catch {
+      return { online: false as const, reason: compactWorkerError(responseBody) };
+    }
   } catch (error: unknown) {
     return {
       online: false as const,
@@ -188,8 +234,9 @@ export async function workerResolveMedia(url: string) {
     body: JSON.stringify({ url }),
   });
   const body = await response.text();
-  if (!response.ok) throw new Error(body.slice(0, 400) || `worker ${response.status}`);
-  return JSON.parse(body) as {
+  if (!response.ok) throw new Error(compactWorkerError(body, response.status));
+  try {
+    return JSON.parse(body) as {
     url: string;
     headers: MediaHeaders;
     title?: string;
@@ -199,6 +246,9 @@ export async function workerResolveMedia(url: string) {
     duration?: number;
     size?: number;
   };
+  } catch {
+    throw new Error(compactWorkerError(body));
+  }
 }
 
 export async function workerDetect(jobId: string, mode: string, roi?: CleanerRegion | null) {
@@ -222,7 +272,7 @@ export async function workerProcess(input: {
   preset: string;
   masks: CleanerRegion[];
   options: Record<string, unknown>;
-  callbackUrl: string;
+  callbackUrl?: string | null;
 }) {
   return call<{ status: string }>(`/v1/jobs/${input.jobId}/process`, {
     method: "POST",
@@ -244,4 +294,8 @@ export async function workerCancel(jobId: string) {
 
 export async function workerDelete(jobId: string) {
   return call<{ ok: boolean }>(`/v1/jobs/${jobId}`, { method: "DELETE", jobId });
+}
+
+export async function workerUploadToken(jobId: string) {
+  return (await usesLegacyWorkerToken()) ? legacyJobToken(jobId) : jobToken(jobId, "upload");
 }

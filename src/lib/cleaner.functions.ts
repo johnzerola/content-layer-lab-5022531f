@@ -14,6 +14,7 @@ import {
   workerDetect,
   workerHealth,
   workerInputStatus,
+  workerUploadToken,
   workerProcess,
   workerStatus,
 } from "@/lib/cleaner.server";
@@ -50,8 +51,8 @@ export const createCleanerJob = createServerFn({ method: "POST" })
         filename: z.string().min(1),
         size: z.number().positive().max(maxUploadBytes, "Video excede o limite permitido"),
         mode: z
-          .enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"])
-          .default("subtitle"),
+          .enum(["smart", "text", "watermark", "logo", "object", "passerby"])
+          .default("smart"),
         preset: z.enum(["fast", "quality", "max"]).default("quality"),
       })
       .parse(d),
@@ -76,7 +77,7 @@ export const createCleanerJob = createServerFn({ method: "POST" })
     return {
       job: row as unknown as CleanerJob,
       upload: base
-        ? { url: `${base}/v1/jobs/${row.id}/upload`, token: jobToken(row.id, "upload") }
+        ? { url: `${base}/v1/jobs/${row.id}/upload`, token: await workerUploadToken(row.id) }
         : null,
     };
   });
@@ -127,7 +128,7 @@ export const prepareCleanerUpload = createServerFn({ method: "POST" })
     return {
       upload: {
         url: `${base}/v1/jobs/${data.id}/upload`,
-        token: jobToken(data.id, "upload"),
+        token: await workerUploadToken(data.id),
       },
     };
   });
@@ -147,13 +148,27 @@ export const deleteCleanerJob = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const cleanupCleanerRemoteJob = createServerFn({ method: "POST" })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .validator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    await requireOwnedJob(context.supabase, context.userId, data.id);
+    await workerDelete(data.id).catch(() => null);
+    await context.supabase
+      .from("cleaner_jobs")
+      .update({ stage: "resultado entregue; arquivos removidos da VPS" })
+      .eq("id", data.id)
+      .eq("user_id", context.userId);
+    return { ok: true };
+  });
+
 export const detectCleanerJob = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
   .validator((d: unknown) =>
     z
       .object({
         id: z.string().uuid(),
-        mode: z.enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"]),
+        mode: z.enum(["smart", "text", "watermark", "logo", "object", "passerby"]),
         roi: cleanerRegionSchema.nullable().optional(),
       })
       .parse(d),
@@ -207,7 +222,7 @@ export const processCleanerJob = createServerFn({ method: "POST" })
     z
       .object({
         id: z.string().uuid(),
-        mode: z.enum(["smart", "subtitle", "text", "watermark", "logo", "object", "passerby"]),
+        mode: z.enum(["smart", "text", "watermark", "logo", "object", "passerby"]),
         preset: z.enum(["fast", "quality", "max"]),
         masks: z.array(cleanerRegionSchema),
         options: z.record(z.string(), z.any()).default({}),
@@ -216,10 +231,10 @@ export const processCleanerJob = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     await requireOwnedJob(context.supabase, context.userId, data.id);
-    const callbackUrl = `${appOrigin()}/api/public/cleaner-callback`;
-    if (!callbackUrl.startsWith("https://")) {
-      throw new Error("PUBLIC_SITE_URL HTTPS nao configurada");
-    }
+    const origin = appOrigin();
+    const callbackUrl = origin.startsWith("https://")
+      ? `${origin}/api/public/cleaner-callback`
+      : null;
     await workerProcess({
       jobId: data.id,
       mode: data.mode,
