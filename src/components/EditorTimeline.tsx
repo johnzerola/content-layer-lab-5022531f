@@ -655,16 +655,16 @@ export function EditorTimeline({
                   >
                     {i + 1} · {fmt(s.end - s.start)}
                   </button>
-                  {onDeleteSegment && segments.length > 1 && (
+                  {onDeleteSegment && (
                     <button
                       onPointerDown={(e) => {
                         e.stopPropagation();
                         onDeleteSegment(i);
                       }}
-                      className="shrink-0 text-destructive"
+                      className="shrink-0 text-destructive hover:scale-110 transition p-0.5"
                       aria-label={`remover trecho ${i + 1}`}
                     >
-                      ×
+                      <X className="size-2.5" />
                     </button>
                   )}
                 </span>
