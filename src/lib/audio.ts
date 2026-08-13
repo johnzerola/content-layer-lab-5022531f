@@ -47,8 +47,13 @@ export async function splitAudio(file: File): Promise<{ voice: Blob; music: Blob
   const voiceData = await instance.readFile("voice.mp3");
   const musicData = await instance.readFile("music.mp3");
   
+  // Converte FileData (Uint8Array) para Blob explicitamente
+  const voiceUint8 = typeof voiceData === 'string' ? new TextEncoder().encode(voiceData) : new Uint8Array(voiceData as any);
+  const musicUint8 = typeof musicData === 'string' ? new TextEncoder().encode(musicData) : new Uint8Array(musicData as any);
+  
   return {
-    voice: new Blob([voiceData], { type: "audio/mp3" }),
-    music: new Blob([musicData], { type: "audio/mp3" }),
+    voice: new Blob([voiceUint8], { type: "audio/mp3" }),
+    music: new Blob([musicUint8], { type: "audio/mp3" }),
   };
+
 }
