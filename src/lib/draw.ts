@@ -492,8 +492,9 @@ function drawVideoLayer(
       box: { x: number; y: number; w: number; h: number },
       mode: "cover" | "contain",
       rect: typeof cr = cr,
-      style?: { blur?: number; dim?: number; useOffset?: boolean },
+      style?: { blur?: number; dim?: number; useOffset?: boolean; voiceLevel?: number; musicLevel?: number },
     ) => {
+
       const fitScale =
         mode === "contain"
           ? Math.min(box.w / rect.ew, box.h / rect.eh)
