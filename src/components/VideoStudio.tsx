@@ -1514,8 +1514,9 @@ export function VideoStudio({
                 </Field>
                   </div>
                 )}
-
+              </div>
             </ScrollArea>
+
 
 
 
