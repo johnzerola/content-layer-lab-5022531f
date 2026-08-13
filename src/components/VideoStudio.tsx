@@ -232,8 +232,8 @@ export function VideoStudio({
       segments: Array.isArray(saved?.segments) ? saved.segments : [],
       transIn: { ...defaults.transIn, ...(saved?.transIn ?? {}) },
       transOut: { ...defaults.transOut, ...(saved?.transOut ?? {}) },
-      antiDup: saved?.antiDup ? { ...saved.antiDup } : undefined,
-      captionStyle: saved?.captionStyle ? { ...saved.captionStyle } : undefined,
+      ...(saved?.antiDup ? { antiDup: { ...saved.antiDup } } : {}),
+      ...(saved?.captionStyle ? { captionStyle: { ...saved.captionStyle } } : {}),
     };
   }, [value.pre]);
   const hist = useEditorHistory<Doc>({
