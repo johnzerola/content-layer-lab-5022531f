@@ -66,10 +66,11 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
       
       const job = await startCleanerJob({
         data: {
-          videoUrl: "pending_upload_from_client",
-          regions: [], // Vazio para modo auto
+          videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4", // Mock para teste
+          regions: [], 
           options: {
-            mode: "auto",
+            mode: "smart",
+            preset: "fast",
             upscale: false
           }
         }
