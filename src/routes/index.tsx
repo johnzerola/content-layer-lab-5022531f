@@ -264,13 +264,11 @@ function Home() {
     lote: [],
     clip: [],
     limpar: [],
-    "limpar-ia": [],
   });
   const [selectedIds, setSelectedIds] = useState<Record<Mode, string | null>>({
     lote: null,
     clip: null,
     limpar: null,
-    "limpar-ia": null,
   });
   const queuesRef = useRef(queues);
   queuesRef.current = queues;
@@ -297,7 +295,7 @@ function Home() {
   /* --------------------------------------------------------------- */
   /* Autosave da sessão (IndexedDB) — o lote sobrevive a F5 e reload   */
   /* --------------------------------------------------------------- */
-  const ALL_MODES = useMemo<Mode[]>(() => ["lote", "clip", "limpar", "limpar-ia"], []);
+  const ALL_MODES = useMemo<Mode[]>(() => ["lote", "clip", "limpar", ], []);
   const [pendingSessions, setPendingSessions] = useState<Partial<Record<Mode, SessionSnap>>>({});
   const [restoring, setRestoring] = useState(false);
   const savedBlobs = useRef<Set<string>>(new Set());
@@ -1226,28 +1224,12 @@ function Home() {
           // CleanerIA: o render precisa partir do vídeo já reconstruído pela GPU,
           // senão a legenda original volta a aparecer na exportação.
           let sourceFile = item.file;
-          if (runMode === "limpar-ia") {
-            if (!item.result_url) {
-              throw new Error(
-                "Este vídeo ainda não foi limpo pela IA. Marque as áreas e clique em “Enviar para GPU” antes de processar.",
-              );
-            }
-            setItems((p) =>
-              p.map((x) => (x.id === id ? { ...x, stage: "baixando vídeo limpo" } : x)),
-            );
-            updateJob(id, { stage: "baixando vídeo limpo" });
-            const res = await fetch(item.result_url, { signal: ac.signal });
-            if (!res.ok) throw new Error("Não consegui baixar o vídeo limpo da GPU.");
-            const cleaned = await res.blob();
-            sourceFile = new File([cleaned], item.file.name, {
-              type: cleaned.type || "video/mp4",
-            });
-          }
+
 
           const baseTpl =
             runMode === "clip"
               ? stripBranding(active)
-              : runMode === "limpar" || runMode === "limpar-ia"
+              : runMode === "limpar"
                 ? cleanOnly(active)
                 : active;
 
@@ -1324,9 +1306,6 @@ function Home() {
                     // cada vídeo usa as áreas detectadas para ele; sem detecção, usa as do template
                     cleanup: itemRegions,
                   }
-                : runMode === "limpar-ia"
-                  ? // a limpeza já foi feita na GPU: só reembala mantendo proporção original
-                    { ...cleanOnly(active, { w: item.w, h: item.h }), cleanup: [] }
                   : applyRatio(baseTpl, plat.w, plat.h);
 
             for (let k = 0; k < n; k++) {
@@ -1635,8 +1614,7 @@ function Home() {
       counts={{ 
         lote: queues.lote.length, 
         clip: queues.clip.length, 
-        limpar: queues.limpar.length,
-        "limpar-ia": queues["limpar-ia"].length 
+        limpar: queues.limpar.length
       }}
       onLibrary={() => setLibraryOpen(true)}
       onCloud={() => setCloudOpen(true)}
@@ -1757,21 +1735,6 @@ function Home() {
               </select>
             </div>
           </section>
-        ) : mode === "limpar-ia" ? (
-          <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
-            <div>
-              <p className="mono-label">AI Video Cleaner</p>
-              <p className="text-lg font-semibold">Remoção Profissional com ProPainter (GPU)</p>
-              <p className="font-mono text-[11px] text-muted-foreground">
-                reconstrução temporal avançada utilizando frames vizinhos para restaurar o fundo original
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-               <span className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-mono text-[11px] text-primary">
-                 <Sparkles className="size-3" /> motor gpu
-               </span>
-            </div>
-          </section>
         ) : (
           <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
             <div>
@@ -1858,22 +1821,6 @@ function Home() {
                   Reposicione o enquadramento quando o corte automático errar.
                 </p>
               </div>
-              {mode === "limpar-ia" && selected ? (
-                <AuthGate>
-                  <CleanerIAStudio 
-                    item={{
-                      id: selected.id,
-                      file: selected.file,
-                      poster: selected.poster,
-                      w: selected.w,
-                      h: selected.h
-                    }}
-                    onComplete={(url) => {
-                      setItems(prev => prev.map(x => x.id === selected.id ? { ...x, result_url: url, status: "pronto" as any } : x));
-                    }}
-                  />
-                </AuthGate>
-              ) : selected ? (
                 <div className="grid gap-5 sm:grid-cols-2">
                   <div className="space-y-2">
                     <p className="mono-label">Original</p>
@@ -2093,18 +2040,243 @@ function Home() {
                       </p>
                     )}
                   </div>
-
-
-
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">Selecione um vídeo na lista.</p>
               )}
+            </section>
+            <section className="panel flex max-h-[70vh] flex-col p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="font-semibold">Vídeos ({items.length})</p>
+                <button
+                  className="font-mono text-xs text-destructive"
+                  onClick={() => {
+                    setItems([]);
+                    setSelectedId(null);
+                  }}
+                >
+                  limpar todos
+                </button>
+              </div>
+              <div className="space-y-2 overflow-y-auto pr-1">
+                {items.map((it, i) => (
+                  <button
+                    key={it.id}
+                    onClick={() => setSelectedId(it.id)}
+                    className={`flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition-all ${
+                      selectedId === it.id ? "border-primary bg-primary/10" : "border-border bg-surface-2 hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
+                      {it.poster && <img src={it.poster} alt="thumb" className="h-full w-full object-cover" />}
+                      {it.clip && (
+                        <div className="absolute top-0 right-0 bg-primary px-1 font-mono text-[8px] text-white">
+                          corte
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-semibold leading-tight">{it.file.name}</p>
+                      <p
+                        className={`font-mono text-[10px] ${
+                          it.status === "pronto"
+                            ? "text-primary"
+                            : it.status === "erro"
+                              ? "text-destructive"
+                              : it.status === "processando"
+                                ? "text-warn"
+                                : "text-muted-foreground"
+                        }`}
+                      >
+                        ● {it.status}
+                        {it.status === "processando" ? ` ${Math.round(it.progress * 100)}%` : ""}
+                        {it.stage && it.status !== "pendente" ? ` · ${it.stage}` : ""}
+                      </p>
+                      {it.status === "processando" && (
+                        <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-warn transition-all"
+                            style={{ width: `${Math.round(it.progress * 100)}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
 
-              <div className="space-y-3 border-t border-border pt-4">
+                    {it.blob && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        title={
+                          (it.outputs?.length ?? 1) > 1 ? `baixar ${it.outputs!.length} variações` : "baixar"
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const base = it.file.name.replace(/\.\w+$/, "");
+                          const outs = it.outputs ?? [{ blob: it.blob!, ext: it.ext ?? "mp4", label: "" }];
+                          outs.forEach((o, k) =>
+                            setTimeout(
+                              () => downloadBlob(o.blob, `${base}-vv${o.label ? `-${o.label}` : ""}.${o.ext}`),
+                              k * 250,
+                            ),
+                          );
+                        }}
+                        className="relative rounded-md border border-border p-1.5 hover:border-primary"
+                      >
+                        <Download className="size-3.5" />
+                        {it.outputs && it.outputs.length > 1 && (
+                          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[8px] text-white">
+                            {it.outputs.length}
+                          </span>
+                        )}
+                      </span>
+                    )}
+
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      title="Editar vídeo (cortar, enquadrar, cor)"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void openStudio(it.id);
+                      }}
+
+                      className={`rounded-md border p-1.5 hover:border-primary ${
+                        hasPreEdit(it.preEdit) || it.clip ? "border-primary text-primary" : "border-border text-muted-foreground"
+                      }`}
+                    >
+                      <Wand2 className="size-3.5" />
+                    </span>
+
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeItemWithUndo(it.id);
+                      }}
+                      className="rounded-md p-1.5 text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="size-3.5" />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
+
+        <div className="space-y-3 border-t border-border pt-4">
+              <div className="space-y-2 overflow-y-auto pr-1">
+                {items.map((it, i) => (
+                  <button
+                    key={it.id}
+                    onClick={() => setSelectedId(it.id)}
+                    className={`flex w-full items-center gap-3 rounded-xl border p-2.5 text-left transition-all ${
+                      selectedId === it.id ? "border-primary bg-primary/10" : "border-border bg-surface-2 hover:border-primary/50"
+                    }`}
+                  >
+                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
+                      {it.poster && <img src={it.poster} alt="thumb" className="h-full w-full object-cover" />}
+                      {it.clip && (
+                        <div className="absolute top-0 right-0 bg-primary px-1 font-mono text-[8px] text-white">
+                          corte
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-semibold leading-tight">{it.file.name}</p>
+                      <p
+                        className={`font-mono text-[10px] ${
+                          it.status === "pronto"
+                            ? "text-primary"
+                            : it.status === "erro"
+                              ? "text-destructive"
+                              : it.status === "processando"
+                                ? "text-warn"
+                                : "text-muted-foreground"
+                        }`}
+                      >
+                        ● {it.status}
+                        {it.status === "processando" ? ` ${Math.round(it.progress * 100)}%` : ""}
+                        {it.stage && it.status !== "pendente" ? ` · ${it.stage}` : ""}
+                      </p>
+                      {it.status === "processando" && (
+                        <div className="mt-1 h-1 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-warn transition-all"
+                            style={{ width: `${Math.round(it.progress * 100)}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {it.blob && (
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        title={
+                          (it.outputs?.length ?? 1) > 1 ? `baixar ${it.outputs!.length} variações` : "baixar"
+                        }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const base = it.file.name.replace(/\.\w+$/, "");
+                          const outs = it.outputs ?? [{ blob: it.blob!, ext: it.ext ?? "mp4", label: "" }];
+                          outs.forEach((o, k) =>
+                            setTimeout(
+                              () => downloadBlob(o.blob, `${base}-vv${o.label ? `-${o.label}` : ""}.${o.ext}`),
+                              k * 250,
+                            ),
+                          );
+                        }}
+                        className="relative rounded-md border border-border p-1.5 hover:border-primary"
+                      >
+                        <Download className="size-3.5" />
+                        {it.outputs && it.outputs.length > 1 && (
+                          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-primary text-[8px] text-white">
+                            {it.outputs.length}
+                          </span>
+                        )}
+                      </span>
+                    )}
+
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      title="Editar vídeo (cortar, enquadrar, cor)"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void openStudio(it.id);
+                      }}
+
+                      className={`rounded-md border p-1.5 hover:border-primary ${
+                        hasPreEdit(it.preEdit) || it.clip ? "border-primary text-primary" : "border-border text-muted-foreground"
+                      }`}
+                    >
+                      <Wand2 className="size-3.5" />
+                    </span>
+
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeItemWithUndo(it.id);
+                      }}
+                      className="rounded-md p-1.5 text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="size-3.5" />
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
+
+        <div className="space-y-3 border-t border-border pt-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button onClick={() => void processAll()} disabled={running}>
-                    <Play className="size-4" /> {running ? "Processando…" : "'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            cria um login de teste por favor"}
+                    <Play className="size-4" /> {running ? "Processando…" : "'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            git add src/components/AppShell.tsx src/components/CleanerIAStudio.tsx src/lib/cleaner.functions.ts src/lib/cleaner.server.ts src/lib/cleaner.ts src/routes/.tsx\n\ngit commit -m \"Remove VPS-specific CleanerIA flow and subtitle mode\"\n\ngit push origin main"}
                   </Button>
                   {running && (
                     <>
@@ -2495,19 +2667,12 @@ function Home() {
                 )}
               </div>
             </section>
+          </div>
+        )}
 
-
-
-
-
-
-
-
-
-
-
-
-            <section className="panel flex max-h-[70vh] flex-col p-5">
+        {mode === "clip" && items.length > 0 && (
+          <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
+            <section className="panel space-y-4 p-5">
               <div className="mb-3 flex items-center justify-between">
                 <p className="font-semibold">Vídeos ({items.length})</p>
                 <button

@@ -13,7 +13,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as ArmazenamentoRouteImport } from './routes/armazenamento'
 import { Route as BibliotecaRouteImport } from './routes/biblioteca'
-import { Route as LimparIaRouteImport } from './routes/limpar-ia'
 import { Route as LiveRouteImport } from './routes/live'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as VendasRouteImport } from './routes/vendas'
@@ -21,8 +20,6 @@ import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
-import { Route as ApiPublicCleanerCallbackRouteImport } from './routes/api/public/cleaner-callback'
-import { Route as ApiPublicCleanerUploadRouteImport } from './routes/api/public/cleaner-upload'
 import { Route as ApiPublicHlsProxyRouteImport } from './routes/api/public/hls-proxy'
 import { Route as ApiPublicMediaProxyRouteImport } from './routes/api/public/media-proxy'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
@@ -45,11 +42,6 @@ const ArmazenamentoRoute = ArmazenamentoRouteImport.update({
 const BibliotecaRoute = BibliotecaRouteImport.update({
   id: '/biblioteca',
   path: '/biblioteca',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LimparIaRoute = LimparIaRouteImport.update({
-  id: '/limpar-ia',
-  path: '/limpar-ia',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LiveRoute = LiveRouteImport.update({
@@ -90,17 +82,6 @@ const Char91DotmcpChar93InvokeToolToolRoute =
     path: '/.mcp/invoke-tool/$tool',
     getParentRoute: () => rootRouteImport,
   } as any)
-const ApiPublicCleanerCallbackRoute =
-  ApiPublicCleanerCallbackRouteImport.update({
-    id: '/api/public/cleaner-callback',
-    path: '/api/public/cleaner-callback',
-    getParentRoute: () => rootRouteImport,
-  } as any)
-const ApiPublicCleanerUploadRoute = ApiPublicCleanerUploadRouteImport.update({
-  id: '/api/public/cleaner-upload',
-  path: '/api/public/cleaner-upload',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const ApiPublicHlsProxyRoute = ApiPublicHlsProxyRouteImport.update({
   id: '/api/public/hls-proxy',
   path: '/api/public/hls-proxy',
@@ -123,7 +104,6 @@ export interface FileRoutesByFullPath {
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
-  '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
   '/vendas': typeof VendasRoute
@@ -131,8 +111,6 @@ export interface FileRoutesByFullPath {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
-  '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
-  '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
@@ -142,7 +120,6 @@ export interface FileRoutesByTo {
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
-  '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
   '/vendas': typeof VendasRoute
@@ -150,8 +127,6 @@ export interface FileRoutesByTo {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
-  '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
-  '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
@@ -162,7 +137,6 @@ export interface FileRoutesById {
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
-  '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
   '/vendas': typeof VendasRoute
@@ -170,8 +144,6 @@ export interface FileRoutesById {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
-  '/api/public/cleaner-callback': typeof ApiPublicCleanerCallbackRoute
-  '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
@@ -183,7 +155,6 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/armazenamento'
     | '/biblioteca'
-    | '/limpar-ia'
     | '/live'
     | '/mcp'
     | '/vendas'
@@ -191,8 +162,6 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
-    | '/api/public/cleaner-callback'
-    | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
     | '/api/public/hooks/publish-due'
@@ -202,7 +171,6 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/armazenamento'
     | '/biblioteca'
-    | '/limpar-ia'
     | '/live'
     | '/mcp'
     | '/vendas'
@@ -210,8 +178,6 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
-    | '/api/public/cleaner-callback'
-    | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
     | '/api/public/hooks/publish-due'
@@ -221,7 +187,6 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/armazenamento'
     | '/biblioteca'
-    | '/limpar-ia'
     | '/live'
     | '/mcp'
     | '/vendas'
@@ -229,8 +194,6 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
-    | '/api/public/cleaner-callback'
-    | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
     | '/api/public/hooks/publish-due'
@@ -241,7 +204,6 @@ export interface RootRouteChildren {
   AgendaRoute: typeof AgendaRoute
   ArmazenamentoRoute: typeof ArmazenamentoRoute
   BibliotecaRoute: typeof BibliotecaRoute
-  LimparIaRoute: typeof LimparIaRoute
   LiveRoute: typeof LiveRoute
   McpRoute: typeof McpRoute
   VendasRoute: typeof VendasRoute
@@ -249,8 +211,6 @@ export interface RootRouteChildren {
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
-  ApiPublicCleanerCallbackRoute: typeof ApiPublicCleanerCallbackRoute
-  ApiPublicCleanerUploadRoute: typeof ApiPublicCleanerUploadRoute
   ApiPublicHlsProxyRoute: typeof ApiPublicHlsProxyRoute
   ApiPublicMediaProxyRoute: typeof ApiPublicMediaProxyRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
@@ -284,13 +244,6 @@ declare module '@tanstack/react-router' {
       path: '/biblioteca'
       fullPath: '/biblioteca'
       preLoaderRoute: typeof BibliotecaRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/limpar-ia': {
-      id: '/limpar-ia'
-      path: '/limpar-ia'
-      fullPath: '/limpar-ia'
-      preLoaderRoute: typeof LimparIaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/live': {
@@ -342,20 +295,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93InvokeToolToolRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/public/cleaner-callback': {
-      id: '/api/public/cleaner-callback'
-      path: '/api/public/cleaner-callback'
-      fullPath: '/api/public/cleaner-callback'
-      preLoaderRoute: typeof ApiPublicCleanerCallbackRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/api/public/cleaner-upload': {
-      id: '/api/public/cleaner-upload'
-      path: '/api/public/cleaner-upload'
-      fullPath: '/api/public/cleaner-upload'
-      preLoaderRoute: typeof ApiPublicCleanerUploadRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/api/public/hls-proxy': {
       id: '/api/public/hls-proxy'
       path: '/api/public/hls-proxy'
@@ -385,7 +324,6 @@ const rootRouteChildren: RootRouteChildren = {
   AgendaRoute: AgendaRoute,
   ArmazenamentoRoute: ArmazenamentoRoute,
   BibliotecaRoute: BibliotecaRoute,
-  LimparIaRoute: LimparIaRoute,
   LiveRoute: LiveRoute,
   McpRoute: McpRoute,
   VendasRoute: VendasRoute,
@@ -394,8 +332,6 @@ const rootRouteChildren: RootRouteChildren = {
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
-  ApiPublicCleanerCallbackRoute: ApiPublicCleanerCallbackRoute,
-  ApiPublicCleanerUploadRoute: ApiPublicCleanerUploadRoute,
   ApiPublicHlsProxyRoute: ApiPublicHlsProxyRoute,
   ApiPublicMediaProxyRoute: ApiPublicMediaProxyRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
