@@ -173,6 +173,19 @@ function Dashboard() {
                    )}
                 </div>
                 </div>
+                <div className="flex gap-2 w-full max-w-[320px]">
+                  {mode === 'lote' && (
+                    <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={() => setEditing(true)}>
+                      <Settings2 className="size-4 mr-2" /> Editar Layout
+                    </Button>
+                  )}
+                  {items.length > 0 && (
+                    <Button variant="secondary" className="flex-1 rounded-xl h-11" onClick={() => setStudioId(selectedId)}>
+                      <Scissors className="size-4 mr-2" /> Ajustar
+                    </Button>
+                  )}
+                </div>
+                </div>
               </div>
 
               {/* Fila Lateral */}
