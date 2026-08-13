@@ -2474,7 +2474,7 @@ function Home() {
         )}
 
         <footer className="py-8 text-center font-mono text-xs text-muted-foreground">
-          tudo roda no navegador · nenhum vídeo sai da sua máquina
+          adicionar uma função aonde consigo seprar a musica do audio sistema sabe o que musica e audio separa automaticamente no editor
         </footer>
       </div>
 
