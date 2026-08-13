@@ -1516,6 +1516,8 @@ export function VideoStudio({
                 )}
               </div>
             </ScrollArea>
+          </aside>
+
 
 
 
