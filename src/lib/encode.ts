@@ -271,15 +271,62 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     // defeituosos deixam decodeAudioData pendurado indefinidamente; nesse caso
     // continuamos com o vídeo, em vez de deixar o lote parado em 0% por horas.
     opts.onProgress?.(0.005);
-    const audio = await withTimeout(
-      decodeAudio(opts.file, segments, v.speed, v.pitch, v.eq),
-      Math.min(60_000, Math.max(20_000, effDur * 250)),
-      "A faixa de áudio não pôde ser preparada",
-    ).catch((error) => {
+    const audio = await (async () => {
+      const base = await withTimeout(
+        decodeAudio(opts.file, segments, v.speed, v.pitch, v.eq),
+        Math.min(60_000, Math.max(20_000, effDur * 250)),
+        "A faixa de áudio não pôde ser preparada",
+      ).catch((err) => {
+        console.warn("Áudio base ignorado:", err);
+        return null;
+      });
 
-      console.warn("Áudio ignorado para evitar bloqueio da exportação:", error);
-      return null;
-    });
+      if (opts.pre?.audioTracks && (opts.pre.audioTracks.voice || opts.pre.audioTracks.music)) {
+        const Ctx = window.AudioContext ?? (window as any).webkitAudioContext;
+        const ac = new Ctx();
+        const sampleRate = 48000;
+        const outLen = Math.max(1, Math.floor(outDur * sampleRate));
+        const off = new OfflineAudioContext(base?.channels ?? 2, outLen, sampleRate);
+        
+        if (base && opts.pre.audioTracks.originalVolume > 0) {
+          const s = off.createBufferSource();
+          s.buffer = base.rendered;
+          const g = off.createGain();
+          g.gain.value = opts.pre.audioTracks.originalVolume;
+          s.connect(g).connect(off.destination);
+          s.start(0);
+        }
+        
+        if (opts.pre.audioTracks.voice && opts.pre.audioTracks.voiceVolume > 0) {
+          const vData = await decodeAudio(opts.pre.audioTracks.voice, [{ start: 0, end: effDur }], 1).catch(() => null);
+          if (vData) {
+            const s = off.createBufferSource();
+            s.buffer = vData.rendered;
+            const g = off.createGain();
+            g.gain.value = opts.pre.audioTracks.voiceVolume;
+            s.connect(g).connect(off.destination);
+            s.start(0);
+          }
+        }
+        
+        if (opts.pre.audioTracks.music && opts.pre.audioTracks.musicVolume > 0) {
+          const mData = await decodeAudio(opts.pre.audioTracks.music, [{ start: 0, end: effDur }], 1).catch(() => null);
+          if (mData) {
+            const s = off.createBufferSource();
+            s.buffer = mData.rendered;
+            const g = off.createGain();
+            g.gain.value = opts.pre.audioTracks.musicVolume;
+            s.connect(g).connect(off.destination);
+            s.start(0);
+          }
+        }
+        
+        const rendered = await off.startRendering();
+        void ac.close();
+        return { rendered, channels: rendered.numberOfChannels, sampleRate: rendered.sampleRate };
+      }
+      return base;
+    })();
     const audioCodec = audio ? await pickAudioCodec(audio.channels, audio.sampleRate) : null;
 
     const muxer = new Muxer({

@@ -1580,7 +1580,7 @@ export function VideoStudio({
                         max={1.5}
                         step={0.05}
                         disabled={!pre.audioTracks?.voice}
-                        onValueChange={([v]) => set({ audioTracks: { ...pre.audioTracks, voiceVolume: v ?? 1, voice: pre.audioTracks?.voice, music: pre.audioTracks?.music, musicVolume: pre.audioTracks?.musicVolume ?? 1, originalVolume: pre.audioTracks?.originalVolume ?? 1 } }, "volume voz")}
+                        onValueChange={([v]) => setPre((prev) => ({ ...prev, audioTracks: { ...prev.audioTracks, voiceVolume: v ?? 1, voice: prev.audioTracks?.voice, music: prev.audioTracks?.music, musicVolume: prev.audioTracks?.musicVolume ?? 1, originalVolume: prev.audioTracks?.originalVolume ?? 1 } as NonNullable<PreEdit["audioTracks"]> }), "volume voz")}
                       />
                     </Field>
 
