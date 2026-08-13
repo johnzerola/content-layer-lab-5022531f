@@ -106,7 +106,10 @@ export function VideoStudio({ file, onSave, onClose, initial }: VideoStudioProps
             <h2 className="text-sm font-black uppercase tracking-tighter">Editor Profissional</h2>
           </div>
           <div className="flex items-center gap-2">
-             <Button variant="ghost" size="sm" onClick={() => setPre(defaultPreEdit())}><RotateCcw className="mr-1 size-3" /> Resetar</Button>
+             <Button variant="ghost" size="sm" onClick={() => setPre(defaultPreEdit())}><RotateCcw className="mr-1 size-3" /> '''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''
+                                        
+                                            
+                                            continua</Button>
             <Button variant="ghost" size="icon" onClick={onClose}><X className="size-4" /></Button>
             <Button size="sm" onClick={() => onSave({ pre, clip: { start: pre.start, end: pre.end } })}>Concluir</Button>
           </div>
