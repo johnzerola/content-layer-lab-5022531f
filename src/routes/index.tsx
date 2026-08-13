@@ -18,17 +18,11 @@ import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
 import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { CloudPanel } from "@/components/CloudPanel";
 import { 
-  defaultTemplate, 
-  defaultPreEdit, 
+  createTemplate, 
   defaultCaptions,
-  describeVariation,
-  formatTime,
   orientationOf,
-  hasPreEdit
 } from "@/lib/template";
-import { cuesToSrt, cuesToText } from "@/lib/captions";
-import { webCodecsSupported } from "@/lib/encode";
-import { downloadBlob } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 
 // Mock data and constants to keep the file valid after the reset
 const PLATFORM_PRESETS = [
@@ -44,10 +38,10 @@ export const Route = createFileRoute("/")({
 function Dashboard() {
   const [items, setItems] = useState<any[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [mode, setMode] = useState<"batch" | "clip" | "limpar">("batch");
+  const [mode, setMode] = useState<"lote" | "clip" | "limpar">("lote");
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
-  const [active, setActive] = useState(defaultTemplate());
+  const [active, setActive] = useState(createTemplate());
   const [templates, setTemplates] = useState<any[]>([]);
   const [editing, setEditing] = useState(false);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -84,8 +78,8 @@ function Dashboard() {
   const openStudio = async (id: string) => setStudioId(id);
   const togglePlatform = (id: string) => {};
   const useTemplate = (t: any) => setActive(t);
-  const commit = (t: any, msg: string) => {};
-  const buildSnapshot = () => ({});
+  const commit = (t: any, msg: string) => ({ list: templates, template: t });
+  const buildSnapshot = () => ({ items: [], templates: [], mode: "lote" });
   const restoreSnapshot = (s: any) => {};
 
   return (
