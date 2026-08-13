@@ -138,16 +138,16 @@ function Dashboard() {
               {/* Preview e Ajustes */}
               <div className="space-y-6">
                 <div className="panel p-4 flex flex-col items-center">
-                   <div className="relative aspect-[9/16] w-full max-w-[320px] overflow-hidden rounded-xl bg-black shadow-2xl">
-                      {mode === 'limpar' || mode === 'cleaner' ? (
-                        <CleanerIAStudio 
-                          item={items.find(it => it.id === selectedId) || items[0]} 
-                          onComplete={() => {}} 
-                        />
-                      ) : (
-                        <TemplateCanvas template={active} previewFile={items.find(it => it.id === selectedId)?.file || items[0].file} />
-                      )}
-                   </div>
+                <div className="relative aspect-[9/16] w-full max-w-[320px] overflow-hidden rounded-xl bg-black shadow-2xl flex items-center justify-center">
+                   {mode === 'limpar' || mode === 'cleaner' ? (
+                     <CleanerIAStudio 
+                       item={items.find(it => it.id === selectedId) || items[0]} 
+                       onComplete={() => {}} 
+                     />
+                   ) : (
+                     <TemplateCanvas template={active} previewFile={items.find(it => it.id === selectedId)?.file || items[0].file} />
+                   )}
+                </div>
                 </div>
               </div>
 
