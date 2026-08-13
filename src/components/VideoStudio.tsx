@@ -970,6 +970,7 @@ export function VideoStudio({
                 {tab === "trim" && (
                   <div className="space-y-4">
 
+
                 <Field label={`Início · ${fmt(start)}`}>
                   <Slider
                     value={[start]}
