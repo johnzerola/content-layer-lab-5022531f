@@ -137,7 +137,7 @@ function Dashboard() {
                             const files = Array.from(e.target.files || []);
                             if (files.length > 0) {
                                 Promise.all(files.map(f => {
-                                  return new Promise<{id: string, file: File, w: number, h: number, duration: number, status: string, mode: string}>((resolve) => {
+                                  return new Promise<any>((resolve) => {
                                     const video = document.createElement('video');
                                     video.preload = 'metadata';
                                     video.onloadedmetadata = () => {
