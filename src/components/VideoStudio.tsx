@@ -678,30 +678,44 @@ export function VideoStudio({
         </header>
 
         {/* corpo: trilha · palco · inspetor */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[132px_minmax(0,1fr)_340px] md:overflow-hidden">
-          {/* trilha de ferramentas */}
-          <nav className="flex gap-2 overflow-x-auto border-b border-border p-2 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[160px_minmax(0,1fr)_340px] md:overflow-hidden bg-background">
+          {/* trilha de ferramentas estilo CapCut */}
+          <aside className="flex gap-1 overflow-x-auto border-b border-border bg-surface p-2 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r">
             {TOOL_GROUPS.map((g) => (
               <div key={g.group} className="flex shrink-0 gap-1 md:block md:space-y-1">
-                <span className="hidden px-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground md:block">
+                <span className="mb-1 hidden px-2 font-display text-[10px] font-bold uppercase tracking-wider text-muted-foreground md:block">
                   {g.group}
                 </span>
                 {g.items.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setTab(t.id)}
-                    className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 font-mono text-[11px] transition ${
-                      tab === t.id
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
-                  >
-                    <t.icon className="size-3.5 shrink-0" /> {t.label}
-                  </button>
+                  <TooltipProvider key={t.id}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => setTab(t.id)}
+                          className={cn(
+                            "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200",
+                            tab === t.id
+                              ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                              : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                          )}
+                        >
+                          <t.icon className={cn("size-4 shrink-0 transition-transform group-hover:scale-110", tab === t.id ? "animate-pulse" : "")} />
+                          <span className="font-display text-xs font-medium">{t.label}</span>
+                          {tab === t.id && (
+                            <div className="absolute left-0 top-1/2 h-4 w-1 -translate-y-1/2 rounded-full bg-white md:block hidden" />
+                          )}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="bg-popover text-popover-foreground">
+                        <p>{t.label} ({t.shortcut})</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 ))}
+                <Separator className="my-2 hidden opacity-20 md:block" />
               </div>
             ))}
-          </nav>
+          </aside>
 
           {/* palco */}
           <section className="flex min-h-0 flex-col gap-2 p-3 md:overflow-hidden">
