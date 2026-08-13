@@ -118,36 +118,34 @@ type Drag = {
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text" | "audio";
-
-const TOOL_GROUPS: { group: string; items: { id: Tab; label: string; icon: typeof Scissors }[] }[] = [
+const TOOL_GROUPS: { group: string; items: { id: Tab; label: string; icon: any; shortcut: string }[] }[] = [
   {
-    group: "Tempo",
+    group: "Ferramentas",
     items: [
-      { id: "trim", label: "Cortar", icon: Scissors },
-      { id: "trans", label: "Transições", icon: SlidersHorizontal },
+      { id: "trim", label: "Corte", icon: Scissors, shortcut: "S" },
+      { id: "crop", label: "Enquadrar", icon: Maximize, shortcut: "C" },
+      { id: "trans", label: "Transições", icon: ArrowRight, shortcut: "T" },
     ],
   },
   {
-    group: "Imagem",
+    group: "Design",
     items: [
-      { id: "layout", label: "Layout", icon: LayoutTemplate },
-      { id: "crop", label: "Enquadrar", icon: Crop },
-      { id: "camera", label: "Câmera", icon: Camera },
-      { id: "keys", label: "Keyframes", icon: Sparkles },
-      { id: "color", label: "Cor", icon: SlidersHorizontal },
+      { id: "layout", label: "Layout", icon: LayoutTemplate, shortcut: "L" },
+      { id: "color", label: "Ajustes", icon: SlidersHorizontal, shortcut: "A" },
+      { id: "camera", label: "IA Motion", icon: Sparkles, shortcut: "M" },
     ],
   },
   {
-    group: "Conteúdo",
+    group: "Áudio & Texto",
     items: [
-      { id: "caps", label: "Legenda", icon: Subtitles },
-      { id: "text", label: "Textos", icon: Type },
-      { id: "audio", label: "Áudio", icon: AudioLines },
+      { id: "caps", label: "Legendas", icon: Captions, shortcut: "G" },
+      { id: "audio", label: "Mixagem", icon: Volume2, shortcut: "V" },
+      { id: "text", label: "Títulos", icon: Type, shortcut: "H" },
     ],
   },
 ];
 
+type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text" | "audio";
 const TOOL_ORDER: Tab[] = TOOL_GROUPS.flatMap((g) => g.items.map((i) => i.id));
 
 /** Miniatura esquemática de cada layout (9:16). */
