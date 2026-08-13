@@ -2,12 +2,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronsLeftRight,
   Diamond,
+  Layers,
   Magnet,
+  Maximize2,
+  Minimize2,
   Pause,
   Play,
   Scissors,
   SkipBack,
   SkipForward,
+  Type,
+  Video,
+  Volume2,
   ZoomIn,
   ZoomOut,
 } from "lucide-react";
@@ -364,26 +370,58 @@ export function EditorTimeline({
     "rounded-md border border-border p-1.5 text-muted-foreground transition hover:border-primary hover:text-foreground";
 
   return (
-    <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-2">
+    <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-2 shadow-xl">
+      {/* Barra de Ferramentas Estilo CapCut */}
+      <div className="flex items-center gap-3 border-b border-border/50 pb-2 mb-2 overflow-x-auto">
+        <div className="flex items-center gap-1 border-r border-border/50 pr-3">
+          <button className="flex flex-col items-center gap-0.5 px-2 py-1 hover:bg-primary/10 rounded transition text-muted-foreground hover:text-primary">
+            <Scissors className="size-4" />
+            <span className="text-[9px] uppercase font-bold tracking-tighter">Editar</span>
+          </button>
+          <button className="flex flex-col items-center gap-0.5 px-2 py-1 hover:bg-primary/10 rounded transition text-muted-foreground hover:text-primary">
+            <Volume2 className="size-4" />
+            <span className="text-[9px] uppercase font-bold tracking-tighter">Áudio</span>
+          </button>
+          <button className="flex flex-col items-center gap-0.5 px-2 py-1 hover:bg-primary/10 rounded transition text-muted-foreground hover:text-primary">
+            <Type className="size-4" />
+            <span className="text-[9px] uppercase font-bold tracking-tighter">Texto</span>
+          </button>
+          <button className="flex flex-col items-center gap-0.5 px-2 py-1 hover:bg-primary/10 rounded transition text-muted-foreground hover:text-primary">
+            <Layers className="size-4" />
+            <span className="text-[9px] uppercase font-bold tracking-tighter">Camadas</span>
+          </button>
+        </div>
+        
+        <div className="flex-1 flex items-center justify-center gap-4 min-w-[120px]">
+          <button onClick={() => onSeek(start)} className="text-muted-foreground hover:text-foreground">
+            <SkipBack className="size-4" />
+          </button>
+          <button 
+            onClick={onTogglePlay}
+            className="size-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-glow-sm hover:scale-105 transition"
+          >
+            {playing ? <Pause className="size-4 fill-current" /> : <Play className="size-4 fill-current ml-0.5" />}
+          </button>
+          <button onClick={() => onSeek(Math.max(start, end - 0.1))} className="text-muted-foreground hover:text-foreground">
+            <SkipForward className="size-4" />
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[11px] tabular-nums text-foreground bg-background px-2 py-1 rounded border border-border">
+            {fmt(time)}
+          </span>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={onTogglePlay}
-          className="rounded-md border border-border bg-primary/10 p-1.5 text-foreground transition hover:border-primary"
+          className="hidden md:flex rounded-md border border-border bg-primary/10 p-1.5 text-foreground transition hover:border-primary"
           aria-label={playing ? "pausar" : "reproduzir"}
           title="espaço"
         >
           {playing ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
-        </button>
-        <button onClick={() => onSeek(start)} className={btn} aria-label="ir para o início do corte" title="Home">
-          <SkipBack className="size-3.5" />
-        </button>
-        <button
-          onClick={() => onSeek(Math.max(start, end - 0.1))}
-          className={btn}
-          aria-label="ir para o fim do corte"
-          title="End"
-        >
-          <SkipForward className="size-3.5" />
         </button>
 
         <span className="rounded bg-background px-1.5 py-0.5 font-mono text-[11px] tabular-nums text-foreground">
@@ -455,11 +493,11 @@ export function EditorTimeline({
           onPointerLeave={() => setHover(null)}
         >
           {/* régua */}
-          <div className="relative h-5 border-b border-border">
+          <div className="relative h-6 border-b border-border/50 bg-background/30">
             {ticks.map((t) => (
               <span
                 key={t}
-                className="absolute top-0 h-full border-l border-border pl-1 font-mono text-[9px] text-muted-foreground"
+                className="absolute top-0 h-full border-l border-border/40 pl-1 font-mono text-[9px] text-muted-foreground flex items-center"
                 style={{ left: t * pps }}
               >
                 {t}s
@@ -468,104 +506,116 @@ export function EditorTimeline({
           </div>
 
           {/* filmstrip + corte */}
-          <div className="relative mt-1 h-16 overflow-hidden rounded-md bg-background">
-            <div className="absolute inset-0 flex">
-              {(thumbs.length ? thumbs : Array.from({ length: THUMBS }, () => "")).map((src, i) =>
-                src ? (
-                  <img
-                    key={i}
-                    src={src}
-                    alt=""
-                    draggable={false}
-                    className="h-full flex-1 object-cover opacity-90"
-                    style={{ minWidth: 0 }}
-                  />
-                ) : (
-                  <div key={i} className="h-full flex-1 animate-pulse bg-muted/40" />
-                ),
-              )}
+          <div className="relative mt-2 flex flex-col gap-2">
+            {/* Faixa de Cabeçalho/Label para Vídeo Principal */}
+            <div className="flex items-center gap-1.5 absolute -left-20 top-4 opacity-70 z-30">
+               <Video className="size-3.5 text-primary" />
+               <span className="text-[10px] font-black uppercase tracking-widest text-primary">V1</span>
             </div>
 
-            {/* áreas fora do corte */}
-            <div className="pointer-events-none absolute inset-y-0 left-0 bg-background/75" style={{ width: sel.left }} />
-            <div
-              className="pointer-events-none absolute inset-y-0 bg-background/75"
-              style={{ left: sel.left + sel.width, right: 0 }}
-            />
+            <div className="relative h-20 overflow-hidden rounded-xl bg-background border border-border/50 shadow-inner group">
+              <div className="absolute inset-0 flex">
+                {(thumbs.length ? thumbs : Array.from({ length: THUMBS }, () => "")).map((src, i) =>
+                  src ? (
+                    <img
+                      key={i}
+                      src={src}
+                      alt=""
+                      draggable={false}
+                      className="h-full flex-1 object-cover opacity-90 grayscale-[20%] group-hover:grayscale-0 transition-all duration-500"
+                      style={{ minWidth: 0 }}
+                    />
+                  ) : (
+                    <div key={i} className="h-full flex-1 animate-pulse bg-muted/40" />
+                  ),
+                )}
+              </div>
 
-            {/* transições */}
-            {transIn.kind !== "none" && (
+              {/* áreas fora do corte */}
+              <div className="pointer-events-none absolute inset-y-0 left-0 bg-background/80 backdrop-blur-[1px]" style={{ width: sel.left }} />
               <div
-                className="pointer-events-none absolute inset-y-0 bg-gradient-to-r from-primary/50 to-transparent"
-                style={{ left: sel.left, width: Math.min(sel.width, transIn.dur * pps) }}
+                className="pointer-events-none absolute inset-y-0 bg-background/80 backdrop-blur-[1px]"
+                style={{ left: sel.left + sel.width, right: 0 }}
               />
-            )}
-            {transOut.kind !== "none" && (
-              <div
-                className="pointer-events-none absolute inset-y-0 bg-gradient-to-l from-primary/50 to-transparent"
-                style={{
-                  left: Math.max(sel.left, sel.left + sel.width - transOut.dur * pps),
-                  width: Math.min(sel.width, transOut.dur * pps),
-                }}
-              />
-            )}
 
-            {/* seleção arrastável */}
-            <div
-              className="absolute inset-y-0 cursor-grab border-2 border-primary active:cursor-grabbing"
-              style={{ left: sel.left, width: sel.width }}
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                dragRef.current = { kind: "range", x: e.clientX, s: start, e: end };
-              }}
-            />
-            {(["in", "out"] as const).map((k) => (
+              {/* transições */}
+              {transIn.kind !== "none" && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 bg-gradient-to-r from-primary/60 to-transparent"
+                  style={{ left: sel.left, width: Math.min(sel.width, transIn.dur * pps) }}
+                />
+              )}
+              {transOut.kind !== "none" && (
+                <div
+                  className="pointer-events-none absolute inset-y-0 bg-gradient-to-l from-primary/60 to-transparent"
+                  style={{
+                    left: Math.max(sel.left, sel.left + sel.width - transOut.dur * pps),
+                    width: Math.min(sel.width, transOut.dur * pps),
+                  }}
+                />
+              )}
+
+              {/* seleção arrastável */}
               <div
-                key={k}
+                className="absolute inset-y-0 cursor-grab border-[3px] border-primary active:cursor-grabbing rounded-[2px]"
+                style={{ left: sel.left, width: sel.width }}
                 onPointerDown={(e) => {
                   e.stopPropagation();
-                  dragRef.current = { kind: k };
+                  dragRef.current = { kind: "range", x: e.clientX, s: start, e: end };
                 }}
-                className="absolute inset-y-0 flex w-3 cursor-ew-resize items-center justify-center rounded-sm bg-primary"
-                style={{ left: k === "in" ? sel.left - 1 : sel.left + sel.width - 11 }}
-                title={k === "in" ? "início do corte (I)" : "fim do corte (O)"}
-              >
-                <span className="h-5 w-px bg-primary-foreground/70" />
-              </div>
-            ))}
-          </div>
+              />
+              {(["in", "out"] as const).map((k) => (
+                <div
+                  key={k}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    dragRef.current = { kind: k };
+                  }}
+                  className="absolute inset-y-0 flex w-4 cursor-ew-resize items-center justify-center rounded bg-primary shadow-lg ring-1 ring-white/20"
+                  style={{ left: k === "in" ? sel.left - 2 : sel.left + sel.width - 14 }}
+                  title={k === "in" ? "início do corte (I)" : "fim do corte (O)"}
+                >
+                  <span className="h-6 w-0.5 bg-primary-foreground/90 rounded-full" />
+                </div>
+              ))}
+            </div>
 
-          {/* waveform */}
-          <div className="relative mt-1 h-10 overflow-hidden rounded-md border border-border bg-background">
-            <span className="pointer-events-none absolute left-1 top-0.5 font-mono text-[9px] text-muted-foreground">
-              áudio
-            </span>
-            {peaks ? (
-              <svg
-                className="absolute inset-0 size-full"
-                viewBox={`0 0 ${peaks.length} 100`}
-                preserveAspectRatio="none"
-                aria-hidden
-              >
-                {peaks.map((p, i) => (
-                  <rect
-                    key={i}
-                    x={i}
-                    y={50 - p * 46}
-                    width={1}
-                    height={Math.max(1, p * 92)}
-                    className="fill-primary/60"
-                  />
-                ))}
-              </svg>
-            ) : (
-              <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
-            )}
-            <div className="pointer-events-none absolute inset-y-0 left-0 bg-background/70" style={{ width: sel.left }} />
-            <div
-              className="pointer-events-none absolute inset-y-0 bg-background/70"
-              style={{ left: sel.left + sel.width, right: 0 }}
-            />
+            {/* waveform */}
+            <div className="relative mt-0.5 h-12 overflow-hidden rounded-xl border border-border bg-surface-1 shadow-sm">
+              <div className="flex items-center gap-1.5 absolute -left-20 top-1/2 -translate-y-1/2 opacity-70 z-30">
+                 <Volume2 className="size-3.5 text-blue-400" />
+                 <span className="text-[10px] font-black uppercase tracking-widest text-blue-400">A1</span>
+              </div>
+              <span className="pointer-events-none absolute left-2 top-1 font-mono text-[9px] font-bold uppercase tracking-tighter text-muted-foreground/50">
+                audio principal
+              </span>
+              {peaks ? (
+                <svg
+                  className="absolute inset-0 size-full"
+                  viewBox={`0 0 ${peaks.length} 100`}
+                  preserveAspectRatio="none"
+                  aria-hidden
+                >
+                  {peaks.map((p, i) => (
+                    <rect
+                      key={i}
+                      x={i}
+                      y={50 - p * 44}
+                      width={1}
+                      height={Math.max(2, p * 88)}
+                      className="fill-blue-500/50"
+                    />
+                  ))}
+                </svg>
+              ) : (
+                <div className="absolute inset-x-0 top-1/2 h-px bg-border/50" />
+              )}
+              <div className="pointer-events-none absolute inset-y-0 left-0 bg-background/60" style={{ width: sel.left }} />
+              <div
+                className="pointer-events-none absolute inset-y-0 bg-background/60"
+                style={{ left: sel.left + sel.width, right: 0 }}
+              />
+            </div>
           </div>
 
           {/* trechos (corte multi-segmento) */}

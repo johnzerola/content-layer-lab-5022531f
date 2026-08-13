@@ -28,6 +28,8 @@ import {
   Type,
   Undo2,
   X,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { AudioSplitterStudio } from "@/components/AudioSplitterStudio";
 import { Button } from "@/components/ui/button";
@@ -205,7 +207,7 @@ interface Doc {
   end: number;
 }
 
-/** Estúdio de edição: palco com preview real, trilha de ferramentas, inspetor e timeline. */
+/** Estúdio de edição profissional: pipeline estilo CapCut com timeline multitrack. */
 export function VideoStudio({
   file,
   width,
@@ -637,125 +639,115 @@ export function VideoStudio({
     : "";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-background/95 p-1 sm:p-3">
-      <div className="flex h-full w-full max-w-[1500px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl">
-        {/* barra superior */}
-        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border px-3 py-2">
-          <div className="min-w-0">
-            <h2 className="truncate font-display text-sm text-foreground">Estúdio de edição</h2>
-            <p className="truncate font-mono text-[11px] text-muted-foreground">
-              {file.name} · {width}×{height} · {fmt(duration)} · saída {fmt(Math.max(0, outDur))}
-            </p>
+    <div className="fixed inset-0 z-50 flex items-stretch justify-center bg-background/98 p-0 sm:p-2">
+      <div className="flex h-full w-full max-w-[1600px] flex-col overflow-hidden rounded-none sm:rounded-2xl border border-border bg-card shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+        {/* Barra Superior Estilo Profissional */}
+        <header className="flex items-center justify-between border-b border-border px-4 py-2.5 bg-surface-1/50 backdrop-blur-md">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="size-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
+               <Scissors className="size-4 text-primary" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="truncate text-sm font-black uppercase tracking-tighter text-foreground">Editor de Vídeo</h2>
+              <p className="truncate font-mono text-[10px] text-muted-foreground">
+                {file.name} • {width}×{height} • {fmt(duration)}
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <Button variant="ghost" size="icon" disabled={!hist.canUndo} onClick={undo} aria-label="Desfazer">
-              <Undo2 className="size-4" />
-            </Button>
-            <Button variant="ghost" size="icon" disabled={!hist.canRedo} onClick={redo} aria-label="Refazer">
-              <Redo2 className="size-4" />
-            </Button>
+
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-1 border-r border-border pr-2 mr-2">
+              <Button variant="ghost" size="icon" disabled={!hist.canUndo} onClick={undo} className="size-8">
+                <Undo2 className="size-4" />
+              </Button>
+              <Button variant="ghost" size="icon" disabled={!hist.canRedo} onClick={redo} className="size-8">
+                <Redo2 className="size-4" />
+              </Button>
+            </div>
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
               onClick={() => hist.reset({ pre: defaultPreEdit(), start: 0, end: duration }, "resetar tudo")}
+              className="hidden sm:flex h-8"
             >
-              <RotateCcw className="mr-1 size-3.5" /> Resetar
+              <RotateCcw className="mr-1.5 size-3.5" /> Resetar
             </Button>
-            <Button size="sm" onClick={save}>
-              Aplicar edição
+            <Button size="sm" onClick={save} className="h-8 px-4 font-bold shadow-glow-sm">
+              Concluir
             </Button>
-            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Fechar">
+            <Button variant="ghost" size="icon" onClick={onClose} className="size-8">
               <X className="size-4" />
             </Button>
           </div>
         </header>
 
-        {/* corpo: trilha · palco · inspetor */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[132px_minmax(0,1fr)_340px] md:overflow-hidden">
-          {/* trilha de ferramentas */}
-          <nav className="flex gap-2 overflow-x-auto border-b border-border p-2 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r">
+        {/* Corpo: Layout CapCut */}
+        <div className="flex min-h-0 flex-1 flex-col md:flex-row overflow-hidden">
+          {/* Navegação Lateral de Ferramentas */}
+          <nav className="flex md:flex-col gap-1 overflow-x-auto md:overflow-y-auto border-b md:border-b-0 md:border-r border-border p-2 bg-surface-1/30 min-w-[72px] md:w-[84px] items-center">
             {TOOL_GROUPS.map((g) => (
-              <div key={g.group} className="flex shrink-0 gap-1 md:block md:space-y-1">
-                <span className="hidden px-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground md:block">
-                  {g.group}
-                </span>
+              <div key={g.group} className="flex md:flex-col gap-1">
                 {g.items.map((t) => (
                   <button
                     key={t.id}
                     onClick={() => setTab(t.id)}
-                    className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 font-mono text-[11px] transition ${
+                    className={`flex flex-col items-center justify-center size-[64px] rounded-xl transition-all duration-300 ${
                       tab === t.id
-                        ? "bg-primary text-primary-foreground"
+                        ? "bg-primary text-primary-foreground shadow-glow-sm scale-105"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >
-                    <t.icon className="size-3.5 shrink-0" /> {t.label}
+                    <t.icon className="size-5 mb-1" />
+                    <span className="text-[9px] font-bold uppercase tracking-tighter leading-none">{t.label}</span>
                   </button>
                 ))}
+                <div className="hidden md:block h-px w-8 bg-border/50 mx-auto my-2 last:hidden" />
               </div>
             ))}
           </nav>
 
-          {/* palco */}
-          <section className="flex min-h-0 flex-col gap-2 p-3 md:overflow-hidden">
-            {tab === "camera" ? (
-              <div className="min-h-0 flex-1 overflow-y-auto">
-                <FramingStudio
-                  url={url}
-                  file={file}
-                  width={width}
-                  height={height}
-                  duration={duration}
-                  pre={pre}
-                  onChange={(p) => setPre(p, "câmera")}
-                />
-              </div>
-            ) : (
-              <>
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <div className="flex rounded-md border border-border p-0.5">
+          {/* Área Central: Preview e Timeline */}
+          <div className="flex flex-1 flex-col min-w-0 bg-background/50">
+            {/* Palco / Preview */}
+            <div className="relative flex-1 flex flex-col min-h-0 p-4">
+              <div className="flex items-center justify-between mb-3 px-2">
+                 <div className="flex rounded-lg bg-surface-2 p-1 border border-border shadow-inner">
                     {(
                       [
-                        ["out", "Saída 9:16"],
+                        ["out", "Preview"],
                         ["src", "Fonte"],
                       ] as const
                     ).map(([id, label]) => (
                       <button
                         key={id}
                         onClick={() => setView(id)}
-                        className={`rounded px-2 py-1 font-mono text-[11px] transition ${
-                          view === id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"
+                        className={`rounded-md px-3 py-1 text-[11px] font-bold uppercase tracking-wider transition ${
+                          view === id ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                         }`}
                       >
                         {label}
                       </button>
                     ))}
-                  </div>
-                  <ToggleChip on={thirds} onClick={() => setThirds((v) => !v)} icon={Grid3X3} label="Terços" />
-                  <ToggleChip on={safe} onClick={() => setSafe((v) => !v)} icon={Shield} label="Área segura" />
-                  <button
-                    onMouseDown={() => setCompare(true)}
-                    onMouseUp={() => setCompare(false)}
-                    onMouseLeave={() => setCompare(false)}
-                    onTouchStart={() => setCompare(true)}
-                    onTouchEnd={() => setCompare(false)}
-                    className="flex items-center gap-1 rounded-md border border-border px-2 py-1 font-mono text-[11px] text-muted-foreground transition hover:text-foreground"
-                  >
-                    <Eye className="size-3.5" /> Comparar
-                  </button>
-                </div>
+                 </div>
+                 
+                 <div className="flex items-center gap-2">
+                    <ToggleChip on={thirds} onClick={() => setThirds((v) => !v)} icon={Grid3X3} label="Grades" />
+                    <ToggleChip on={safe} onClick={() => setSafe((v) => !v)} icon={Shield} label="Seguro" />
+                    <Button variant="ghost" size="sm" className="h-7 text-[10px]" onMouseDown={() => setCompare(true)} onMouseUp={() => setCompare(false)}>
+                       <Eye className="mr-1 size-3" /> Comparar
+                    </Button>
+                 </div>
+              </div>
 
-                <div className="relative flex min-h-0 flex-1 items-center justify-center">
-                  {/* fonte (sempre montada: alimenta o canvas de saída) */}
-                  <div
+              <div className="relative flex-1 flex items-center justify-center min-h-0 bg-black/40 rounded-3xl border border-border/50 overflow-hidden shadow-2xl">
+                 {/* Conteúdo do Preview */}
+                 <div
                     ref={boxRef}
-                    className={`relative overflow-hidden rounded-xl border border-border bg-black ${
+                    className={`relative overflow-hidden rounded-xl border border-white/5 bg-black shadow-2xl ${
                       view === "out" ? "pointer-events-none invisible absolute size-px opacity-0" : "h-full max-h-full"
                     }`}
                     style={view === "out" ? undefined : { aspectRatio: String(srcAR), maxWidth: "100%" }}
                     onPointerMove={onPointerMove}
-                    onPointerUp={() => (dragRef.current = null)}
-                    onPointerCancel={() => (dragRef.current = null)}
                   >
                     <video
                       ref={videoRef}
@@ -771,69 +763,38 @@ export function VideoStudio({
                         })`,
                       }}
                       onLoadedMetadata={() => seek(start)}
-                      onPause={() => setPlaying(false)}
                     />
                     {view === "src" && (
                       <div
-                        className="absolute cursor-move border-2 border-primary"
+                        className="absolute cursor-move border-[3px] border-primary shadow-[0_0_0_9999px_rgba(0,0,0,0.7)]"
                         style={{
                           left: `${crop.x * 100}%`,
                           top: `${crop.y * 100}%`,
                           width: `${crop.w * 100}%`,
                           height: `${crop.h * 100}%`,
-                          boxShadow: "0 0 0 9999px rgba(0,0,0,0.6)",
                         }}
                         onPointerDown={(e) => onPointerDown(e, "move")}
                       >
-                        <div className="pointer-events-none absolute inset-0 opacity-60">
-                          <div className="absolute inset-y-0 left-1/3 w-px bg-primary/40" />
-                          <div className="absolute inset-y-0 left-2/3 w-px bg-primary/40" />
-                          <div className="absolute inset-x-0 top-1/3 h-px bg-primary/40" />
-                          <div className="absolute inset-x-0 top-2/3 h-px bg-primary/40" />
-                        </div>
-                        <span className="pointer-events-none absolute -top-6 left-0 rounded bg-background/90 px-1.5 py-0.5 font-mono text-[10px] text-foreground">
-                          {cropPx.w}×{cropPx.h}
-                          {pre.keys.length > 0
-                            ? ` · ${nearKey ? `ajustando ${fmt(nearKey.t)}` : `nova posição em ${fmt(time)}`}`
-                            : ""}
-                        </span>
-                        {HANDLES.map((h) => {
-                          const cursor =
-                            h === "n" || h === "s"
-                              ? "cursor-ns-resize"
-                              : h === "e" || h === "w"
-                                ? "cursor-ew-resize"
-                                : h === "nw" || h === "se"
-                                  ? "cursor-nwse-resize"
-                                  : "cursor-nesw-resize";
-                          const mid = h.length === 1;
-                          return (
-                            <span
-                              key={h}
-                              onPointerDown={(e) => onPointerDown(e, h)}
-                              className={`absolute size-3.5 rounded-sm border border-primary bg-background ${cursor}`}
-                              style={{
-                                left: h.includes("w")
-                                  ? -7
-                                  : mid && (h === "n" || h === "s")
-                                    ? "calc(50% - 7px)"
-                                    : undefined,
-                                right: h.includes("e") ? -7 : undefined,
-                                top: h.startsWith("n")
-                                  ? -7
-                                  : mid && (h === "e" || h === "w")
-                                    ? "calc(50% - 7px)"
-                                    : undefined,
-                                bottom: h.startsWith("s") ? -7 : undefined,
-                              }}
-                            />
-                          );
-                        })}
+                         {/* Handles */}
+                         {HANDLES.map((h) => (
+                           <span
+                             key={h}
+                             onPointerDown={(e) => onPointerDown(e, h)}
+                             className="absolute size-4 rounded-full border-2 border-primary bg-white shadow-xl cursor-pointer"
+                             style={{
+                               left: h.includes("w") ? -8 : h.includes("e") ? "auto" : "50%",
+                               right: h.includes("e") ? -8 : "auto",
+                               top: h.startsWith("n") ? -8 : h.startsWith("s") ? "auto" : "50%",
+                               bottom: h.startsWith("s") ? -8 : "auto",
+                               transform: `translate(${h.includes("w") || h.includes("e") ? 0 : "-50%"}, ${h.startsWith("n") || h.startsWith("s") ? 0 : "-50%"})`
+                             }}
+                           />
+                         ))}
                       </div>
                     )}
-                  </div>
+                 </div>
 
-                  {view === "out" && (
+                 {view === "out" && (
                     <StagePreview
                       videoRef={videoRef}
                       pre={pre}
@@ -845,81 +806,64 @@ export function VideoStudio({
                       className="h-full max-h-full"
                       variation={adPreview ? adVariation : undefined}
                     />
-
-                  )}
-                </div>
-
-                {/* transporte */}
-                <div className="flex flex-wrap items-center justify-center gap-1.5 rounded-lg border border-border px-2 py-1.5">
-                  <Button variant="ghost" size="icon" onClick={() => seek(start)} aria-label="Início">
-                    <ChevronFirst className="size-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => step(-1)} aria-label="Quadro anterior">
-                    <StepBack className="size-4" />
-                  </Button>
-                  <Button size="icon" onClick={toggle} aria-label={playing ? "Pausar" : "Reproduzir"}>
-                    {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => step(1)} aria-label="Próximo quadro">
-                    <StepForward className="size-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => seek(Math.max(start, end - 0.1))} aria-label="Fim">
-                    <ChevronLast className="size-4" />
-                  </Button>
-                  <span className="px-1 font-mono text-[11px] text-foreground">
-                    {fmt(time)} <span className="text-muted-foreground">/ {fmt(end)}</span>
-                  </span>
-                  <select
-                    value={speed}
-                    onChange={(e) => setSpeed(Number(e.target.value))}
-                    aria-label="Velocidade"
-                    className="rounded-md border border-border bg-background px-1.5 py-1 font-mono text-[11px] text-foreground"
-                  >
-                    {SPEEDS.map((s) => (
-                      <option key={s} value={s}>
-                        {s}x
-                      </option>
-                    ))}
-                  </select>
-                  <ToggleChip on={loop} onClick={() => setLoop((v) => !v)} icon={Repeat} label="Loop" />
-                </div>
-              </>
-            )}
-
-            <EditorTimeline
-              url={url}
-              duration={duration}
-              time={time}
-              playing={playing}
-              start={start}
-              end={end}
-              keys={pre.keys}
-              transIn={pre.transIn}
-              transOut={pre.transOut}
-              cues={captions}
-              onSeek={seek}
-              onTogglePlay={toggle}
-              onTrim={(s, e) => hist.set((d) => ({ ...d, start: s, end: e }), "corte")}
-              onKeysChange={(keys) => set({ keys }, "keyframes")}
-              onAddKey={addKey}
-              segments={segs}
-              onSplit={split}
-              onDeleteSegment={deleteSegment}
-            />
-          </section>
-
-          {/* inspetor */}
-          <aside
-            className={`min-h-0 space-y-4 border-t border-border p-3 md:overflow-y-auto md:border-l md:border-t-0 ${
-              tab === "camera" ? "hidden md:block" : ""
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-sm text-foreground">{toolLabel}</h3>
-              <span className="font-mono text-[10px] text-muted-foreground">
-                {TOOL_ORDER.indexOf(tab) + 1} · atalho
-              </span>
+                 )}
+              </div>
+              
+              {/* Controles de Playback Centrais */}
+              <div className="flex items-center justify-center gap-4 py-4">
+                 <Button variant="ghost" size="icon" onClick={() => step(-1)} className="text-muted-foreground"><StepBack className="size-5" /></Button>
+                 <Button onClick={toggle} className="size-12 rounded-full bg-primary text-primary-foreground shadow-glow active:scale-95 transition-all">
+                    {playing ? <Pause className="size-6 fill-current" /> : <Play className="size-6 fill-current ml-1" />}
+                 </Button>
+                 <Button variant="ghost" size="icon" onClick={() => step(1)} className="text-muted-foreground"><StepForward className="size-5" /></Button>
+              </div>
             </div>
+
+            {/* Timeline */}
+            <div className="border-t border-border bg-surface-1/50 p-4">
+               <EditorTimeline
+                  url={url}
+                  duration={duration}
+                  time={time}
+                  playing={playing}
+                  start={start}
+                  end={end}
+                  keys={pre.keys}
+                  transIn={pre.transIn}
+                  transOut={pre.transOut}
+                  cues={captions}
+                  segments={segs}
+                  onSeek={seek}
+                  onTogglePlay={toggle}
+                  onTrim={(s, e) => hist.set((d) => ({ ...d, start: s, end: e }), "corte")}
+                  onKeysChange={(keys) => set({ keys }, "keyframes")}
+                  onAddKey={addKey}
+                  onSplit={split}
+                  onDeleteSegment={deleteSegment}
+               />
+            </div>
+          </div>
+
+          {/* Inspetor Lateral (Configurações) */}
+          <aside className="w-full md:w-[320px] border-t md:border-t-0 md:border-l border-border bg-surface-1/40 flex flex-col min-h-0">
+             <div className="px-4 py-3 border-b border-border bg-surface-2 flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-widest text-primary">{toolLabel || tab}</span>
+                <Button variant="ghost" size="icon" className="size-6 rounded-full" onClick={() => hist.undo()} disabled={!hist.canUndo}><Undo2 className="size-3" /></Button>
+             </div>
+             
+             <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                <div className="space-y-6">
+                </div>
+             </div>
+          </aside>
+
+
+
+
+
+
+
+
 
             {tab === "camera" && (
               <p className="font-mono text-[11px] text-muted-foreground">
@@ -1730,17 +1674,30 @@ export function VideoStudio({
                 </Field>
               </div>
             )}
-
-            <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
-              Atalhos: espaço reproduz · setas andam quadro a quadro · I/O marcam entrada e saída · S divide ·
-              K grava keyframe · Ctrl+Z desfaz.
-            </p>
-          </aside>
-        </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function ToggleChip({
   on,
