@@ -1552,6 +1552,89 @@ export function VideoStudio({
               </div>
             )}
 
+            {tab === "audio" && (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <AudioLines className="size-4 text-primary" />
+                    <span className="font-bold text-xs">Mixagem de Trilhas</span>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <Field label={`Volume Original · ${Math.round((pre.audioTracks?.originalVolume ?? 1) * 100)}%`}>
+                      <Slider
+                        value={[pre.audioTracks?.originalVolume ?? 1]}
+                        min={0}
+                        max={1.5}
+                        step={0.05}
+                        onValueChange={([v]) => set({ audioTracks: { ...pre.audioTracks, originalVolume: v ?? 1, voiceVolume: pre.audioTracks?.voiceVolume ?? 1, musicVolume: pre.audioTracks?.musicVolume ?? 1 } }, "volume original")}
+                      />
+                    </Field>
+
+                    <Field label={`Volume Voz IA · ${Math.round((pre.audioTracks?.voiceVolume ?? 1) * 100)}%`}>
+                      <Slider
+                        value={[pre.audioTracks?.voiceVolume ?? 1]}
+                        min={0}
+                        max={1.5}
+                        step={0.05}
+                        disabled={!pre.audioTracks?.voice}
+                        onValueChange={([v]) => set({ audioTracks: { ...pre.audioTracks, voiceVolume: v ?? 1, voice: pre.audioTracks?.voice, music: pre.audioTracks?.music, musicVolume: pre.audioTracks?.musicVolume ?? 1, originalVolume: pre.audioTracks?.originalVolume ?? 1 } }, "volume voz")}
+                      />
+                    </Field>
+
+                    <Field label={`Volume Trilha IA · ${Math.round((pre.audioTracks?.musicVolume ?? 1) * 100)}%`}>
+                      <Slider
+                        value={[pre.audioTracks?.musicVolume ?? 1]}
+                        min={0}
+                        max={1.5}
+                        step={0.05}
+                        disabled={!pre.audioTracks?.music}
+                        onValueChange={([v]) => set({ audioTracks: { ...pre.audioTracks, musicVolume: v ?? 1, voice: pre.audioTracks?.voice, music: pre.audioTracks?.music, voiceVolume: pre.audioTracks?.voiceVolume ?? 1, originalVolume: pre.audioTracks?.originalVolume ?? 1 } }, "volume trilha")}
+                      />
+                    </Field>
+                  </div>
+
+                  {pre.audioTracks?.voice && (
+                    <div className="pt-2">
+                       <Button variant="ghost" size="sm" className="w-full text-[10px]" onClick={() => set({ audioTracks: undefined }, "remover trilhas")}>
+                         Remover trilhas externas
+                       </Button>
+                    </div>
+                  )}
+                </div>
+
+                {!pre.audioTracks?.voice && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-[11px] text-muted-foreground">Isolamento via FFmpeg</span>
+                      <Sparkles className="size-3.5 text-primary" />
+                    </div>
+                    <p className="font-mono text-[10px] text-muted-foreground leading-relaxed">
+                      Separe voz e música deste vídeo para ajustar volumes de forma independente.
+                    </p>
+                    <import { AudioSplitterStudio } from "@/components/AudioSplitterStudio"; />
+                    {/* JSX cannot import inside a block, so I will add the component call below */}
+                    <div className="mt-2">
+                      <AudioSplitterStudio_Wrapper 
+                        file={file} 
+                        onComplete={(vBlob, mBlob, vUrl, mUrl) => {
+                          set({ 
+                            audioTracks: { 
+                              voice: vUrl, 
+                              music: mUrl, 
+                              voiceVolume: 1, 
+                              musicVolume: 1, 
+                              originalVolume: 0 
+                            } 
+                          }, "separação de áudio");
+                        }} 
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {tab === "text" && (
               <div className="space-y-3">
                 {texts ? (
