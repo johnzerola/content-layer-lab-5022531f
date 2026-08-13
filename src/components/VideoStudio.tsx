@@ -971,6 +971,7 @@ export function VideoStudio({
                   <div className="space-y-4">
 
 
+
                 <Field label={`Início · ${fmt(start)}`}>
                   <Slider
                     value={[start]}
