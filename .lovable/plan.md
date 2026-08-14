@@ -13,22 +13,17 @@ Implement a feature to allow users to automatically schedule all processed video
 Create a new component `src/components/AutoScheduleModal.tsx` that:
 - Lists connected social accounts.
 - Allows selecting the post format (Reels, Feed, Stories).
-- Provides options for scheduling intervals (e.g., one video every 2 hours, or every day at a specific time).
-- Allows a base caption/hashtags for all videos.
+- Provides options for scheduling intervals (e.g., every X hours, or daily at a fixed time).
+- Allows a base caption for all videos.
 
 ### 2. Update `src/routes/index.tsx` (Dashboard)
-- Add a "Fazer agendamento automático" button that appears after batch processing is complete (next to the report or the ZIP download button).
+- Add a "Fazer agendamento automático" button that appears after batch processing is complete.
 - Integrate the `AutoScheduleModal`.
-- Implement the logic to take all successfully processed items and schedule them using the `schedulePost` and `uploadPostVideo` functions from `src/lib/social.ts`.
+- Logic: Takes all successfully processed items and schedules them using `schedulePost` and `uploadPostVideo` from `src/lib/social.ts`.
 
 ### 3. Update `src/lib/social.ts`
-- Add a helper function to bulk schedule multiple videos to simplify the implementation in the UI.
+- Add a helper for bulk scheduling.
 
-## Technical Details
+## Visual Text Edits
+The requested phrase was interpreted as the instruction to build this feature.
 
-- **Concurrency**: Uploading many videos to Supabase Storage and then inserting into the database will be done sequentially or with limited concurrency to avoid overwhelming the client's connection.
-- **State Management**: The modal will manage its own internal state for the scheduling logic (start date, interval).
-- **Backend**: Uses existing Supabase tables (`social_accounts`, `scheduled_posts`) and Storage bucket (`posts`).
-
-## Visual Text Edits (as requested)
-The requested command phrase will be understood as an instruction for this implementation.
