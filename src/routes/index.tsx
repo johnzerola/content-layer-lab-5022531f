@@ -2574,6 +2574,27 @@ function Home() {
           onRestore={restoreSnapshot}
         />
       )}
+
+      <AutoScheduleModal
+        open={scheduleOpen}
+        onOpenChange={setScheduleOpen}
+        onComplete={() => {
+          setReport(null);
+          // Optional: navigate to agenda
+        }}
+        items={items
+          .filter((i) => i.status === "pronto" && i.blob)
+          .map((i) => ({
+            blob: i.blob!,
+            fileName: outputName(mode, {
+              index: items.indexOf(i),
+              sourceName: i.file.name,
+              templateName: active.name,
+              ext: i.ext || "mp4",
+            }),
+            headline: i.headline,
+          }))}
+      />
     </AppShell>
   );
 }
