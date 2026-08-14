@@ -122,13 +122,7 @@ export function ResultLibrary() {
                   </div>
 
                   <div className="flex items-center gap-2 sm:ml-4">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-9 gap-2" 
-                      onClick={() => e.url && window.open(e.url, "_blank")}
-                      disabled={!e.url}
-                    >
+                    <Button variant="outline" size="sm" className="h-9 gap-2" disabled>
                       <Download className="size-4" /> Baixar
                     </Button>
                   </div>
