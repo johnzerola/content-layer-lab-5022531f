@@ -166,12 +166,18 @@ function AgendaPage() {
           >
             <ArrowLeft className="size-4" /> Voltar
           </Link>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="truncate font-display text-lg font-bold tracking-tight">Agenda de postagens</h1>
             <p className="truncate font-mono text-[11px] text-muted-foreground">
               Reels · Feed · Stories no horário certo
             </p>
           </div>
+          <Link
+            to="/integracoes"
+            className="rounded-xl border border-border bg-surface-2 px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground"
+          >
+            Integrações
+          </Link>
         </div>
       </header>
 
