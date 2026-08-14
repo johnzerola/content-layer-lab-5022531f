@@ -337,6 +337,7 @@ function Home() {
     seconds: number;
     fails: { name: string; error: string }[];
   } | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
 
   const smartRef = useRef(smartFrame);
 
