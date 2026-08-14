@@ -402,6 +402,8 @@ function LivePage() {
           }}
         />
       )}
+      </main>
+
       {libOpen && (
         <TemplateLibrary 
           templates={templates} 
