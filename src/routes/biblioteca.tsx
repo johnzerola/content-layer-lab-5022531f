@@ -1,6 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { AppShell } from "@/components/AppShell";
+import { useState } from "react";
+import { AppShell, type AppMode } from "@/components/AppShell";
 import { ResultLibrary } from "@/components/ResultLibrary";
+import { TemplateLibrary } from "@/components/TemplateLibrary";
+import { CloudPanel } from "@/components/CloudPanel";
+import { listJobs } from "@/lib/jobs";
 
 export const Route = createFileRoute("/biblioteca")({
   component: BibliotecaPage,
@@ -18,8 +22,19 @@ export const Route = createFileRoute("/biblioteca")({
 });
 
 function BibliotecaPage() {
+  const [mode, setMode] = useState<AppMode>("lote");
+  const [libOpen, setLibOpen] = useState(false);
+  const [cloudOpen, setCloudOpen] = useState(false);
+  const jobs = listJobs();
+
   return (
-    <AppShell>
+    <AppShell 
+      mode={mode} 
+      onMode={setMode} 
+      count={jobs.length} 
+      onLibrary={() => setLibOpen(true)}
+      onCloud={() => setCloudOpen(true)}
+    >
       <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
         <header className="mb-8">
           <h1 className="font-display text-3xl font-bold tracking-tight">Biblioteca de Resultados</h1>
@@ -30,6 +45,21 @@ function BibliotecaPage() {
 
         <ResultLibrary />
       </div>
+
+      <TemplateLibrary 
+        open={libOpen} 
+        onOpenChange={setLibOpen}
+        templates={[]}
+        onApply={() => {}}
+        onCommit={() => ({})}
+      />
+      
+      <CloudPanel 
+        open={cloudOpen} 
+        onOpenChange={setCloudOpen}
+        templates={[]}
+        onPull={() => {}}
+      />
     </AppShell>
   );
 }
