@@ -35,6 +35,7 @@ import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
 import { AuthGate } from "@/components/AuthGate";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
+import { AutoScheduleModal } from "@/components/AutoScheduleModal";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
 import { failJob, finishJob, setJobCancel, setJobRetry, startJob, updateJob } from "@/lib/jobs";
 import { undoable } from "@/lib/undo";
