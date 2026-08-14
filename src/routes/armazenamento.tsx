@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, HardDrive, Trash2, RotateCcw } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { HardDrive, Trash2, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import {
@@ -12,6 +12,10 @@ import {
   type Template,
   type TemplateVersion,
 } from "@/lib/template";
+import { AppShell, type AppMode } from "@/components/AppShell";
+import { TemplateLibrary } from "@/components/TemplateLibrary";
+import { CloudPanel } from "@/components/CloudPanel";
+import { listJobs } from "@/lib/jobs";
 
 export const Route = createFileRoute("/armazenamento")({
   head: () => ({
@@ -20,7 +24,7 @@ export const Route = createFileRoute("/armazenamento")({
       {
         name: "description",
         content:
-          "'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            I have approved the plan",
+          "Gerencie o histórico de versões dos seus templates e libere espaço local.",
       },
       { property: "og:title", content: "Armazenamento e versões de templates — VaiViral" },
       {
@@ -41,6 +45,11 @@ const fmt = (ts?: number) =>
 const LIMIT = 5 * 1024 * 1024; // quota típica do localStorage
 
 function StoragePage() {
+  const [mode, setMode] = useState<AppMode>("lote");
+  const [libOpen, setLibOpen] = useState(false);
+  const [cloudOpen, setCloudOpen] = useState(false);
+  const jobs = listJobs();
+
   const [templates, setTemplates] = useState<Template[]>([]);
   const [map, setMap] = useState<Record<string, TemplateVersion[]>>({});
   const [usage, setUsage] = useState({ templates: 0, versions: 0, total: 0, other: 0 });
@@ -103,16 +112,16 @@ function StoragePage() {
   const pct = Math.min(100, Math.round((usage.total / LIMIT) * 100));
 
   return (
-    <div className="min-h-dvh bg-background px-4 py-8 sm:px-8">
-      <div className="mx-auto w-full max-w-4xl space-y-6">
+    <AppShell 
+      mode={mode} 
+      onMode={setMode} 
+      count={jobs.length} 
+      onLibrary={() => setLibOpen(true)}
+      onCloud={() => setCloudOpen(true)}
+    >
+      <div className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-8 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <Link
-              to="/"
-              className="mb-2 inline-flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="size-3.5" /> voltar
-            </Link>
             <h1 className="font-display text-2xl font-bold tracking-tight">Armazenamento de templates</h1>
             <p className="text-sm text-muted-foreground">
               Selecione e apague versões antigas para não estourar o limite do navegador.
@@ -226,6 +235,28 @@ function StoragePage() {
           </div>
         )}
       </div>
-    </div>
+
+      {libOpen && (
+        <TemplateLibrary 
+          templates={templates} 
+          activeId=""
+          onClose={() => setLibOpen(false)}
+          onChangeList={setTemplates}
+          onUse={() => {}}
+          onCommit={(t) => t}
+        />
+      )}
+      
+      {cloudOpen && (
+        <CloudPanel 
+          templates={templates} 
+          onClose={() => setCloudOpen(false)}
+          onChangeList={setTemplates}
+          mode={mode}
+          buildSnapshot={() => ({ items: [] })}
+          onRestore={() => {}}
+        />
+      )}
+    </AppShell>
   );
 }

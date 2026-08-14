@@ -7,6 +7,7 @@ import {
   Library,
   Cloud,
   CalendarClock,
+  History,
   PanelLeftClose,
   PanelLeftOpen,
   Sparkle,
@@ -195,6 +196,14 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           >
             <Radio className="size-[18px] shrink-0" />
             {open && "Monitora Live"}
+          </Link>
+          <Link
+            to="/biblioteca"
+            title="Biblioteca de Resultados"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+          >
+            <History className="size-[18px] shrink-0" />
+            {open && "Resultados"}
           </Link>
           <Link
             to="/agenda"
