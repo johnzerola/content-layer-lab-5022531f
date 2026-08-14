@@ -412,6 +412,8 @@ function AgendaPage() {
             </section>
           </div>
         )}
+      </main>
+
       {libOpen && (
         <TemplateLibrary 
           templates={templates} 
