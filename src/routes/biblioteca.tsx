@@ -5,6 +5,7 @@ import { ResultLibrary } from "@/components/ResultLibrary";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
 import { listJobs } from "@/lib/jobs";
+import type { Template } from "@/lib/template";
 
 export const Route = createFileRoute("/biblioteca")({
   component: BibliotecaPage,
@@ -25,6 +26,7 @@ function BibliotecaPage() {
   const [mode, setMode] = useState<AppMode>("lote");
   const [libOpen, setLibOpen] = useState(false);
   const [cloudOpen, setCloudOpen] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const jobs = listJobs();
 
   return (
@@ -46,20 +48,27 @@ function BibliotecaPage() {
         <ResultLibrary />
       </div>
 
-      <TemplateLibrary 
-        open={libOpen} 
-        onOpenChange={setLibOpen}
-        templates={[]}
-        onApply={() => {}}
-        onCommit={() => ({})}
-      />
+      {libOpen && (
+        <TemplateLibrary 
+          templates={templates} 
+          activeId=""
+          onClose={() => setLibOpen(false)}
+          onChangeList={setTemplates}
+          onUse={() => {}}
+          onCommit={(t) => t}
+        />
+      )}
       
-      <CloudPanel 
-        open={cloudOpen} 
-        onOpenChange={setCloudOpen}
-        templates={[]}
-        onPull={() => {}}
-      />
+      {cloudOpen && (
+        <CloudPanel 
+          templates={templates} 
+          onClose={() => setCloudOpen(false)}
+          onChangeList={setTemplates}
+          mode={mode}
+          buildSnapshot={() => ({ items: [] })}
+          onRestore={() => {}}
+        />
+      )}
     </AppShell>
   );
 }
