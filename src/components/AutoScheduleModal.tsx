@@ -54,7 +54,7 @@ export function AutoScheduleModal({
     d.setHours(d.getHours() + 1, 0, 0, 0);
     return d.toISOString().slice(0, 16);
   });
-  
+
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
@@ -62,7 +62,9 @@ export function AutoScheduleModal({
 
   useEffect(() => {
     if (open) {
-      listAccounts().then(setAccounts).catch(() => toast.error("Erro ao carregar contas."));
+      listAccounts()
+        .then(setAccounts)
+        .catch(() => toast.error("Erro ao carregar contas."));
     }
   }, [open]);
 
@@ -86,22 +88,22 @@ export function AutoScheduleModal({
 
     try {
       const start = new Date(startDate);
-      
+
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
         if (!item) continue;
 
         const scheduledAt = new Date(start);
-        
+
         if (intervalType === "hours") {
-          scheduledAt.setHours(start.getHours() + (i * intervalValue));
+          scheduledAt.setHours(start.getHours() + i * intervalValue);
         } else {
-          scheduledAt.setDate(start.getDate() + (i * intervalValue));
+          scheduledAt.setDate(start.getDate() + i * intervalValue);
         }
 
         // Upload
         const up = await uploadPostVideo(item.blob, item.fileName);
-        
+
         // Schedule
         await schedulePost({
           accountId,
@@ -162,7 +164,9 @@ export function AutoScheduleModal({
                 ))}
               </select>
               {accounts.length === 0 && (
-                <p className="text-[10px] text-destructive">Nenhuma conta conectada. Vá para Agenda primeiro.</p>
+                <p className="text-[10px] text-destructive">
+                  Nenhuma conta conectada. Vá para Agenda primeiro.
+                </p>
               )}
             </div>
 

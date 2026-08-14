@@ -1,87 +1,100 @@
-// Publica os posts vencidos da fila. Chamado por agendador (pg_cron) ou manualmente.
+import { randomUUID } from "node:crypto";
 import { createFileRoute } from "@tanstack/react-router";
+import { requireCronAuthorization } from "@/lib/publish-auth.server";
+import { runPublishQueue, type QueueDependencies } from "@/lib/publish-queue.server";
+
+const DEFAULT_MAX_ATTEMPTS = 5;
+const DEFAULT_LOCK_TIMEOUT_SECONDS = 15 * 60;
+
+function positiveInteger(value: string | undefined, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
 
 export const Route = createFileRoute("/api/public/hooks/publish-due")({
   server: {
     handlers: {
-      POST: async () => {
+      GET: async () =>
+        new Response(null, {
+          status: 405,
+          headers: { Allow: "POST" },
+        }),
+      POST: async ({ request }) => {
+        const unauthorized = requireCronAuthorization(request);
+        if (unauthorized) return unauthorized;
+
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-        const { publish, activeProvider } = await import("@/lib/publish.server");
+        const { publish } = await import("@/lib/publish.server");
+        const maxAttempts = positiveInteger(process.env["PUBLISH_MAX_ATTEMPTS"], DEFAULT_MAX_ATTEMPTS);
+        const lockTimeoutSeconds = positiveInteger(
+          process.env["PUBLISH_LOCK_TIMEOUT_SECONDS"],
+          DEFAULT_LOCK_TIMEOUT_SECONDS,
+        );
 
-        const nowIso = new Date().toISOString();
-        const { data: due, error } = await supabaseAdmin
-          .from("scheduled_posts")
-          .select("id,user_id,account_id,kind,caption,video_url,video_path,attempts")
-          .eq("status", "agendado")
-          .lte("scheduled_at", nowIso)
-          .order("scheduled_at", { ascending: true })
-          .limit(10);
-
-        if (error) {
-          return Response.json({ ok: false, error: error.message }, { status: 500 });
-        }
-        if (!due?.length) {
-          return Response.json({ ok: true, processed: 0, provider: activeProvider() });
-        }
-
-        let published = 0;
-        let failed = 0;
-
-        for (const post of due) {
-          await supabaseAdmin.from("scheduled_posts").update({ status: "processando" }).eq("id", post.id);
-
-          let videoUrl = post.video_url;
-          if (!videoUrl && post.video_path) {
-            const { data: signed } = await supabaseAdmin.storage
-              .from("posts")
-              .createSignedUrl(post.video_path, 60 * 60 * 6);
-            videoUrl = signed?.signedUrl ?? null;
-          }
-
-          let username = "";
-          if (post.account_id) {
-            const { data: acc } = await supabaseAdmin
+        const dependencies: QueueDependencies = {
+          claim: async (lockId, limit, lockTimeout, maximumAttempts) => {
+            const { data, error } = await supabaseAdmin.rpc("claim_due_scheduled_posts", {
+              p_lock_id: lockId,
+              p_limit: limit,
+              p_lock_timeout_seconds: lockTimeout,
+              p_max_attempts: maximumAttempts,
+            });
+            if (error) throw new Error("claim failed");
+            return data ?? [];
+          },
+          loadAccount: async (accountId) => {
+            const { data, error } = await supabaseAdmin
               .from("social_accounts")
-              .select("username")
-              .eq("id", post.account_id)
+              .select("id,user_id,platform,username,provider,provider_account_id")
+              .eq("id", accountId)
               .maybeSingle();
-            username = acc?.username ?? "";
-          }
-
-          const result = videoUrl
-            ? await publish({
-                kind: post.kind as "reels" | "feed" | "stories",
-                caption: post.caption,
-                videoUrl,
-                username,
-              })
-            : ({ ok: false, error: "Vídeo indisponível para publicação." } as const);
-
-          if (result.ok) {
-            published++;
-            await supabaseAdmin
+            if (error) throw new Error("account lookup failed");
+            return data;
+          },
+          loadConnection: async (accountId, userId) => {
+            const { data, error } = await supabaseAdmin
+              .from("social_connections")
+              .select("provider,provider_account_id,status,expires_at")
+              .eq("social_account_id", accountId)
+              .eq("user_id", userId)
+              .maybeSingle();
+            if (error) throw new Error("connection lookup failed");
+            return data;
+          },
+          createSignedUrl: async (videoPath, expiresInSeconds) => {
+            const { data, error } = await supabaseAdmin.storage
+              .from("posts")
+              .createSignedUrl(videoPath, expiresInSeconds);
+            if (error || !data?.signedUrl) throw new Error("signed URL failed");
+            return data.signedUrl;
+          },
+          publish,
+          updateClaimedPost: async (postId, lockId, update) => {
+            const { data, error } = await supabaseAdmin
               .from("scheduled_posts")
-              .update({
-                status: "publicado",
-                published_at: new Date().toISOString(),
-                permalink: result.permalink ?? null,
-                error: null,
-              })
-              .eq("id", post.id);
-          } else {
-            failed++;
-            await supabaseAdmin
-              .from("scheduled_posts")
-              .update({
-                status: "falhou",
-                attempts: (post.attempts ?? 0) + 1,
-                error: result.error.slice(0, 500),
-              })
-              .eq("id", post.id);
-          }
+              .update(update)
+              .eq("id", postId)
+              .eq("lock_id", lockId)
+              .select("id")
+              .maybeSingle();
+            if (error || !data) throw new Error("result update failed");
+          },
+          now: () => new Date(),
+          log: (entry) => console.info(JSON.stringify(entry)),
+        };
+
+        try {
+          const summary = await runPublishQueue(dependencies, {
+            lockId: randomUUID(),
+            limit: 10,
+            lockTimeoutSeconds,
+            maxAttempts,
+          });
+          return Response.json({ ok: true, ...summary });
+        } catch {
+          console.error(JSON.stringify({ event: "publish_dispatch_failed", code: "DATABASE_ERROR" }));
+          return Response.json({ ok: false, error: "Falha ao processar a fila." }, { status: 500 });
         }
-
-        return Response.json({ ok: true, processed: due.length, published, failed, provider: activeProvider() });
       },
     },
   },

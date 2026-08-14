@@ -14,7 +14,8 @@ export const Route = createFileRoute("/biblioteca")({
       { title: "Biblioteca de Resultados — VaiViral" },
       {
         name: "description",
-        content: "Histórico completo de todos os vídeos exportados, organizados por lote e plataforma.",
+        content:
+          "Histórico completo de todos os vídeos exportados, organizados por lote e plataforma.",
       },
       { property: "og:title", content: "Biblioteca de Resultados — VaiViral" },
       { property: "og:type", content: "website" },
@@ -30,16 +31,18 @@ function BibliotecaPage() {
   const jobs = listJobs();
 
   return (
-    <AppShell 
-      mode={mode} 
-      onMode={setMode} 
-      count={jobs.length} 
+    <AppShell
+      mode={mode}
+      onMode={setMode}
+      count={jobs.length}
       onLibrary={() => setLibOpen(true)}
       onCloud={() => setCloudOpen(true)}
     >
       <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6">
         <header className="mb-8">
-          <h1 className="font-display text-3xl font-bold tracking-tight">Biblioteca de Resultados</h1>
+          <h1 className="font-display text-3xl font-bold tracking-tight">
+            Biblioteca de Resultados
+          </h1>
           <p className="mt-2 text-muted-foreground">
             Acompanhe e busque todos os vídeos que você já exportou no sistema.
           </p>
@@ -49,8 +52,8 @@ function BibliotecaPage() {
       </div>
 
       {libOpen && (
-        <TemplateLibrary 
-          templates={templates} 
+        <TemplateLibrary
+          templates={templates}
           activeId=""
           onClose={() => setLibOpen(false)}
           onChangeList={setTemplates}
@@ -58,10 +61,10 @@ function BibliotecaPage() {
           onCommit={(t) => t}
         />
       )}
-      
+
       {cloudOpen && (
-        <CloudPanel 
-          templates={templates} 
+        <CloudPanel
+          templates={templates}
           onClose={() => setCloudOpen(false)}
           onChangeList={setTemplates}
           mode={mode}

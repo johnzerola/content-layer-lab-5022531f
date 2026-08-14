@@ -146,7 +146,16 @@ export async function cancelPost(id: string) {
 export async function reschedulePost(id: string, when: Date) {
   const { error } = await supabase
     .from("scheduled_posts")
-    .update({ scheduled_at: when.toISOString(), status: "agendado", error: null })
+    .update({
+      scheduled_at: when.toISOString(),
+      status: "agendado",
+      attempts: 0,
+      error: null,
+      error_code: null,
+      next_attempt_at: null,
+      lock_id: null,
+      locked_at: null,
+    })
     .eq("id", id);
   if (error) throw error;
 }

@@ -1,14 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-  Download,
-  Loader2,
-  Radio,
-  Scissors,
-  Square,
-  Trash2,
-} from "lucide-react";
+import { Download, Loader2, Radio, Scissors, Square, Trash2 } from "lucide-react";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
@@ -56,7 +49,8 @@ function fmt(t: number) {
 
 function ScoreRing({ value }: { value: number }) {
   const c = 2 * Math.PI * 18;
-  const tone = value >= 75 ? "text-emerald-400" : value >= 55 ? "text-primary" : "text-muted-foreground";
+  const tone =
+    value >= 75 ? "text-emerald-400" : value >= 55 ? "text-primary" : "text-muted-foreground";
   return (
     <span className="relative grid size-12 shrink-0 place-items-center">
       <svg viewBox="0 0 44 44" className="absolute inset-0 -rotate-90">
@@ -137,7 +131,8 @@ function LivePage() {
       detachRef.current?.();
       detachRef.current = await attachHls(video, hls);
 
-      const capture = (video as HTMLVideoElement & { captureStream?: () => MediaStream }).captureStream;
+      const capture = (video as HTMLVideoElement & { captureStream?: () => MediaStream })
+        .captureStream;
       if (!capture) {
         toast.error("Este navegador não permite gravar a live (use Chrome ou Edge).");
         return;
@@ -183,9 +178,12 @@ function LivePage() {
       setBusy(false);
     }
     if (pollRef.current) window.clearInterval(pollRef.current);
-    pollRef.current = window.setInterval(() => {
-      if (!clipperRef.current) void check().catch(() => undefined);
-    }, Math.max(20, poll) * 1000);
+    pollRef.current = window.setInterval(
+      () => {
+        if (!clipperRef.current) void check().catch(() => undefined);
+      },
+      Math.max(20, poll) * 1000,
+    );
   }
 
   function stop() {
@@ -225,10 +223,10 @@ function LivePage() {
   };
 
   return (
-    <AppShell 
-      mode={mode} 
-      onMode={setMode} 
-      count={jobs.length} 
+    <AppShell
+      mode={mode}
+      onMode={setMode}
+      count={jobs.length}
       onLibrary={() => setLibOpen(true)}
       onCloud={() => setCloudOpen(true)}
     >
@@ -245,10 +243,10 @@ function LivePage() {
             <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-4 py-3">
               <span className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
                 <Radio className="size-3.5" />
-              {info?.title ??
-                (info?.handle
-                  ? `${info.platform === "kick" ? "Kick" : info.platform === "tiktok" ? "TikTok" : "X"} · @${info.handle}`
-                  : "aguardando transmissão")}
+                {info?.title ??
+                  (info?.handle
+                    ? `${info.platform === "kick" ? "Kick" : info.platform === "tiktok" ? "TikTok" : "X"} · @${info.handle}`
+                    : "aguardando transmissão")}
               </span>
               <button
                 onClick={() => clipperRef.current?.cutNow()}
@@ -364,7 +362,8 @@ function LivePage() {
                 disabled={busy}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
               >
-                {busy ? <Loader2 className="size-4 animate-spin" /> : <Radio className="size-4" />} monitorar
+                {busy ? <Loader2 className="size-4 animate-spin" /> : <Radio className="size-4" />}{" "}
+                monitorar
               </button>
             ) : (
               <button
@@ -404,8 +403,8 @@ function LivePage() {
       )}
 
       {libOpen && (
-        <TemplateLibrary 
-          templates={templates} 
+        <TemplateLibrary
+          templates={templates}
           activeId=""
           onClose={() => setLibOpen(false)}
           onChangeList={setTemplates}
@@ -413,10 +412,10 @@ function LivePage() {
           onCommit={(t) => t}
         />
       )}
-      
+
       {cloudOpen && (
-        <CloudPanel 
-          templates={templates} 
+        <CloudPanel
+          templates={templates}
           onClose={() => setCloudOpen(false)}
           onChangeList={setTemplates}
           mode={mode}
@@ -466,7 +465,10 @@ function ClipEditor({
       <div className="w-full max-w-3xl space-y-4 rounded-2xl border border-border bg-surface p-4">
         <div className="flex items-center gap-3">
           <h3 className="font-display text-base font-bold">{clip.title}</h3>
-          <button onClick={onClose} className="ml-auto text-sm text-muted-foreground hover:text-foreground">
+          <button
+            onClick={onClose}
+            className="ml-auto text-sm text-muted-foreground hover:text-foreground"
+          >
             fechar
           </button>
         </div>

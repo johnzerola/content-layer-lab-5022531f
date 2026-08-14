@@ -22,7 +22,7 @@ export function ResultLibrary() {
   const [exports, setExports] = useState<ExportRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  
+
   useEffect(() => {
     listExports(100)
       .then(setExports)
@@ -31,7 +31,7 @@ export function ResultLibrary() {
   }, []);
 
   const filtered = exports.filter((e) =>
-    (e.file_name + (e.source_name || "")).toLowerCase().includes(search.toLowerCase())
+    (e.file_name + (e.source_name || "")).toLowerCase().includes(search.toLowerCase()),
   );
 
   const formatSize = (bytes: number) => {
@@ -75,29 +75,35 @@ export function ResultLibrary() {
           </div>
           <h3 className="text-lg font-medium">Nenhum resultado encontrado</h3>
           <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">
-            {search ? "Tente mudar os termos da busca." : "As exportações que você fizer aparecerão aqui."}
+            {search
+              ? "Tente mudar os termos da busca."
+              : "As exportações que você fizer aparecerão aqui."}
           </p>
         </div>
       ) : (
         <div className="grid gap-4">
           {filtered.map((e) => (
-            <Card key={e.id} className="overflow-hidden border-border/50 bg-surface/30 transition-colors hover:bg-surface/50">
+            <Card
+              key={e.id}
+              className="overflow-hidden border-border/50 bg-surface/30 transition-colors hover:bg-surface/50"
+            >
               <CardContent className="p-4">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                   <div className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                     <FileVideo className="size-6" />
                   </div>
-                  
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h4 className="truncate font-medium text-sm sm:text-base">
-                        {e.file_name}
-                      </h4>
-                      <Badge variant="outline" className="text-[10px] uppercase font-mono h-5 bg-background/50">
+                      <h4 className="truncate font-medium text-sm sm:text-base">{e.file_name}</h4>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] uppercase font-mono h-5 bg-background/50"
+                      >
                         {e.mode}
                       </Badge>
                     </div>
-                    
+
                     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       {e.source_name && (
                         <span className="flex items-center gap-1">
@@ -106,7 +112,10 @@ export function ResultLibrary() {
                       )}
                       <span className="flex items-center gap-1">
                         <Calendar className="size-3" />
-                        {formatDistanceToNow(new Date(e.created_at), { addSuffix: true, locale: ptBR })}
+                        {formatDistanceToNow(new Date(e.created_at), {
+                          addSuffix: true,
+                          locale: ptBR,
+                        })}
                       </span>
                       {e.platform && (
                         <span className="flex items-center gap-1">

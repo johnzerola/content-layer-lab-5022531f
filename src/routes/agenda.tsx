@@ -1,15 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import {
-  CalendarClock,
-  Instagram,
-  Loader2,
-  Plus,
-  Trash2,
-  UploadCloud,
-  X,
-} from "lucide-react";
+import { CalendarClock, Instagram, Loader2, Plus, Trash2, UploadCloud, X } from "lucide-react";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
@@ -45,7 +37,8 @@ export const Route = createFileRoute("/agenda")({
       { property: "og:title", content: "Agenda de postagens — VaiViral" },
       {
         property: "og:description",
-        content: "Fila de publicação automática de Reels, Feed e Stories para as contas conectadas.",
+        content:
+          "Fila de publicação automática de Reels, Feed e Stories para as contas conectadas.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -167,10 +160,10 @@ function AgendaPage() {
   }
 
   return (
-    <AppShell 
-      mode={mode} 
-      onMode={setMode} 
-      count={jobs.length} 
+    <AppShell
+      mode={mode}
+      onMode={setMode}
+      count={jobs.length}
       onLibrary={() => setLibOpen(true)}
       onCloud={() => setCloudOpen(true)}
     >
@@ -183,17 +176,17 @@ function AgendaPage() {
             Seus vídeos vão ao ar sozinhos
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Envie o MP4 pronto, escolha a conta, o formato e a hora. O servidor publica na fila sem você
-            precisar abrir o app. A conexão real com o Instagram é ligada assim que o provedor de publicação
-            for configurado — até lá os posts ficam agendados e sinalizam o motivo.
+            Envie o MP4 pronto, escolha a conta, o formato e a hora. O servidor publica na fila sem
+            você precisar abrir o app. A conexão real com o Instagram é ligada assim que o provedor
+            de publicação for configurado — até lá os posts ficam agendados e sinalizam o motivo.
           </p>
         </section>
 
         {!user && (
           <div className="rounded-2xl border border-border bg-surface/60 p-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Faça login na aba <strong className="text-foreground">Nuvem</strong> para conectar contas e
-              agendar publicações.
+              Faça login na aba <strong className="text-foreground">Nuvem</strong> para conectar
+              contas e agendar publicações.
             </p>
           </div>
         )}
@@ -331,7 +324,11 @@ function AgendaPage() {
                   disabled={sending}
                   className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
                 >
-                  {sending ? <Loader2 className="size-4 animate-spin" /> : <CalendarClock className="size-4" />}
+                  {sending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <CalendarClock className="size-4" />
+                  )}
                   {sending ? "Enviando…" : "Agendar publicação"}
                 </button>
               </section>
@@ -369,7 +366,9 @@ function AgendaPage() {
                                 {KIND_LABEL[p.kind] ?? p.kind} · {p.file_name ?? "vídeo"}
                               </p>
                               {p.caption && (
-                                <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{p.caption}</p>
+                                <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                  {p.caption}
+                                </p>
                               )}
                               {p.error && <p className="mt-1 text-xs text-red-400">{p.error}</p>}
                             </div>
@@ -415,8 +414,8 @@ function AgendaPage() {
       </main>
 
       {libOpen && (
-        <TemplateLibrary 
-          templates={templates} 
+        <TemplateLibrary
+          templates={templates}
           activeId=""
           onClose={() => setLibOpen(false)}
           onChangeList={setTemplates}
@@ -424,10 +423,10 @@ function AgendaPage() {
           onCommit={(t) => t}
         />
       )}
-      
+
       {cloudOpen && (
-        <CloudPanel 
-          templates={templates} 
+        <CloudPanel
+          templates={templates}
           onClose={() => setCloudOpen(false)}
           onChangeList={setTemplates}
           mode={mode}
