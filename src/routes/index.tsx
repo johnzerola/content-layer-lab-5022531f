@@ -22,6 +22,7 @@ import {
   Columns2,
   Wand2,
   Crop,
+  CalendarClock,
 } from "lucide-react";
 import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
 import { AuthGate } from "@/components/AuthGate";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
+import { AutoScheduleModal } from "@/components/AutoScheduleModal";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
 import { failJob, finishJob, setJobCancel, setJobRetry, startJob, updateJob } from "@/lib/jobs";
 import { undoable } from "@/lib/undo";
@@ -336,6 +338,7 @@ function Home() {
     seconds: number;
     fails: { name: string; error: string }[];
   } | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
 
   const smartRef = useRef(smartFrame);
 
@@ -1847,6 +1850,14 @@ function Home() {
                   <Button variant="outline" onClick={() => void downloadZipAll()} disabled={readyCount === 0 || zipping}>
                     <FileArchive className="size-4" /> {zipping ? "Compactando…" : `Baixar ZIP (${readyCount})`}
                   </Button>
+                  {readyCount > 0 && (
+                    <Button 
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
+                      onClick={() => setScheduleOpen(true)}
+                    >
+                      <CalendarClock className="size-4 mr-2" /> Fazer agendamento automático
+                    </Button>
+                  )}
                   {fsAccessSupported() && (
                     <Button variant="outline" onClick={() => void saveFolder()} disabled={readyCount === 0}>
                       <FolderDown className="size-4" /> Salvar na pasta
@@ -2563,6 +2574,27 @@ function Home() {
           onRestore={restoreSnapshot}
         />
       )}
+
+      <AutoScheduleModal
+        open={scheduleOpen}
+        onOpenChange={setScheduleOpen}
+        onComplete={() => {
+          setReport(null);
+          // Optional: navigate to agenda
+        }}
+        items={items
+          .filter((i) => i.status === "pronto" && i.blob)
+          .map((i) => ({
+            blob: i.blob!,
+            fileName: outputName(mode, {
+              index: items.indexOf(i),
+              sourceName: i.file.name,
+              templateName: active.name,
+              ext: i.ext || "mp4",
+            }),
+            headline: i.headline,
+          }))}
+      />
     </AppShell>
   );
 }
