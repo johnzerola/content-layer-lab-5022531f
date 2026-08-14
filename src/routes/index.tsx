@@ -22,6 +22,7 @@ import {
   Columns2,
   Wand2,
   Crop,
+  CalendarClock,
 } from "lucide-react";
 import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
 import { Button } from "@/components/ui/button";
