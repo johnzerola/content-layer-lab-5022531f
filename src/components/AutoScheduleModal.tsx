@@ -68,7 +68,8 @@ export function AutoScheduleModal({
 
   useEffect(() => {
     if (accounts.length > 0 && !accountId) {
-      setAccountId(accounts[0].id);
+      const first = accounts[0];
+      if (first) setAccountId(first.id);
     }
   }, [accounts, accountId]);
 
