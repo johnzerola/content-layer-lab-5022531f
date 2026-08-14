@@ -1849,6 +1849,14 @@ function Home() {
                   <Button variant="outline" onClick={() => void downloadZipAll()} disabled={readyCount === 0 || zipping}>
                     <FileArchive className="size-4" /> {zipping ? "Compactando…" : `Baixar ZIP (${readyCount})`}
                   </Button>
+                  {readyCount > 0 && (
+                    <Button 
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
+                      onClick={() => setScheduleOpen(true)}
+                    >
+                      <CalendarClock className="size-4 mr-2" /> Fazer agendamento automático
+                    </Button>
+                  )}
                   {fsAccessSupported() && (
                     <Button variant="outline" onClick={() => void saveFolder()} disabled={readyCount === 0}>
                       <FolderDown className="size-4" /> Salvar na pasta
