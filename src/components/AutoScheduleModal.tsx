@@ -88,6 +88,8 @@ export function AutoScheduleModal({
       
       for (let i = 0; i < items.length; i++) {
         const item = items[i];
+        if (!item) continue;
+
         const scheduledAt = new Date(start);
         
         if (intervalType === "hours") {
