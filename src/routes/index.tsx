@@ -22,6 +22,7 @@ import {
   Columns2,
   Wand2,
   Crop,
+  CalendarClock,
 } from "lucide-react";
 import { PreviewCropOverlay } from "@/components/PreviewCropOverlay";
 import { Button } from "@/components/ui/button";
@@ -30,11 +31,18 @@ import { BeforeAfterSlider } from "@/components/BeforeAfterSlider";
 import { TemplateEditor } from "@/components/TemplateEditor";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
-import { autoSyncTemplates, enableCloudQuotaFallback, logBatch, logExports, type ProjectSnapshot } from "@/lib/cloud";
+import {
+  autoSyncTemplates,
+  enableCloudQuotaFallback,
+  logBatch,
+  logExports,
+  type ProjectSnapshot,
+} from "@/lib/cloud";
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
 import { AuthGate } from "@/components/AuthGate";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
+import { AutoScheduleModal } from "@/components/AutoScheduleModal";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
 import { failJob, finishJob, setJobCancel, setJobRetry, startJob, updateJob } from "@/lib/jobs";
 import { undoable } from "@/lib/undo";
@@ -46,14 +54,12 @@ import {
   CANVAS_W,
   CAPTION_PRESETS,
   commitTemplate,
-
   createTemplate,
   defaultCaptions,
   fitCanvasToSource,
   orientationOf,
   loadTemplates,
   migrate,
-
   PLATFORM_PRESETS,
   RATIO_PRESETS,
   makeCleanupRegion,
@@ -81,8 +87,6 @@ import { ImportPanel } from "@/components/ImportPanel";
 import { FLOWS, outputName, zipName, type Mode } from "@/lib/flows";
 import { Toaster } from "@/components/ui/sonner";
 
-
-
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -95,7 +99,8 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "VaiViral — Editor de vídeos em lote 9:16" },
       {
         property: "og:description",
-        content: "Template visual estilo Canva, importação em massa, anti-duplicidade e download de todos os vídeos prontos.",
+        content:
+          "Template visual estilo Canva, importação em massa, anti-duplicidade e download de todos os vídeos prontos.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -152,7 +157,6 @@ interface Item {
 
   error?: string | undefined;
 }
-
 
 interface QueueCtrl {
   paused: boolean;
@@ -240,10 +244,10 @@ function Home() {
           action: { label: "Nuvem", onClick: () => setCloudOpen(true) },
         });
     });
-    return () => { enableCloudQuotaFallback(); };
+    return () => {
+      enableCloudQuotaFallback();
+    };
   }, []);
-
-
 
   // filas totalmente separadas por ferramenta
   const [queues, setQueues] = useState<Record<Mode, Item[]>>({
@@ -280,7 +284,6 @@ function Home() {
     [],
   );
 
-
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [zipping, setZipping] = useState(false);
@@ -291,7 +294,9 @@ function Home() {
   const [autoBitrate, setAutoBitrate] = useState(true);
   const [platforms, setPlatforms] = useState<string[]>(["reels"]);
   const togglePlatform = (id: string) =>
-    setPlatforms((p) => (p.includes(id) ? (p.length > 1 ? p.filter((x) => x !== id) : p) : [...p, id]));
+    setPlatforms((p) =>
+      p.includes(id) ? (p.length > 1 ? p.filter((x) => x !== id) : p) : [...p, id],
+    );
 
   const [smartFrame, setSmartFrame] = useState(true);
   const [linkUrl, setLinkUrl] = useState("");
@@ -321,8 +326,6 @@ function Home() {
   // as transcrições rodam em fila (uma por vez) mesmo com render paralelo
   const capChain = useRef<Promise<unknown>>(Promise.resolve());
 
-
-
   const inputRef = useRef<HTMLInputElement>(null);
   const folderRef = useRef<HTMLInputElement>(null);
   const ctrlRef = useRef<QueueCtrl>({ paused: false, cancelled: false, aborts: new Map() });
@@ -336,6 +339,7 @@ function Home() {
     seconds: number;
     fails: { name: string; error: string }[];
   } | null>(null);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
 
   const smartRef = useRef(smartFrame);
 
@@ -389,99 +393,117 @@ function Home() {
     void registerFonts(list.flatMap((t) => t.fonts ?? []));
   }, []);
 
-
-
-  const addVideos = useCallback(async (list: File[], meta?: { sourceUrl?: string }) => {
-    const vids = list.filter(isVideoFile);
-    const ignored = list.length - vids.length;
-    if (ignored > 0) toast.warning(`${ignored} arquivo(s) ignorado(s): não são vídeos.`);
-    const undecodable = vids.filter((f) => !canBrowserDecode(f));
-    if (undecodable.length) {
-      toast.warning(
-        `${undecodable.length} arquivo(s) em formato que o navegador pode não decodificar (ex: .avi, .mkv, .wmv). Se o preview ficar preto, converta para MP4/MOV/WebM.`,
-      );
-    }
-    const created: Item[] = vids.map((file) => ({
-
-      id: crypto.randomUUID(),
-      file,
-      ...(meta?.sourceUrl ? { sourceUrl: meta.sourceUrl } : {}),
-      poster: null,
-      w: 0,
-      h: 0,
-      duration: 0,
-      headline: "",
-      offsetX: 0,
-      offsetY: 0,
-      status: "pendente",
-      progress: 0,
-    }));
-    const runMode = modeRef.current;
-    const setQ = (upd: Item[] | ((prev: Item[]) => Item[])) => setItemsIn(runMode, upd);
-    setQ((prev) => [...prev, ...created]);
-    if (!selectedIdsRef.current[runMode] && created[0]) setSelectedId(created[0].id);
-    for (const it of created) {
-      try {
-        const meta = await grabPoster(it.file);
-        setQ((prev) =>
-          prev.map((p) => (p.id === it.id ? { ...p, poster: meta.url, w: meta.w, h: meta.h, duration: meta.duration } : p)),
+  const addVideos = useCallback(
+    async (list: File[], meta?: { sourceUrl?: string }) => {
+      const vids = list.filter(isVideoFile);
+      const ignored = list.length - vids.length;
+      if (ignored > 0) toast.warning(`${ignored} arquivo(s) ignorado(s): não são vídeos.`);
+      const undecodable = vids.filter((f) => !canBrowserDecode(f));
+      if (undecodable.length) {
+        toast.warning(
+          `${undecodable.length} arquivo(s) em formato que o navegador pode não decodificar (ex: .avi, .mkv, .wmv). Se o preview ficar preto, converta para MP4/MOV/WebM.`,
         );
-        if (runMode !== "limpar" && smartRef.current) {
-          const af = await autoFrame(it.file);
+      }
+      const created: Item[] = vids.map((file) => ({
+        id: crypto.randomUUID(),
+        file,
+        ...(meta?.sourceUrl ? { sourceUrl: meta.sourceUrl } : {}),
+        poster: null,
+        w: 0,
+        h: 0,
+        duration: 0,
+        headline: "",
+        offsetX: 0,
+        offsetY: 0,
+        status: "pendente",
+        progress: 0,
+      }));
+      const runMode = modeRef.current;
+      const setQ = (upd: Item[] | ((prev: Item[]) => Item[])) => setItemsIn(runMode, upd);
+      setQ((prev) => [...prev, ...created]);
+      if (!selectedIdsRef.current[runMode] && created[0]) setSelectedId(created[0].id);
+      for (const it of created) {
+        try {
+          const meta = await grabPoster(it.file);
           setQ((prev) =>
             prev.map((p) =>
-              p.id === it.id ? { ...p, offsetX: af.offsetX, offsetY: af.offsetY, autoFrameSource: af.source } : p,
+              p.id === it.id
+                ? { ...p, poster: meta.url, w: meta.w, h: meta.h, duration: meta.duration }
+                : p,
             ),
           );
-        }
-      } catch {
-        setQ((prev) => prev.map((p) => (p.id === it.id ? { ...p, status: "erro" } : p)));
-      }
-    }
-    // LimpaVídeo: analisa cada vídeo automaticamente (2 por vez) e guarda as áreas encontradas
-    if (runMode === "limpar") {
-      const pool = [...created];
-      const worker = async () => {
-        for (;;) {
-          const it = pool.shift();
-          if (!it) return;
-          setQ((prev) => prev.map((p) => (p.id === it.id ? { ...p, detectStatus: "analisando", detectMsg: "analisando quadros…" } : p)));
-          try {
-            const found = await detectOverlays(it.file, {
-              onProgress: (d, t) =>
-                setQ((prev) =>
-                  prev.map((p) => (p.id === it.id ? { ...p, detectMsg: `analisando ${d}/${t}` } : p)),
-                ),
-            });
-            const regions = found.map((f) => makeCleanupRegion(f));
+          if (runMode !== "limpar" && smartRef.current) {
+            const af = await autoFrame(it.file);
             setQ((prev) =>
               prev.map((p) =>
                 p.id === it.id
-                  ? {
-                      ...p,
-                      regions,
-                      detectStatus: regions.length ? "ok" : "vazio",
-                      detectMsg: regions.length
-                        ? `${regions.length} área(s) detectada(s)`
-                        : "nada fixo encontrado",
-                    }
-                  : p,
-              ),
-            );
-          } catch (err) {
-            setQ((prev) =>
-              prev.map((p) =>
-                p.id === it.id
-                  ? { ...p, detectStatus: "erro", detectMsg: String((err as Error)?.message ?? err) }
+                  ? { ...p, offsetX: af.offsetX, offsetY: af.offsetY, autoFrameSource: af.source }
                   : p,
               ),
             );
           }
+        } catch {
+          setQ((prev) => prev.map((p) => (p.id === it.id ? { ...p, status: "erro" } : p)));
         }
-      };
-      void Promise.all([worker(), worker()]);
-    }
-  }, [setItemsIn, setSelectedId]);
+      }
+      // LimpaVídeo: analisa cada vídeo automaticamente (2 por vez) e guarda as áreas encontradas
+      if (runMode === "limpar") {
+        const pool = [...created];
+        const worker = async () => {
+          for (;;) {
+            const it = pool.shift();
+            if (!it) return;
+            setQ((prev) =>
+              prev.map((p) =>
+                p.id === it.id
+                  ? { ...p, detectStatus: "analisando", detectMsg: "analisando quadros…" }
+                  : p,
+              ),
+            );
+            try {
+              const found = await detectOverlays(it.file, {
+                onProgress: (d, t) =>
+                  setQ((prev) =>
+                    prev.map((p) =>
+                      p.id === it.id ? { ...p, detectMsg: `analisando ${d}/${t}` } : p,
+                    ),
+                  ),
+              });
+              const regions = found.map((f) => makeCleanupRegion(f));
+              setQ((prev) =>
+                prev.map((p) =>
+                  p.id === it.id
+                    ? {
+                        ...p,
+                        regions,
+                        detectStatus: regions.length ? "ok" : "vazio",
+                        detectMsg: regions.length
+                          ? `${regions.length} área(s) detectada(s)`
+                          : "nada fixo encontrado",
+                      }
+                    : p,
+                ),
+              );
+            } catch (err) {
+              setQ((prev) =>
+                prev.map((p) =>
+                  p.id === it.id
+                    ? {
+                        ...p,
+                        detectStatus: "erro",
+                        detectMsg: String((err as Error)?.message ?? err),
+                      }
+                    : p,
+                ),
+              );
+            }
+          }
+        };
+        void Promise.all([worker(), worker()]);
+      }
+    },
+    [setItemsIn, setSelectedId],
+  );
 
   const addFiles = useCallback(
     (files: FileList | null) => (files ? addVideos(Array.from(files)) : Promise.resolve()),
@@ -524,8 +546,6 @@ function Home() {
     }
   }, [addVideos]);
 
-
-
   /** Importa um vídeo apenas colando o link (baixa pelo servidor, sem upload). */
   const importFromLink = useCallback(async () => {
     const url = linkUrl.trim();
@@ -553,8 +573,11 @@ function Home() {
       const urlExt =
         res.ext ?? new URL(res.videoUrl).pathname.match(VIDEO_EXT_RE)?.[1]?.toLowerCase() ?? "mp4";
       const base =
-        (res.title ?? "video").replace(VIDEO_EXT_RE, "").replace(/[^\w\-. ]+/g, "").trim().slice(0, 60) ||
-        "video";
+        (res.title ?? "video")
+          .replace(VIDEO_EXT_RE, "")
+          .replace(/[^\w\-. ]+/g, "")
+          .trim()
+          .slice(0, 60) || "video";
       const name = `${base}.${urlExt}`;
       const file = new File([blob], name, { type: blob.type || guessMime(name) });
 
@@ -567,7 +590,6 @@ function Home() {
       setLinkBusy(false);
     }
   }, [linkUrl, linkBusy, addVideos]);
-
 
   /** Snapshot do projeto atual (metadados; o vídeo volta pelo link de origem). */
   const buildSnapshot = useCallback((): ProjectSnapshot => {
@@ -693,7 +715,6 @@ function Home() {
             /* mantém a miniatura do vídeo original */
           }
         }
-
       } catch (err) {
         setLinkMsg(`falha na clipagem: ${String((err as Error)?.message ?? err)}`);
       } finally {
@@ -709,7 +730,9 @@ function Home() {
       if (capBusyId) return;
       setCapBusyId(item.id);
       setItems((p) =>
-        p.map((x) => (x.id === item.id ? { ...x, capStatus: "ouvindo o áudio...", capError: false } : x)),
+        p.map((x) =>
+          x.id === item.id ? { ...x, capStatus: "ouvindo o áudio...", capError: false } : x,
+        ),
       );
       try {
         const cues = await generateCaptions(item.file, {
@@ -717,7 +740,9 @@ function Home() {
           language: capLang || undefined,
           onProgress: ({ done, total }) =>
             setItems((p) =>
-              p.map((x) => (x.id === item.id ? { ...x, capStatus: `transcrevendo ${done}/${total}` } : x)),
+              p.map((x) =>
+                x.id === item.id ? { ...x, capStatus: `transcrevendo ${done}/${total}` } : x,
+              ),
             ),
         });
         setItems((p) =>
@@ -732,12 +757,17 @@ function Home() {
               : x,
           ),
         );
-        if (cues.length) setActive((t) => ({ ...t, captions: { ...(t.captions ?? defaultCaptions()), visible: true } }));
+        if (cues.length)
+          setActive((t) => ({
+            ...t,
+            captions: { ...(t.captions ?? defaultCaptions()), visible: true },
+          }));
       } catch (err) {
         const msg = String((err as Error)?.message ?? err);
-        setItems((p) => p.map((x) => (x.id === item.id ? { ...x, capStatus: msg, capError: true } : x)));
+        setItems((p) =>
+          p.map((x) => (x.id === item.id ? { ...x, capStatus: msg, capError: true } : x)),
+        );
       } finally {
-
         setCapBusyId(null);
       }
     },
@@ -746,7 +776,6 @@ function Home() {
 
   const selected = items.find((i) => i.id === selectedId) ?? null;
   const studioItem = studioId ? (items.find((i) => i.id === studioId) ?? null) : null;
-
 
   const antiDup = active.antiDup ?? defaultAntiDup();
   const setAntiDup = (patch: Partial<typeof antiDup>) =>
@@ -804,7 +833,9 @@ function Home() {
     ok: Set<string>;
   } | null>(null);
   const selRegionsKey = JSON.stringify(
-    (selected?.regions ?? []).filter((r) => r.enabled).map((r) => [r.id, r.x, r.y, r.w, r.h, r.mode]),
+    (selected?.regions ?? [])
+      .filter((r) => r.enabled)
+      .map((r) => [r.id, r.x, r.y, r.w, r.h, r.mode]),
   );
   useEffect(() => {
     if (mode !== "limpar" || !selected?.file) {
@@ -867,10 +898,6 @@ function Home() {
     ],
   );
 
-
-
-
-
   const processAll = async (onlyIds?: string[], safe = false) => {
     // a fila roda presa à ferramenta em que foi disparada
     const runMode = modeRef.current;
@@ -887,12 +914,17 @@ function Home() {
     failures.current = [];
     setReport(null);
 
-
     const pending = listNow()
       .filter((i) => (onlyIds ? onlyIds.includes(i.id) : i.status !== "pronto"))
       .map((i) => i.id);
     const queue = [...pending];
-    setItems((p) => p.map((x) => (queue.includes(x.id) ? { ...x, status: "na fila", progress: 0, stage: "na fila", stepIndex: 0, stepTotal: 0 } : x)));
+    setItems((p) =>
+      p.map((x) =>
+        queue.includes(x.id)
+          ? { ...x, status: "na fila", progress: 0, stage: "na fila", stepIndex: 0, stepTotal: 0 }
+          : x,
+      ),
+    );
 
     const worker = async () => {
       while (queue.length) {
@@ -915,9 +947,21 @@ function Home() {
         updateJob(id, { status: "processando", safeMode: safe });
         setJobCancel(id, () => ac.abort());
         setJobRetry(id, (asSafe) => void processAll([id], asSafe));
-        setItems((p) => p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0, stage: "preparando", stepIndex: 0, stepTotal: 0 } : x)));
+        setItems((p) =>
+          p.map((x) =>
+            x.id === id
+              ? {
+                  ...x,
+                  status: "processando",
+                  progress: 0,
+                  stage: "preparando",
+                  stepIndex: 0,
+                  stepTotal: 0,
+                }
+              : x,
+          ),
+        );
         const runItem = async () => {
-
           const n = runFlow.variants ? Math.max(1, variants) : 1;
           const targets = runFlow.platforms
             ? PLATFORM_PRESETS.filter((p) => platforms.includes(p.id))
@@ -955,7 +999,6 @@ function Home() {
                 ? cleanOnly(active)
                 : active;
 
-
           // transcreve na hora do processamento, para queimar a legenda no vídeo
           let cues = item.captions;
           const wantCaptions = (active.captions ?? defaultCaptions()).visible;
@@ -963,7 +1006,16 @@ function Home() {
             const run = capChain.current.then(async () => {
               if (ctrl.cancelled || ac.signal.aborted) return undefined;
               setItems((p) =>
-                p.map((x) => (x.id === id ? { ...x, capStatus: "transcrevendo…", capError: false, stage: "transcrevendo áudio" } : x)),
+                p.map((x) =>
+                  x.id === id
+                    ? {
+                        ...x,
+                        capStatus: "transcrevendo…",
+                        capError: false,
+                        stage: "transcrevendo áudio",
+                      }
+                    : x,
+                ),
               );
               updateJob(id, { stage: "transcrevendo áudio" });
               return generateCaptions(item.file, {
@@ -973,7 +1025,11 @@ function Home() {
                   setItems((p) =>
                     p.map((x) =>
                       x.id === id
-                        ? { ...x, capStatus: `transcrevendo ${done}/${t}`, stage: `transcrevendo ${done}/${t}` }
+                        ? {
+                            ...x,
+                            capStatus: `transcrevendo ${done}/${t}`,
+                            stage: `transcrevendo ${done}/${t}`,
+                          }
                         : x,
                     ),
                   ),
@@ -995,10 +1051,11 @@ function Home() {
             } catch (err) {
               // sem legenda o vídeo ainda é exportado normalmente
               const msg = String((err as Error)?.message ?? err);
-              setItems((p) => p.map((x) => (x.id === id ? { ...x, capStatus: msg, capError: true } : x)));
+              setItems((p) =>
+                p.map((x) => (x.id === id ? { ...x, capStatus: msg, capError: true } : x)),
+              );
             }
           }
-
 
           // LimpaVídeo: recupera o fundo real por mediana temporal antes de renderizar
           const itemRegions = item.regions?.length ? item.regions : (active.cleanup ?? []);
@@ -1038,12 +1095,13 @@ function Home() {
               const stageLabel = `render ${at + 1}/${total}${outs.length > 1 ? ` · ${plat.short}` : ""}${n > 1 ? ` · v${k + 1}` : ""}`;
               setItems((prev) =>
                 prev.map((x) =>
-                  x.id === id ? { ...x, stage: stageLabel, stepIndex: at + 1, stepTotal: total } : x,
+                  x.id === id
+                    ? { ...x, stage: stageLabel, stepIndex: at + 1, stepTotal: total }
+                    : x,
                 ),
               );
               updateJob(id, { stage: stageLabel });
               const { blob, ext } = await renderVideo(sourceFile, tpl, {
-
                 variation: variationOf(item, k),
                 offsetX: item.offsetX,
                 offsetY: item.offsetY,
@@ -1105,7 +1163,11 @@ function Home() {
               const aborted = (err as Error)?.name === "AbortError" || ctrl.cancelled;
               if (aborted || attempt === 2) break;
               setItems((p) =>
-                p.map((x) => (x.id === id ? { ...x, status: "processando", progress: 0, stage: "nova tentativa…" } : x)),
+                p.map((x) =>
+                  x.id === id
+                    ? { ...x, status: "processando", progress: 0, stage: "nova tentativa…" }
+                    : x,
+                ),
               );
               await new Promise((r) => setTimeout(r, 500));
             }
@@ -1114,7 +1176,11 @@ function Home() {
         } catch (err) {
           const aborted = (err as Error)?.name === "AbortError";
           const msg = String((err as Error)?.message ?? err);
-          if (!aborted) failures.current.push({ name: listNow().find((x) => x.id === id)?.file.name ?? id, error: msg });
+          if (!aborted)
+            failures.current.push({
+              name: listNow().find((x) => x.id === id)?.file.name ?? id,
+              error: msg,
+            });
           setItems((p) =>
             p.map((x) =>
               x.id === id
@@ -1127,7 +1193,6 @@ function Home() {
         } finally {
           ctrl.aborts.delete(id);
         }
-
       }
     };
 
@@ -1145,17 +1210,20 @@ function Home() {
         listNow()
           .filter((i) => i.status === "pronto")
           .flatMap((i) =>
-            (i.outputs?.length ? i.outputs : i.blob ? [{ blob: i.blob, ext: i.ext ?? "mp4", label: "" }] : []).map(
-              (o) => ({
-                mode: runMode,
-                fileName: `${i.file.name.replace(/\.[^.]+$/, "")}${o.label ? `-${o.label}` : ""}.${o.ext}`,
-                sourceName: i.file.name,
-                platform: platforms.join(","),
-                ...(o.label ? { variant: o.label } : {}),
-                bytes: o.blob.size,
-                seconds: i.duration,
-              }),
-            ),
+            (i.outputs?.length
+              ? i.outputs
+              : i.blob
+                ? [{ blob: i.blob, ext: i.ext ?? "mp4", label: "" }]
+                : []
+            ).map((o) => ({
+              mode: runMode,
+              fileName: `${i.file.name.replace(/\.[^.]+$/, "")}${o.label ? `-${o.label}` : ""}.${o.ext}`,
+              sourceName: i.file.name,
+              platform: platforms.join(","),
+              ...(o.label ? { variant: o.label } : {}),
+              bytes: o.blob.size,
+              seconds: i.duration,
+            })),
           ),
       ).catch(() => {});
       void logBatch({
@@ -1168,9 +1236,7 @@ function Home() {
         seconds,
       }).catch(() => {});
     }
-
   };
-
 
   const togglePause = () => {
     ctrlRef.current.paused = !ctrlRef.current.paused;
@@ -1184,7 +1250,11 @@ function Home() {
     ctrlRef.current.aborts.clear();
     setPaused(false);
     setRunning(false);
-    setItems((p) => p.map((x) => (x.status === "processando" || x.status === "na fila" ? { ...x, status: "pendente" } : x)));
+    setItems((p) =>
+      p.map((x) =>
+        x.status === "processando" || x.status === "na fila" ? { ...x, status: "pendente" } : x,
+      ),
+    );
   };
 
   const retryErrors = () => {
@@ -1249,15 +1319,16 @@ function Home() {
     toast.success(`Áreas aplicadas em ${items.length} vídeo(s).`);
   };
 
-
   const readyCount = items.filter((i) => i.status === "pronto").length;
   const errorCount = items.filter((i) => i.status === "erro").length;
   // progresso global do lote: soma do progresso de cada arquivo em andamento/concluído
   const batchItems = items.filter((i) => i.status !== "pendente");
   const batchDone = batchItems.filter((i) => i.status === "pronto" || i.status === "erro").length;
   const batchProgress = batchItems.length
-    ? batchItems.reduce((a, i) => a + (i.status === "pronto" || i.status === "erro" ? 1 : i.progress), 0) /
-      batchItems.length
+    ? batchItems.reduce(
+        (a, i) => a + (i.status === "pronto" || i.status === "erro" ? 1 : i.progress),
+        0,
+      ) / batchItems.length
     : 0;
   const activeItem = items.find((i) => i.status === "processando");
   const pendingCount = items.filter((i) => i.status !== "pronto").length;
@@ -1309,7 +1380,6 @@ function Home() {
     }
   };
 
-
   const baseTpl: Template =
     mode === "clip"
       ? stripBranding(active)
@@ -1334,11 +1404,11 @@ function Home() {
       mode={mode}
       onMode={(m) => setMode(m as Mode)}
       count={items.length}
-      counts={{ 
-        lote: queues.lote.length, 
-        clip: queues.clip.length, 
+      counts={{
+        lote: queues.lote.length,
+        clip: queues.clip.length,
         limpar: queues.limpar.length,
-        "limpar-ia": queues["limpar-ia"].length 
+        "limpar-ia": queues["limpar-ia"].length,
       }}
       onLibrary={() => setLibraryOpen(true)}
       onCloud={() => setCloudOpen(true)}
@@ -1346,83 +1416,84 @@ function Home() {
       <Toaster />
 
       <div className="space-y-5">
-
         {webmWarn && (
           <div className="flex items-start gap-3 rounded-xl border border-warn/50 bg-warn/10 p-4">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" />
             <div className="font-mono text-[11px] leading-relaxed text-muted-foreground">
               <p className="text-warn">este navegador não gera MP4</p>
               <p>
-                a saída sairá em WebM, que o Instagram e o TikTok recusam. Abra o VaiViral no Chrome ou Edge
-                atualizados (desktop) para exportar MP4 H.264 — ou converta os arquivos antes de publicar.
+                a saída sairá em WebM, que o Instagram e o TikTok recusam. Abra o VaiViral no Chrome
+                ou Edge atualizados (desktop) para exportar MP4 H.264 — ou converta os arquivos
+                antes de publicar.
               </p>
             </div>
           </div>
         )}
 
         {mode === "lote" ? (
-        <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
-          <div>
-            <p className="mono-label">Template ativo</p>
-            <p className="text-lg font-semibold">{active.name}</p>
-            <p className="font-mono text-[11px] text-muted-foreground">
-              v{active.version ?? 1}
-              {templates.some((t) => t.id === active.id) ? "" : " · não salvo"}
-              {savedFlash && <span className="ml-2 text-primary">● salvo</span>}
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {templates.length > 0 && (
+          <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
+            <div>
+              <p className="mono-label">Template ativo</p>
+              <p className="text-lg font-semibold">{active.name}</p>
+              <p className="font-mono text-[11px] text-muted-foreground">
+                v{active.version ?? 1}
+                {templates.some((t) => t.id === active.id) ? "" : " · não salvo"}
+                {savedFlash && <span className="ml-2 text-primary">● salvo</span>}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {templates.length > 0 && (
+                <select
+                  className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm"
+                  value={templates.some((t) => t.id === active.id) ? active.id : ""}
+                  onChange={(e) => {
+                    const t = templates.find((x) => x.id === e.target.value);
+                    if (t) applyTemplate(t);
+                  }}
+                >
+                  <option value="" disabled>
+                    Meus templates
+                  </option>
+                  {templates.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name} · v{t.version ?? 1}
+                    </option>
+                  ))}
+                </select>
+              )}
               <select
                 className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm"
-                value={templates.some((t) => t.id === active.id) ? active.id : ""}
+                value={`${active.canvasW ?? 1080}x${active.canvasH ?? 1920}`}
                 onChange={(e) => {
-                  const t = templates.find((x) => x.id === e.target.value);
-                    if (t) applyTemplate(t);
-
+                  const p = RATIO_PRESETS.find((r) => `${r.w}x${r.h}` === e.target.value);
+                  if (p) setActive(applyRatio(active, p.w, p.h));
                 }}
               >
-                <option value="" disabled>
-                  Meus templates
-                </option>
-                {templates.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} · v{t.version ?? 1}
+                {RATIO_PRESETS.map((r) => (
+                  <option key={r.id} value={`${r.w}x${r.h}`}>
+                    {r.label}
                   </option>
                 ))}
               </select>
-            )}
-            <select
-              className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm"
-              value={`${active.canvasW ?? 1080}x${active.canvasH ?? 1920}`}
-              onChange={(e) => {
-                const p = RATIO_PRESETS.find((r) => `${r.w}x${r.h}` === e.target.value);
-                if (p) setActive(applyRatio(active, p.w, p.h));
-              }}
-            >
-              {RATIO_PRESETS.map((r) => (
-                <option key={r.id} value={`${r.w}x${r.h}`}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-            <Button variant="outline" onClick={() => setActive(createTemplate("Novo template"))}>
-              Novo
-            </Button>
+              <Button variant="outline" onClick={() => setActive(createTemplate("Novo template"))}>
+                Novo
+              </Button>
 
-            <Button variant="outline" onClick={() => commit(active, "salvo manualmente")}>
-              <Save className="size-4" /> Salvar versão
-            </Button>
-            <Button onClick={() => setEditing(true)}>
-              <Pencil className="size-4" /> Editar template
-            </Button>
-          </div>
-        </section>
+              <Button variant="outline" onClick={() => commit(active, "salvo manualmente")}>
+                <Save className="size-4" /> Salvar versão
+              </Button>
+              <Button onClick={() => setEditing(true)}>
+                <Pencil className="size-4" /> Editar template
+              </Button>
+            </div>
+          </section>
         ) : mode === "limpar" ? (
           <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
             <div>
               <p className="mono-label">Limpar vídeo</p>
-              <p className="text-lg font-semibold">Remover legenda queimada, marca d'água e textos</p>
+              <p className="text-lg font-semibold">
+                Remover legenda queimada, marca d'água e textos
+              </p>
               <p className="font-mono text-[11px] text-muted-foreground">
                 marque as áreas sobre o quadro no preview — clonar vizinho, borrão, mosaico ou tarja
               </p>
@@ -1453,13 +1524,14 @@ function Home() {
               <p className="mono-label">AI Video Cleaner</p>
               <p className="text-lg font-semibold">Remoção Profissional com ProPainter (GPU)</p>
               <p className="font-mono text-[11px] text-muted-foreground">
-                reconstrução temporal avançada utilizando frames vizinhos para restaurar o fundo original
+                reconstrução temporal avançada utilizando frames vizinhos para restaurar o fundo
+                original
               </p>
             </div>
             <div className="flex items-center gap-2">
-               <span className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-mono text-[11px] text-primary">
-                 <Sparkles className="size-3" /> motor gpu
-               </span>
+              <span className="flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 font-mono text-[11px] text-primary">
+                <Sparkles className="size-3" /> motor gpu
+              </span>
             </div>
           </section>
         ) : (
@@ -1488,7 +1560,6 @@ function Home() {
           </section>
         )}
 
-
         <ImportPanel
           mode={mode}
           count={items.length}
@@ -1505,7 +1576,12 @@ function Home() {
           <ClipStudio
             sources={items.filter((i) => !i.clip)}
             clips={items.filter((i) => i.clip)}
-            settings={{ minLen: clipMinLen, maxLen: clipMaxLen, max: clipMax, minScore: clipMinScore }}
+            settings={{
+              minLen: clipMinLen,
+              maxLen: clipMaxLen,
+              max: clipMax,
+              minScore: clipMinScore,
+            }}
             onSettings={(p) => {
               if (p.minLen !== undefined) setClipMinLen(p.minLen);
               if (p.maxLen !== undefined) setClipMaxLen(p.maxLen);
@@ -1526,14 +1602,15 @@ function Home() {
             onTogglePause={togglePause}
             onCancel={cancelAll}
             onRemove={(id) => removeItemWithUndo(id)}
-            onDownload={(it) => it.blob && downloadBlob(it.blob, `corte-${it.id.slice(0, 6)}.${it.ext}`)}
+            onDownload={(it) =>
+              it.blob && downloadBlob(it.blob, `corte-${it.id.slice(0, 6)}.${it.ext}`)
+            }
             onZip={() => void downloadZipAll()}
             onSaveFolder={() => void saveFolder()}
           />
         )}
 
         {mode !== "clip" && items.length > 0 && (
-
           <div className="grid gap-5 lg:grid-cols-[1fr_420px]">
             <section className="panel space-y-4 p-5">
               <div>
@@ -1546,16 +1623,22 @@ function Home() {
               </div>
               {mode === "limpar-ia" && selected ? (
                 <AuthGate>
-                  <CleanerIAStudio 
+                  <CleanerIAStudio
                     item={{
                       id: selected.id,
                       file: selected.file,
                       poster: selected.poster,
                       w: selected.w,
-                      h: selected.h
+                      h: selected.h,
                     }}
                     onComplete={(url) => {
-                      setItems(prev => prev.map(x => x.id === selected.id ? { ...x, result_url: url, status: "pronto" as any } : x));
+                      setItems((prev) =>
+                        prev.map((x) =>
+                          x.id === selected.id
+                            ? { ...x, result_url: url, status: "pronto" as any }
+                            : x,
+                        ),
+                      );
                     }}
                   />
                 </AuthGate>
@@ -1564,7 +1647,11 @@ function Home() {
                   <div className="space-y-2">
                     <p className="mono-label">Original</p>
                     {selected.poster ? (
-                      <img src={selected.poster} alt="quadro original" className="w-full rounded-xl border border-border" />
+                      <img
+                        src={selected.poster}
+                        alt="quadro original"
+                        className="w-full rounded-xl border border-border"
+                      />
                     ) : (
                       <div className="grid h-52 place-items-center rounded-xl border border-border text-xs text-muted-foreground">
                         carregando quadro…
@@ -1572,14 +1659,18 @@ function Home() {
                     )}
                     <div className="space-y-2 pt-1">
                       {mode === "lote" && (
-                      <input
-                        className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                        placeholder="Headline só deste vídeo (opcional)"
-                        value={selected.headline}
-                        onChange={(e) =>
-                          setItems((p) => p.map((x) => (x.id === selected.id ? { ...x, headline: e.target.value } : x)))
-                        }
-                      />
+                        <input
+                          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                          placeholder="Headline só deste vídeo (opcional)"
+                          value={selected.headline}
+                          onChange={(e) =>
+                            setItems((p) =>
+                              p.map((x) =>
+                                x.id === selected.id ? { ...x, headline: e.target.value } : x,
+                              ),
+                            )
+                          }
+                        />
                       )}
                       {(["offsetX", "offsetY"] as const).map((axis) => (
                         <label key={axis} className="block text-xs text-muted-foreground">
@@ -1592,7 +1683,11 @@ function Home() {
                             value={selected[axis]}
                             onChange={(e) =>
                               setItems((p) =>
-                                p.map((x) => (x.id === selected.id ? { ...x, [axis]: Number(e.target.value) } : x)),
+                                p.map((x) =>
+                                  x.id === selected.id
+                                    ? { ...x, [axis]: Number(e.target.value) }
+                                    : x,
+                                ),
                               )
                             }
                             className="w-full accent-[var(--primary)]"
@@ -1602,7 +1697,11 @@ function Home() {
                       <button
                         className="flex items-center gap-1.5 font-mono text-xs text-primary"
                         onClick={() =>
-                          setItems((p) => p.map((x) => (x.id === selected.id ? { ...x, offsetX: 0, offsetY: 0 } : x)))
+                          setItems((p) =>
+                            p.map((x) =>
+                              x.id === selected.id ? { ...x, offsetX: 0, offsetY: 0 } : x,
+                            ),
+                          )
                         }
                       >
                         <Repeat className="size-3" /> restaurar auto
@@ -1622,7 +1721,9 @@ function Home() {
                             : (detectMsg ?? selected.detectMsg)
                         }
                         perVideo={mode === "limpar"}
-                        onApplyAll={mode === "limpar" && items.length > 1 ? applyRegionsToAll : undefined}
+                        onApplyAll={
+                          mode === "limpar" && items.length > 1 ? applyRegionsToAll : undefined
+                        }
                         onUseSafeZones={() =>
                           setCleanupRegions([
                             ...cleanupRegions,
@@ -1755,7 +1856,14 @@ function Home() {
                               setItems((p) =>
                                 p.map((x) =>
                                   x.id === selected.id
-                                    ? { ...x, preEdit: { ...(x.preEdit ?? defaultPreEdit()), crop: null, keys: [] } }
+                                    ? {
+                                        ...x,
+                                        preEdit: {
+                                          ...(x.preEdit ?? defaultPreEdit()),
+                                          crop: null,
+                                          keys: [],
+                                        },
+                                      }
                                     : x,
                                 ),
                               )
@@ -1763,7 +1871,6 @@ function Home() {
                           />
                         )}
                       </div>
-
                     )}
                     {/* estilo rápido de legenda direto na prévia */}
                     <div className="flex flex-wrap items-center gap-1">
@@ -1793,7 +1900,11 @@ function Home() {
                           onClick={() =>
                             setActive((t) => ({
                               ...t,
-                              captions: { ...(t.captions ?? defaultCaptions()), ...p.style, visible: true },
+                              captions: {
+                                ...(t.captions ?? defaultCaptions()),
+                                ...p.style,
+                                visible: true,
+                              },
                             }))
                           }
                           className="rounded-md border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground hover:border-primary/60 hover:text-foreground"
@@ -1803,7 +1914,6 @@ function Home() {
                       ))}
                     </div>
                     {previewVariation && (
-
                       <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
                         {variants > 1 ? `v${variantIdx + 1} · ` : ""}
                         {describeVariation(previewVariation)}
@@ -1816,9 +1926,6 @@ function Home() {
                       </p>
                     )}
                   </div>
-
-
-
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground">Selecione um vídeo na lista.</p>
@@ -1844,11 +1951,28 @@ function Home() {
                       <RotateCcw className="size-4" /> Tentar de novo ({errorCount})
                     </Button>
                   )}
-                  <Button variant="outline" onClick={() => void downloadZipAll()} disabled={readyCount === 0 || zipping}>
-                    <FileArchive className="size-4" /> {zipping ? "Compactando…" : `Baixar ZIP (${readyCount})`}
+                  <Button
+                    variant="outline"
+                    onClick={() => void downloadZipAll()}
+                    disabled={readyCount === 0 || zipping}
+                  >
+                    <FileArchive className="size-4" />{" "}
+                    {zipping ? "Compactando…" : `Baixar ZIP (${readyCount})`}
                   </Button>
+                  {readyCount > 0 && (
+                    <Button
+                      className="bg-primary text-primary-foreground hover:bg-primary/90"
+                      onClick={() => setScheduleOpen(true)}
+                    >
+                      <CalendarClock className="size-4 mr-2" /> Fazer agendamento automático
+                    </Button>
+                  )}
                   {fsAccessSupported() && (
-                    <Button variant="outline" onClick={() => void saveFolder()} disabled={readyCount === 0}>
+                    <Button
+                      variant="outline"
+                      onClick={() => void saveFolder()}
+                      disabled={readyCount === 0}
+                    >
                       <FolderDown className="size-4" /> Salvar na pasta
                     </Button>
                   )}
@@ -1860,7 +1984,8 @@ function Home() {
                     <div className="flex items-center justify-between gap-2">
                       <p className="mono-label">Progresso do lote</p>
                       <p className="font-mono text-[11px] text-muted-foreground">
-                        {batchDone}/{batchItems.length} arquivos · {Math.round(batchProgress * 100)}%
+                        {batchDone}/{batchItems.length} arquivos · {Math.round(batchProgress * 100)}
+                        %
                       </p>
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -1908,7 +2033,10 @@ function Home() {
                     {report.fails.length > 0 && (
                       <ul className="max-h-24 space-y-0.5 overflow-auto">
                         {report.fails.map((f, i) => (
-                          <li key={`${f.name}-${i}`} className="font-mono text-[10px] text-destructive">
+                          <li
+                            key={`${f.name}-${i}`}
+                            className="font-mono text-[10px] text-destructive"
+                          >
                             {f.name}: {f.error}
                           </li>
                         ))}
@@ -1916,8 +2044,6 @@ function Home() {
                     )}
                   </div>
                 )}
-
-
 
                 {/* entrega — cada ferramenta tem a sua própria saída */}
                 <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
@@ -1939,13 +2065,19 @@ function Home() {
                           disabled={running}
                           onClick={() => togglePlatform(p.id)}
                           className={`rounded-lg border px-3 py-2 text-left transition-colors disabled:opacity-50 ${
-                            on ? "border-primary bg-primary/15" : "border-border hover:border-primary/50"
+                            on
+                              ? "border-primary bg-primary/15"
+                              : "border-border hover:border-primary/50"
                           }`}
                         >
-                          <span className={`block text-xs font-semibold ${on ? "text-primary" : "text-foreground"}`}>
+                          <span
+                            className={`block text-xs font-semibold ${on ? "text-primary" : "text-foreground"}`}
+                          >
                             {p.label}
                           </span>
-                          <span className="block font-mono text-[10px] text-muted-foreground">{p.hint}</span>
+                          <span className="block font-mono text-[10px] text-muted-foreground">
+                            {p.hint}
+                          </span>
                         </button>
                       );
                     })}
@@ -1961,8 +2093,6 @@ function Home() {
                     usar bitrate recomendado de cada plataforma
                   </label>
                 </div>
-
-
 
                 <div className="flex flex-wrap items-center gap-4 font-mono text-[11px] text-muted-foreground">
                   <label className="flex items-center gap-2">
@@ -1990,9 +2120,10 @@ function Home() {
                       className="w-24 accent-[var(--primary)]"
                     />
                     {autoBitrate ? "auto (preset)" : `${bitrate} Mbps`}
-
                   </label>
-                  <label className={`items-center gap-2 ${flow.export.variants ? "flex" : "hidden"}`}>
+                  <label
+                    className={`items-center gap-2 ${flow.export.variants ? "flex" : "hidden"}`}
+                  >
                     variações
                     <input
                       type="range"
@@ -2048,7 +2179,9 @@ function Home() {
                       <div className="mt-2 flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-2">
                         <AlertTriangle className="mt-[2px] size-3.5 shrink-0 text-destructive" />
                         <div className="space-y-1">
-                          <p className="font-mono text-[11px] leading-relaxed text-destructive">{selected.capStatus}</p>
+                          <p className="font-mono text-[11px] leading-relaxed text-destructive">
+                            {selected.capStatus}
+                          </p>
                           <button
                             type="button"
                             className="font-mono text-[10px] underline underline-offset-2 text-muted-foreground hover:text-foreground"
@@ -2060,7 +2193,8 @@ function Home() {
                       </div>
                     ) : (
                       <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-                        {selected.capStatus ?? "transcreve a fala e desenha no estilo escolhido abaixo."}
+                        {selected.capStatus ??
+                          "transcreve a fala e desenha no estilo escolhido abaixo."}
                       </p>
                     )}
 
@@ -2074,7 +2208,9 @@ function Home() {
                           onClick={() =>
                             setItems((p) =>
                               p.map((x) =>
-                                x.id === selected.id ? { ...x, captions: undefined, capStatus: undefined } : x,
+                                x.id === selected.id
+                                  ? { ...x, captions: undefined, capStatus: undefined }
+                                  : x,
                               ),
                             )
                           }
@@ -2094,7 +2230,9 @@ function Home() {
                         </button>
                         <button
                           className="font-mono text-[11px] text-muted-foreground underline"
-                          onClick={() => void navigator.clipboard.writeText(cuesToText(selected.captions!))}
+                          onClick={() =>
+                            void navigator.clipboard.writeText(cuesToText(selected.captions!))
+                          }
                         >
                           <Copy className="inline size-3" /> copiar texto
                         </button>
@@ -2108,12 +2246,13 @@ function Home() {
                           file={selected.file}
                           cues={selected.captions}
                           onChange={(cues) =>
-                            setItems((p) => p.map((x) => (x.id === selected.id ? { ...x, captions: cues } : x)))
+                            setItems((p) =>
+                              p.map((x) => (x.id === selected.id ? { ...x, captions: cues } : x)),
+                            )
                           }
                         />
                       </div>
                     )}
-
 
                     <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
                       <p className="mono-label">Estilo das legendas (CapCut)</p>
@@ -2124,7 +2263,10 @@ function Home() {
                           onChange={(e) =>
                             setActive((t) => ({
                               ...t,
-                              captions: { ...(t.captions ?? defaultCaptions()), visible: e.target.checked },
+                              captions: {
+                                ...(t.captions ?? defaultCaptions()),
+                                visible: e.target.checked,
+                              },
                             }))
                           }
                           className="size-4 accent-[var(--primary)]"
@@ -2159,9 +2301,7 @@ function Home() {
                       />
                     </div>
                   </div>
-
                 )}
-
 
                 {selected && mode !== "limpar" && (
                   <div className="rounded-xl border border-border bg-surface-2 p-3">
@@ -2319,11 +2459,8 @@ function Home() {
                       este vídeo: {describeVariation(variationOf(selected))}
                     </p>
                   )}
-
                 </div>
-
               </div>
-
             </section>
 
             <section className="panel flex max-h-[70vh] flex-col p-5">
@@ -2345,7 +2482,9 @@ function Home() {
                     key={it.id}
                     onClick={() => setSelectedId(it.id)}
                     className={`flex w-full items-center gap-3 rounded-xl border p-2.5 text-left ${
-                      selectedId === it.id ? "border-primary bg-accent/40" : "border-border bg-surface-2"
+                      selectedId === it.id
+                        ? "border-primary bg-accent/40"
+                        : "border-border bg-surface-2"
                     }`}
                   >
                     {it.poster ? (
@@ -2361,11 +2500,11 @@ function Home() {
                         {it.file.name}
                       </p>
                       <p className="font-mono text-[11px] text-muted-foreground">
-                        {it.w && it.h ? `${it.w}×${it.h}` : "…"} · {it.duration ? `${it.duration.toFixed(0)}s` : "…"}
+                        {it.w && it.h ? `${it.w}×${it.h}` : "…"} ·{" "}
+                        {it.duration ? `${it.duration.toFixed(0)}s` : "…"}
                         {it.clip ? ` · corte ${formatTime(it.clip.start)}` : ""}
                         {it.score ? ` · ${it.score}` : ""}
                         {hasPreEdit(it.preEdit) ? " · editado" : ""}
-
                       </p>
                       <p
                         className={`font-mono text-[11px] ${
@@ -2415,15 +2554,23 @@ function Home() {
                         role="button"
                         tabIndex={0}
                         title={
-                          (it.outputs?.length ?? 1) > 1 ? `baixar ${it.outputs!.length} variações` : "baixar"
+                          (it.outputs?.length ?? 1) > 1
+                            ? `baixar ${it.outputs!.length} variações`
+                            : "baixar"
                         }
                         onClick={(e) => {
                           e.stopPropagation();
                           const base = it.file.name.replace(/\.\w+$/, "");
-                          const outs = it.outputs ?? [{ blob: it.blob!, ext: it.ext ?? "mp4", label: "" }];
+                          const outs = it.outputs ?? [
+                            { blob: it.blob!, ext: it.ext ?? "mp4", label: "" },
+                          ];
                           outs.forEach((o, k) =>
                             setTimeout(
-                              () => downloadBlob(o.blob, `${base}-vv${o.label ? `-${o.label}` : ""}.${o.ext}`),
+                              () =>
+                                downloadBlob(
+                                  o.blob,
+                                  `${base}-vv${o.label ? `-${o.label}` : ""}.${o.ext}`,
+                                ),
                               k * 250,
                             ),
                           );
@@ -2449,7 +2596,9 @@ function Home() {
                         setStudioId(it.id);
                       }}
                       className={`rounded-md border p-1.5 hover:border-primary ${
-                        hasPreEdit(it.preEdit) || it.clip ? "border-primary text-primary" : "border-border text-muted-foreground"
+                        hasPreEdit(it.preEdit) || it.clip
+                          ? "border-primary text-primary"
+                          : "border-border text-muted-foreground"
                       }`}
                     >
                       <Wand2 className="size-3.5" />
@@ -2474,7 +2623,8 @@ function Home() {
         )}
 
         <footer className="py-8 text-center font-mono text-xs text-muted-foreground">
-          adicionar uma função aonde consigo seprar a musica do audio sistema sabe o que musica e audio separa automaticamente no editor
+          adicionar uma função aonde consigo seprar a musica do audio sistema sabe o que musica e
+          audio separa automaticamente no editor
         </footer>
       </div>
 
@@ -2529,7 +2679,9 @@ function Home() {
             cta: active.cta.text,
           }}
           onTextsChange={(t) => {
-            setItems((p) => p.map((x) => (x.id === studioItem.id ? { ...x, headline: t.headline } : x)));
+            setItems((p) =>
+              p.map((x) => (x.id === studioItem.id ? { ...x, headline: t.headline } : x)),
+            );
             setActive((tpl) => ({
               ...tpl,
               name_: { ...tpl.name_, text: t.name },
@@ -2563,6 +2715,27 @@ function Home() {
           onRestore={restoreSnapshot}
         />
       )}
+
+      <AutoScheduleModal
+        open={scheduleOpen}
+        onOpenChange={setScheduleOpen}
+        onComplete={() => {
+          setReport(null);
+          // Optional: navigate to agenda
+        }}
+        items={items
+          .filter((i) => i.status === "pronto" && i.blob)
+          .map((i) => ({
+            blob: i.blob!,
+            fileName: outputName(mode, {
+              index: items.indexOf(i),
+              sourceName: i.file.name,
+              templateName: active.name,
+              ext: i.ext || "mp4",
+            }),
+            headline: i.headline,
+          }))}
+      />
     </AppShell>
   );
 }

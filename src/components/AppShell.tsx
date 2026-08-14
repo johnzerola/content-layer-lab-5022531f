@@ -7,6 +7,7 @@ import {
   Library,
   Cloud,
   CalendarClock,
+  History,
   PanelLeftClose,
   PanelLeftOpen,
   Sparkle,
@@ -43,7 +44,7 @@ const MODES: ModeDef[] = [
     brand: "ViralBatch",
     mark: "VB",
     tagline: "branding em massa",
-    headline: "Um template, centenas de vídeos",
+    headline: "'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            o que falta concluir para lançar o projeto ?",
     description:
       "Monte o layout uma vez — avatar, nome, headline, CTA e marca d'água — e aplique em todo o lote com variações antiduplicidade.",
     chips: ["editor de template", "variações 3–5x", "branding automático", "ZIP por plataforma"],
@@ -196,6 +197,14 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           >
             <Radio className="size-[18px] shrink-0" />
             {open && "Monitora Live"}
+          </Link>
+          <Link
+            to="/biblioteca"
+            title="Biblioteca de Resultados"
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+          >
+            <History className="size-[18px] shrink-0" />
+            {open && "Resultados"}
           </Link>
           <Link
             to="/agenda"

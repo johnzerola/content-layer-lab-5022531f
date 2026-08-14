@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as ArmazenamentoRouteImport } from './routes/armazenamento'
+import { Route as BibliotecaRouteImport } from './routes/biblioteca'
 import { Route as IntegracoesRouteImport } from './routes/integracoes'
 import { Route as LimparIaRouteImport } from './routes/limpar-ia'
 import { Route as LiveRouteImport } from './routes/live'
@@ -40,6 +41,11 @@ const AgendaRoute = AgendaRouteImport.update({
 const ArmazenamentoRoute = ArmazenamentoRouteImport.update({
   id: '/armazenamento',
   path: '/armazenamento',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BibliotecaRoute = BibliotecaRouteImport.update({
+  id: '/biblioteca',
+  path: '/biblioteca',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IntegracoesRoute = IntegracoesRouteImport.update({
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
+  '/biblioteca': typeof BibliotecaRoute
   '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
@@ -141,6 +148,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
+  '/biblioteca': typeof BibliotecaRoute
   '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/armazenamento': typeof ArmazenamentoRoute
+  '/biblioteca': typeof BibliotecaRoute
   '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
@@ -182,6 +191,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/armazenamento'
+    | '/biblioteca'
     | '/integracoes'
     | '/limpar-ia'
     | '/live'
@@ -201,6 +211,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/armazenamento'
+    | '/biblioteca'
     | '/integracoes'
     | '/limpar-ia'
     | '/live'
@@ -220,6 +231,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/armazenamento'
+    | '/biblioteca'
     | '/integracoes'
     | '/limpar-ia'
     | '/live'
@@ -240,6 +252,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgendaRoute: typeof AgendaRoute
   ArmazenamentoRoute: typeof ArmazenamentoRoute
+  BibliotecaRoute: typeof BibliotecaRoute
   IntegracoesRoute: typeof IntegracoesRoute
   LimparIaRoute: typeof LimparIaRoute
   LiveRoute: typeof LiveRoute
@@ -277,6 +290,13 @@ declare module '@tanstack/react-router' {
       path: '/armazenamento'
       fullPath: '/armazenamento'
       preLoaderRoute: typeof ArmazenamentoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/biblioteca': {
+      id: '/biblioteca'
+      path: '/biblioteca'
+      fullPath: '/biblioteca'
+      preLoaderRoute: typeof BibliotecaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/integracoes': {
@@ -384,6 +404,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgendaRoute: AgendaRoute,
   ArmazenamentoRoute: ArmazenamentoRoute,
+  BibliotecaRoute: BibliotecaRoute,
   IntegracoesRoute: IntegracoesRoute,
   LimparIaRoute: LimparIaRoute,
   LiveRoute: LiveRoute,
