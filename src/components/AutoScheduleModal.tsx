@@ -6,7 +6,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/button"; // This is wrong, should be from dialog. Checking existing UI components.
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import {
   CalendarClock,
