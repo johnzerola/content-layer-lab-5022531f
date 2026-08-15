@@ -16,7 +16,6 @@ export type ClaimedPost = {
   video_url: string | null;
   video_path: string | null;
   attempts: number;
-  idempotency_key?: string | null;
 };
 
 export type PublishingAccount = {
@@ -40,7 +39,6 @@ export type PostUpdate = {
   published_at?: string | null;
   permalink?: string | null;
   provider_post_id?: string | null;
-  deleted_storage_at?: string | null;
   error?: string | null;
   error_code?: string | null;
   lock_id?: string | null;
@@ -113,7 +111,7 @@ async function publishClaimedPost(post: ClaimedPost, deps: QueueDependencies): P
     platform: account.platform,
     provider: provider(connection?.provider ?? account.provider),
     providerAccountId: connection?.provider_account_id ?? account.provider_account_id,
-    idempotencyKey: post.idempotency_key ?? post.id,
+    idempotencyKey: post.id,
   });
 }
 
@@ -134,11 +132,9 @@ export async function runPublishQueue(
     }
 
     if (result.ok) {
-      let deletedStorageAt: string | null = null;
       if (post.video_path && deps.removeStorageObject) {
         try {
           await deps.removeStorageObject(post.video_path);
-          deletedStorageAt = deps.now().toISOString();
         } catch {
           deps.log({
             event: "publish_storage_cleanup_failed",
@@ -152,7 +148,6 @@ export async function runPublishQueue(
         published_at: deps.now().toISOString(),
         permalink: result.permalink ?? null,
         provider_post_id: result.providerPostId ?? null,
-        deleted_storage_at: deletedStorageAt,
         error: null,
         error_code: null,
         lock_id: null,

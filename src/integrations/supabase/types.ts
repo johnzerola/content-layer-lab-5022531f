@@ -249,7 +249,6 @@ export type Database = {
           error_code: string | null
           file_name: string | null
           id: string
-          idempotency_key: string
           kind: string
           lock_id: string | null
           locked_at: string | null
@@ -261,8 +260,6 @@ export type Database = {
           status: string
           updated_at: string
           user_id: string
-          consent_at: string | null
-          deleted_storage_at: string | null
           video_path: string | null
           video_url: string | null
         }
@@ -275,7 +272,6 @@ export type Database = {
           error_code?: string | null
           file_name?: string | null
           id?: string
-          idempotency_key?: string
           kind?: string
           lock_id?: string | null
           locked_at?: string | null
@@ -287,8 +283,6 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id: string
-          consent_at?: string | null
-          deleted_storage_at?: string | null
           video_path?: string | null
           video_url?: string | null
         }
@@ -301,7 +295,6 @@ export type Database = {
           error_code?: string | null
           file_name?: string | null
           id?: string
-          idempotency_key?: string
           kind?: string
           lock_id?: string | null
           locked_at?: string | null
@@ -313,8 +306,6 @@ export type Database = {
           status?: string
           updated_at?: string
           user_id?: string
-          consent_at?: string | null
-          deleted_storage_at?: string | null
           video_path?: string | null
           video_url?: string | null
         }
@@ -337,9 +328,6 @@ export type Database = {
           platform: string
           provider: string
           provider_account_id: string | null
-          token_ref: string | null
-          expires_at: string | null
-          last_checked_at: string | null
           status: string
           updated_at: string
           user_id: string
@@ -353,9 +341,6 @@ export type Database = {
           platform?: string
           provider?: string
           provider_account_id?: string | null
-          token_ref?: string | null
-          expires_at?: string | null
-          last_checked_at?: string | null
           status?: string
           updated_at?: string
           user_id: string
@@ -369,9 +354,6 @@ export type Database = {
           platform?: string
           provider?: string
           provider_account_id?: string | null
-          token_ref?: string | null
-          expires_at?: string | null
-          last_checked_at?: string | null
           status?: string
           updated_at?: string
           user_id?: string
@@ -386,7 +368,6 @@ export type Database = {
           id: string
           provider: string
           provider_account_id: string | null
-          scopes: string[]
           social_account_id: string
           status: string
           updated_at: string
@@ -398,7 +379,6 @@ export type Database = {
           id?: string
           provider?: string
           provider_account_id?: string | null
-          scopes?: string[]
           social_account_id: string
           status?: string
           updated_at?: string
@@ -410,7 +390,6 @@ export type Database = {
           id?: string
           provider?: string
           provider_account_id?: string | null
-          scopes?: string[]
           social_account_id?: string
           status?: string
           updated_at?: string

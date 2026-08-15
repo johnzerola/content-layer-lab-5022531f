@@ -20,7 +20,6 @@ export type SocialAccount = {
   provider: string;
   provider_account_id: string | null;
   status: string;
-  expires_at?: string | null;
   created_at: string;
 };
 
@@ -62,7 +61,7 @@ export function resolveAccountLinkUi(
 /* ------------------------------- contas -------------------------------- */
 
 export const SOCIAL_ACCOUNT_SELECT =
-  "id,platform,username,display_name,avatar_url,provider,status,provider_account_id,expires_at,created_at";
+  "id,platform,username,display_name,avatar_url,provider,status,provider_account_id,created_at";
 
 export async function listAccounts(): Promise<SocialAccount[]> {
   const { data, error } = await supabase
@@ -135,7 +134,6 @@ export async function schedulePost(p: NewPost) {
     video_path: p.videoPath ?? null,
     video_url: p.videoUrl ?? null,
     file_name: p.fileName ?? null,
-    consent_at: new Date().toISOString(),
     status: "agendado",
   });
   if (error) throw error;
