@@ -514,6 +514,24 @@ export type Database = {
           video_url: string
         }[]
       }
+      link_global_meta_account: {
+        Args: {
+          p_provider_account_id: string
+          p_user_id: string
+          p_username: string
+        }
+        Returns: {
+          avatar_url: string
+          created_at: string
+          display_name: string
+          id: string
+          platform: string
+          provider: string
+          provider_account_id: string
+          status: string
+          username: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

@@ -137,4 +137,44 @@ describe("publishing queue integration", () => {
     expect(fixture.publish).not.toHaveBeenCalled();
     expect(fixture.updates[0]?.update).toMatchObject({ status: "falhou", error_code: "MEDIA_NOT_FOUND" });
   });
+
+  it("uses an explicit connected Meta connection instead of the legacy account provider", async () => {
+    const fixture = dependencies([duePost()], { ok: true });
+    fixture.deps.loadAccount = async () => ({
+      id: "account-1",
+      user_id: "user-1",
+      platform: "instagram",
+      username: "madereiracarvalhos",
+      provider: "pending",
+      provider_account_id: null,
+    });
+    fixture.deps.loadConnection = async () => ({
+      provider: "meta",
+      provider_account_id: "ig-validated",
+      status: "conectado",
+      expires_at: null,
+    });
+
+    await runPublishQueue(fixture.deps, options);
+
+    expect(fixture.publish).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "meta", providerAccountId: "ig-validated" }),
+    );
+  });
+
+  it("never lets a pending explicit connection fall through to a global provider", async () => {
+    const fixture = dependencies([duePost()], { ok: true });
+    fixture.deps.loadConnection = async () => ({
+      provider: "pending",
+      provider_account_id: null,
+      status: "aguardando_configuracao",
+      expires_at: null,
+    });
+
+    const summary = await runPublishQueue(fixture.deps, options);
+
+    expect(summary.failed).toBe(1);
+    expect(fixture.publish).not.toHaveBeenCalled();
+    expect(fixture.updates[0]?.update).toMatchObject({ error_code: "ACCOUNT_NOT_CONNECTED" });
+  });
 });
