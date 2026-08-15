@@ -16,6 +16,7 @@ export async function persistValidatedMetaAccount(
   });
   if (error || !account?.[0]) {
     const message = error?.message ?? "";
+    console.error("META_LINK_RPC_ERROR", JSON.stringify(error));
     if (message.includes("account ownership mismatch")) {
       throw new MetaLinkError(
         "ACCOUNT_OWNERSHIP_INVALID",
