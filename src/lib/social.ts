@@ -1,7 +1,6 @@
-﻿/** Contas sociais conectadas e fila de publicaÃ§Ãµes agendadas (Lovable Cloud). */
+/** Contas sociais conectadas e fila de publicações agendadas (Lovable Cloud). */
 import { supabase } from "@/integrations/supabase/client";
 import { currentUser } from "@/lib/cloud";
-import type { LinkAccountResult } from "@/lib/social-linking.server";
 
 export type PostKind = "reels" | "feed" | "stories";
 
@@ -18,7 +17,6 @@ export type SocialAccount = {
   display_name: string | null;
   avatar_url: string | null;
   provider: string;
-  provider_account_id: string | null;
   status: string;
   created_at: string;
 };
@@ -47,29 +45,34 @@ export const STATUS_LABEL: Record<string, string> = {
   cancelado: "Cancelado",
 };
 
-export function resolveAccountLinkUi(
-  accounts: SocialAccount[],
-  result: LinkAccountResult,
-): { ok: true; accounts: SocialAccount[] } | { ok: false; error: string } {
-  if (!result.ok) return { ok: false, error: result.error };
-  return {
-    ok: true,
-    accounts: [...accounts.filter((account) => account.id !== result.account.id), result.account],
-  };
-}
-
 /* ------------------------------- contas -------------------------------- */
-
-export const SOCIAL_ACCOUNT_SELECT =
-  "id,platform,username,display_name,avatar_url,provider,status,provider_account_id,created_at";
 
 export async function listAccounts(): Promise<SocialAccount[]> {
   const { data, error } = await supabase
     .from("social_accounts")
-    .select(SOCIAL_ACCOUNT_SELECT)
+    .select("id,platform,username,display_name,avatar_url,provider,status,created_at")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as SocialAccount[];
+}
+
+export async function addAccount(username: string, displayName?: string) {
+  const user = await currentUser();
+  if (!user) throw new Error("Faça login para conectar uma conta.");
+  const handle = username.trim().replace(/^@/, "").toLowerCase();
+  if (!handle) throw new Error("Informe o @ da conta.");
+  const { error } = await supabase.from("social_accounts").upsert(
+    {
+      user_id: user.id,
+      platform: "instagram",
+      username: handle,
+      display_name: displayName?.trim() || null,
+      provider: "pending",
+      status: "aguardando provedor",
+    },
+    { onConflict: "user_id,platform,username" },
+  );
+  if (error) throw error;
 }
 
 export async function removeAccount(id: string) {
@@ -77,12 +80,12 @@ export async function removeAccount(id: string) {
   if (error) throw error;
 }
 
-/* ---------------------------- vÃ­deo no storage --------------------------- */
+/* ---------------------------- vídeo no storage --------------------------- */
 
 /** Sobe o MP4 para o bucket privado e devolve caminho + link assinado (7 dias). */
 export async function uploadPostVideo(file: File | Blob, fileName: string) {
   const user = await currentUser();
-  if (!user) throw new Error("FaÃ§a login para enviar o vÃ­deo.");
+  if (!user) throw new Error("Faça login para enviar o vídeo.");
   const safe = fileName.replace(/[^\w.-]+/g, "_");
   const path = `${user.id}/${Date.now()}-${safe}`;
   const { error } = await supabase.storage.from("posts").upload(path, file, {
@@ -104,27 +107,11 @@ export type NewPost = {
   videoPath?: string | null;
   videoUrl?: string | null;
   fileName?: string | null;
-  consent?: boolean;
 };
 
 export async function schedulePost(p: NewPost) {
   const user = await currentUser();
-  if (!user) throw new Error("FaÃ§a login para agendar.");
-  if (!p.accountId) throw new Error("Selecione uma conta conectada para publicar.");
-  if (!p.consent) throw new Error("Confirme o consentimento para enviar este video a rede social.");
-
-  const { data: account, error: accountError } = await supabase
-    .from("social_accounts")
-    .select("id,status,provider,provider_account_id")
-    .eq("id", p.accountId)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (accountError) throw accountError;
-  const connected = account?.status === "connected" || account?.status === "conectado";
-  if (!account || !connected || !account.provider_account_id || account.provider === "pending") {
-    throw new Error("Esta conta ainda nao tem conexao OAuth/API valida. Conecte pelo provedor oficial antes de agendar.");
-  }
-
+  if (!user) throw new Error("Faça login para agendar.");
   const { error } = await supabase.from("scheduled_posts").insert({
     user_id: user.id,
     account_id: p.accountId,
@@ -159,16 +146,7 @@ export async function cancelPost(id: string) {
 export async function reschedulePost(id: string, when: Date) {
   const { error } = await supabase
     .from("scheduled_posts")
-    .update({
-      scheduled_at: when.toISOString(),
-      status: "agendado",
-      attempts: 0,
-      error: null,
-      error_code: null,
-      next_attempt_at: null,
-      lock_id: null,
-      locked_at: null,
-    })
+    .update({ scheduled_at: when.toISOString(), status: "agendado", error: null })
     .eq("id", id);
   if (error) throw error;
 }

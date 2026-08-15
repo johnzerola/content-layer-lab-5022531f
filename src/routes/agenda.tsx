@@ -1,8 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarClock, Instagram, Loader2, Plus, Trash2, UploadCloud, X } from "lucide-react";
+import {
+  CalendarClock,
+  Instagram,
+  Loader2,
+  Plus,
+  Trash2,
+  UploadCloud,
+  X,
+} from "lucide-react";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
@@ -11,19 +18,18 @@ import type { Template } from "@/lib/template";
 import {
   KIND_LABEL,
   STATUS_LABEL,
+  addAccount,
   cancelPost,
   deletePost,
   listAccounts,
   listPosts,
   removeAccount,
-  resolveAccountLinkUi,
   schedulePost,
   uploadPostVideo,
   type PostKind,
   type ScheduledPost,
   type SocialAccount,
 } from "@/lib/social";
-import { addAccount } from "@/lib/social.functions";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/agenda")({
@@ -39,8 +45,7 @@ export const Route = createFileRoute("/agenda")({
       { property: "og:title", content: "Agenda de postagens — VaiViral" },
       {
         property: "og:description",
-        content:
-          "Fila de publicação automática de Reels, Feed e Stories para as contas conectadas.",
+        content: "Fila de publicação automática de Reels, Feed e Stories para as contas conectadas.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -72,8 +77,6 @@ function AgendaPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(false);
-  const [linkingAccount, setLinkingAccount] = useState(false);
-  const linkAccount = useServerFn(addAccount);
 
   const [handle, setHandle] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -81,7 +84,6 @@ function AgendaPage() {
   const [kind, setKind] = useState<PostKind>("reels");
   const [caption, setCaption] = useState("");
   const [when, setWhen] = useState(() => localInput(new Date(Date.now() + 60 * 60 * 1000)));
-  const [consent, setConsent] = useState(false);
   const [sending, setSending] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -126,22 +128,13 @@ function AgendaPage() {
   }, [posts]);
 
   async function onAddAccount() {
-    setLinkingAccount(true);
     try {
-      const result = await linkAccount({ data: { username: handle } });
-      const ui = resolveAccountLinkUi(accounts, result);
-      if (!ui.ok) {
-        toast.error(ui.error);
-        return;
-      }
-      setAccounts(ui.accounts);
+      await addAccount(handle);
       setHandle("");
-      toast.success("Conta Instagram conectada.");
+      toast.success("Conta adicionada à lista.");
       await refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível adicionar.");
-    } finally {
-      setLinkingAccount(false);
     }
   }
 
@@ -161,11 +154,9 @@ function AgendaPage() {
         videoPath: up.path,
         videoUrl: up.url,
         fileName: file.name,
-        consent,
       });
       setFile(null);
       setCaption("");
-      setConsent(false);
       toast.success("Publicação agendada.");
       await refresh();
     } catch (e) {
@@ -192,17 +183,17 @@ function AgendaPage() {
             Seus vídeos vão ao ar sozinhos
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Envie o MP4 pronto, escolha a conta, o formato e a hora. A publicacao automatica so
-            roda em contas conectadas por OAuth/API oficial; contas digitadas manualmente ficam como
-            rascunho ate a conexao real ser configurada.
+            Envie o MP4 pronto, escolha a conta, o formato e a hora. O servidor publica na fila sem você
+            precisar abrir o app. A conexão real com o Instagram é ligada assim que o provedor de publicação
+            for configurado — até lá os posts ficam agendados e sinalizam o motivo.
           </p>
         </section>
 
         {!user && (
           <div className="rounded-2xl border border-border bg-surface/60 p-6 text-center">
             <p className="text-sm text-muted-foreground">
-              Faça login na aba <strong className="text-foreground">Nuvem</strong> para conectar
-              contas e agendar publicações.
+              Faça login na aba <strong className="text-foreground">Nuvem</strong> para conectar contas e
+              agendar publicações.
             </p>
           </div>
         )}
@@ -219,17 +210,15 @@ function AgendaPage() {
                     <input
                       value={handle}
                       onChange={(e) => setHandle(e.target.value)}
-                      placeholder="@suapagina para preparar"
+                      placeholder="@suapagina"
                       className="w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted-foreground"
                     />
                   </div>
                   <button
                     onClick={onAddAccount}
-                    disabled={linkingAccount}
                     className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground"
                   >
-                    {linkingAccount ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-                    {linkingAccount ? "Validando…" : "Add"}
+                    <Plus className="size-4" /> Add
                   </button>
                 </div>
 
@@ -245,9 +234,7 @@ function AgendaPage() {
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">@{a.username}</span>
                         <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                          {a.status === "connected" || a.status === "conectado"
-                            ? `conectada via ${a.provider}`
-                            : "rascunho; falta OAuth/API"}
+                          {a.status}
                         </span>
                       </span>
                       <button
@@ -339,29 +326,12 @@ function AgendaPage() {
                   />
                 </label>
 
-                <label className="mt-3 flex items-start gap-2 rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
-                  <input
-                    type="checkbox"
-                    checked={consent}
-                    onChange={(e) => setConsent(e.target.checked)}
-                    className="mt-0.5 accent-[var(--primary)]"
-                  />
-                  <span>
-                    Confirmo que tenho direito de publicar este vídeo e autorizo o envio do arquivo à rede social
-                    escolhida no horário agendado.
-                  </span>
-                </label>
-
                 <button
                   onClick={onSchedule}
                   disabled={sending}
                   className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
                 >
-                  {sending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <CalendarClock className="size-4" />
-                  )}
+                  {sending ? <Loader2 className="size-4 animate-spin" /> : <CalendarClock className="size-4" />}
                   {sending ? "Enviando…" : "Agendar publicação"}
                 </button>
               </section>
@@ -399,9 +369,7 @@ function AgendaPage() {
                                 {KIND_LABEL[p.kind] ?? p.kind} · {p.file_name ?? "vídeo"}
                               </p>
                               {p.caption && (
-                                <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                                  {p.caption}
-                                </p>
+                                <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{p.caption}</p>
                               )}
                               {p.error && <p className="mt-1 text-xs text-red-400">{p.error}</p>}
                             </div>
