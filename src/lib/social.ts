@@ -20,7 +20,6 @@ export type SocialAccount = {
   provider: string;
   provider_account_id: string | null;
   status: string;
-  scopes?: string[] | null;
   expires_at?: string | null;
   created_at: string;
 };
@@ -62,10 +61,13 @@ export function resolveAccountLinkUi(
 
 /* ------------------------------- contas -------------------------------- */
 
+export const SOCIAL_ACCOUNT_SELECT =
+  "id,platform,username,display_name,avatar_url,provider,status,provider_account_id,expires_at,created_at";
+
 export async function listAccounts(): Promise<SocialAccount[]> {
   const { data, error } = await supabase
     .from("social_accounts")
-    .select("id,platform,username,display_name,avatar_url,provider,status,provider_account_id,scopes,expires_at,created_at")
+    .select(SOCIAL_ACCOUNT_SELECT)
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as SocialAccount[];
