@@ -197,12 +197,6 @@ export type Database = {
           error: string | null
           file_name: string | null
           id: string
-          error_code: string | null
-          last_attempt_at: string | null
-          locked_at: string | null
-          lock_id: string | null
-          next_attempt_at: string | null
-          provider_post_id: string | null
           kind: string
           permalink: string | null
           published_at: string | null
@@ -221,12 +215,6 @@ export type Database = {
           error?: string | null
           file_name?: string | null
           id?: string
-          error_code?: string | null
-          last_attempt_at?: string | null
-          locked_at?: string | null
-          lock_id?: string | null
-          next_attempt_at?: string | null
-          provider_post_id?: string | null
           kind?: string
           permalink?: string | null
           published_at?: string | null
@@ -245,12 +233,6 @@ export type Database = {
           error?: string | null
           file_name?: string | null
           id?: string
-          error_code?: string | null
-          last_attempt_at?: string | null
-          locked_at?: string | null
-          lock_id?: string | null
-          next_attempt_at?: string | null
-          provider_post_id?: string | null
           kind?: string
           permalink?: string | null
           published_at?: string | null
@@ -310,52 +292,6 @@ export type Database = {
           updated_at?: string
           user_id?: string
           username?: string
-        }
-        Relationships: []
-      }
-      social_connections: {
-        Row: {
-          created_at: string
-          expires_at: string | null
-          id: string
-          metadata: Json
-          provider: string
-          provider_account_id: string | null
-          refresh_secret_ref: string | null
-          scopes: string[]
-          secret_ref: string | null
-          social_account_id: string
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          expires_at?: string | null
-          id?: string
-          metadata?: Json
-          provider: string
-          provider_account_id?: string | null
-          refresh_secret_ref?: string | null
-          scopes?: string[]
-          secret_ref?: string | null
-          social_account_id: string
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          expires_at?: string | null
-          metadata?: Json
-          provider?: string
-          provider_account_id?: string | null
-          refresh_secret_ref?: string | null
-          scopes?: string[]
-          secret_ref?: string | null
-          social_account_id?: string
-          status?: string
-          updated_at?: string
-          user_id?: string
         }
         Relationships: []
       }
@@ -429,15 +365,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      claim_due_scheduled_posts: {
-        Args: {
-          p_limit?: number
-          p_lock_id: string
-          p_lock_timeout_seconds?: number
-          p_max_attempts?: number
-        }
-        Returns: Database["public"]["Tables"]["scheduled_posts"]["Row"][]
-      }
+      [_ in never]: never
     }
     Enums: {
       [_ in never]: never
