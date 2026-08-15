@@ -195,10 +195,15 @@ export type Database = {
           caption: string
           created_at: string
           error: string | null
+          error_code: string | null
           file_name: string | null
           id: string
           kind: string
+          lock_id: string | null
+          locked_at: string | null
+          next_attempt_at: string | null
           permalink: string | null
+          provider_post_id: string | null
           published_at: string | null
           scheduled_at: string
           status: string
@@ -213,10 +218,15 @@ export type Database = {
           caption?: string
           created_at?: string
           error?: string | null
+          error_code?: string | null
           file_name?: string | null
           id?: string
           kind?: string
+          lock_id?: string | null
+          locked_at?: string | null
+          next_attempt_at?: string | null
           permalink?: string | null
+          provider_post_id?: string | null
           published_at?: string | null
           scheduled_at?: string
           status?: string
@@ -231,10 +241,15 @@ export type Database = {
           caption?: string
           created_at?: string
           error?: string | null
+          error_code?: string | null
           file_name?: string | null
           id?: string
           kind?: string
+          lock_id?: string | null
+          locked_at?: string | null
+          next_attempt_at?: string | null
           permalink?: string | null
+          provider_post_id?: string | null
           published_at?: string | null
           scheduled_at?: string
           status?: string
@@ -294,6 +309,50 @@ export type Database = {
           username?: string
         }
         Relationships: []
+      }
+      social_connections: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          provider: string
+          provider_account_id: string | null
+          social_account_id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          provider?: string
+          provider_account_id?: string | null
+          social_account_id: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          provider?: string
+          provider_account_id?: string | null
+          social_account_id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_connections_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: true
+            referencedRelation: "social_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       template_versions: {
         Row: {
@@ -365,7 +424,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      claim_due_scheduled_posts: {
+        Args: {
+          p_limit: number
+          p_lock_id: string
+          p_lock_timeout_seconds: number
+          p_max_attempts: number
+        }
+        Returns: {
+          account_id: string
+          attempts: number
+          caption: string
+          id: string
+          kind: string
+          user_id: string
+          video_path: string
+          video_url: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
