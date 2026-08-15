@@ -1,24 +1,20 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   ArrowLeft,
   Download,
   Loader2,
+  Pencil,
   Radio,
   Scissors,
+  Sparkles,
   Square,
   Trash2,
 } from "lucide-react";
 import { checkXLive, type LiveCheck } from "@/lib/live.functions";
-import {
-  LiveClipper,
-  attachHls,
-  clipTitle,
-  exportClip,
-  scoreClip,
-  type LiveClip,
-} from "@/lib/live";
+import { LiveClipper, analyzeLiveClip, attachHls, clipTitle, type LiveClip } from "@/lib/live";
+import { markPendingTool, sendItemsToTool } from "@/lib/handoff";
 import { downloadAsZip } from "@/lib/zip";
 
 export const Route = createFileRoute("/live")({
@@ -52,7 +48,8 @@ function fmt(t: number) {
 
 function ScoreRing({ value }: { value: number }) {
   const c = 2 * Math.PI * 18;
-  const tone = value >= 75 ? "text-emerald-400" : value >= 55 ? "text-primary" : "text-muted-foreground";
+  const tone =
+    value >= 75 ? "text-emerald-400" : value >= 55 ? "text-primary" : "text-muted-foreground";
   return (
     <span className="relative grid size-12 shrink-0 place-items-center">
       <svg viewBox="0 0 44 44" className="absolute inset-0 -rotate-90">
@@ -75,13 +72,14 @@ function ScoreRing({ value }: { value: number }) {
 }
 
 function LivePage() {
+  const navigate = useNavigate();
   const [target, setTarget] = useState("");
   const [clipLen, setClipLen] = useState(45);
+  const [minScore, setMinScore] = useState(65);
   const [poll, setPoll] = useState(60);
   const [status, setStatus] = useState<Status>("parado");
   const [info, setInfo] = useState<LiveCheck | null>(null);
   const [clips, setClips] = useState<LiveClip[]>([]);
-  const [editing, setEditing] = useState<LiveClip | null>(null);
   const [busy, setBusy] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -104,7 +102,7 @@ function LivePage() {
   useEffect(() => () => teardown(), [teardown]);
 
   const onClipReady = useCallback(async (blob: Blob, at: number, duration: number) => {
-    const score = await scoreClip(blob);
+    const analysis = await analyzeLiveClip(blob, duration);
     const id = crypto.randomUUID();
     setClips((prev) => [
       {
@@ -113,12 +111,46 @@ function LivePage() {
         url: URL.createObjectURL(blob),
         at,
         duration,
-        score,
+        score: analysis.score,
         title: clipTitle(at, indexRef.current++),
+        reason: analysis.reason,
+        tags: analysis.tags,
+        trim: analysis.trim,
       },
       ...prev,
     ]);
   }, []);
+
+  const orderedClips = useMemo(() => [...clips].sort((a, b) => b.score - a.score), [clips]);
+  const recommendedClips = useMemo(
+    () => orderedClips.filter((clip) => clip.score >= minScore),
+    [orderedClips, minScore],
+  );
+
+  function editInCorteIA(selected: LiveClip[]) {
+    if (!selected.length) {
+      toast.info("Nenhum corte atingiu o score atual. Reduza o score mínimo ou escolha um corte.");
+      return;
+    }
+    sendItemsToTool(
+      "clip",
+      selected.map((clip) => ({
+        file: new File(
+          [clip.blob],
+          `${clip.title.replace(/[^\w-]+/g, "_")}.${clip.blob.type.includes("mp4") ? "mp4" : "webm"}`,
+          { type: clip.blob.type || "video/webm" },
+        ),
+        clip: clip.trim ?? { start: 0, end: clip.duration },
+        score: clip.score,
+        clipTitle: clip.title,
+        clipReason: clip.reason,
+        clipTags: clip.tags,
+      })),
+      "Monitora Live",
+    );
+    markPendingTool("clip");
+    void navigate({ to: "/" });
+  }
 
   const startCapture = useCallback(
     async (hls: string) => {
@@ -127,7 +159,8 @@ function LivePage() {
       detachRef.current?.();
       detachRef.current = await attachHls(video, hls);
 
-      const capture = (video as HTMLVideoElement & { captureStream?: () => MediaStream }).captureStream;
+      const capture = (video as HTMLVideoElement & { captureStream?: () => MediaStream })
+        .captureStream;
       if (!capture) {
         toast.error("Este navegador não permite gravar a live (use Chrome ou Edge).");
         return;
@@ -173,9 +206,12 @@ function LivePage() {
       setBusy(false);
     }
     if (pollRef.current) window.clearInterval(pollRef.current);
-    pollRef.current = window.setInterval(() => {
-      if (!clipperRef.current) void check().catch(() => undefined);
-    }, Math.max(20, poll) * 1000);
+    pollRef.current = window.setInterval(
+      () => {
+        if (!clipperRef.current) void check().catch(() => undefined);
+      },
+      Math.max(20, poll) * 1000,
+    );
   }
 
   function stop() {
@@ -225,12 +261,16 @@ function LivePage() {
             <ArrowLeft className="size-4" /> Voltar
           </Link>
           <div className="min-w-0">
-            <h1 className="truncate font-display text-lg font-bold tracking-tight">Monitora Live</h1>
+            <h1 className="truncate font-display text-lg font-bold tracking-tight">
+              Monitora Live
+            </h1>
             <p className="truncate font-mono text-[11px] text-muted-foreground">
-              cortes automáticos de transmissões do X
+              cortes automáticos de X, Kick, TikTok e HLS
             </p>
           </div>
-          <span className={`ml-auto rounded-full border px-3 py-1 font-mono text-[11px] ${statusChip[status]}`}>
+          <span
+            className={`ml-auto rounded-full border px-3 py-1 font-mono text-[11px] ${statusChip[status]}`}
+          >
             {status}
           </span>
         </div>
@@ -249,10 +289,10 @@ function LivePage() {
             <div className="flex flex-wrap items-center gap-2 border-t border-border/70 px-4 py-3">
               <span className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
                 <Radio className="size-3.5" />
-              {info?.title ??
-                (info?.handle
-                  ? `${info.platform === "kick" ? "Kick" : info.platform === "tiktok" ? "TikTok" : "X"} · @${info.handle}`
-                  : "aguardando transmissão")}
+                {info?.title ??
+                  (info?.handle
+                    ? `${info.platform === "kick" ? "Kick" : info.platform === "tiktok" ? "TikTok" : "X"} · @${info.handle}`
+                    : "aguardando transmissão")}
               </span>
               <button
                 onClick={() => clipperRef.current?.cutNow()}
@@ -271,15 +311,29 @@ function LivePage() {
           )}
 
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="font-display text-base font-bold">Cortes ({clips.length})</h2>
-              <button
-                onClick={() => void downloadAll()}
-                disabled={!clips.length || busy}
-                className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm transition hover:bg-surface-2 disabled:opacity-40"
-              >
-                <Download className="size-4" /> baixar todos (ZIP)
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="font-display text-base font-bold">Cortes ({clips.length})</h2>
+                <p className="font-mono text-[11px] text-muted-foreground">
+                  {recommendedClips.length} recomendado(s), ordenados por potencial
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => editInCorteIA(recommendedClips)}
+                  disabled={!recommendedClips.length}
+                  className="flex items-center gap-2 rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-40"
+                >
+                  <Sparkles className="size-4" /> editar melhores no CorteIA
+                </button>
+                <button
+                  onClick={() => void downloadAll()}
+                  disabled={!clips.length || busy}
+                  className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm transition hover:bg-surface-2 disabled:opacity-40"
+                >
+                  <Download className="size-4" /> ZIP
+                </button>
+              </div>
             </div>
 
             {!clips.length && (
@@ -289,24 +343,54 @@ function LivePage() {
             )}
 
             <div className="grid gap-3 sm:grid-cols-2">
-              {clips.map((c) => (
-                <article key={c.id} className="rounded-2xl border border-border bg-surface p-3">
-                  <video src={c.url} controls className="aspect-video w-full rounded-xl bg-black" />
+              {orderedClips.map((c) => (
+                <article
+                  key={c.id}
+                  className={`rounded-2xl border bg-surface p-3 ${
+                    c.score >= minScore ? "border-primary/50" : "border-border"
+                  }`}
+                >
+                  <video
+                    src={c.url}
+                    controls
+                    onLoadedMetadata={(event) => {
+                      event.currentTarget.currentTime = c.trim?.start ?? 0;
+                    }}
+                    onTimeUpdate={(event) => {
+                      if (c.trim && event.currentTarget.currentTime >= c.trim.end)
+                        event.currentTarget.pause();
+                    }}
+                    className="aspect-video w-full rounded-xl bg-black"
+                  />
                   <div className="mt-3 flex items-center gap-3">
                     <ScoreRing value={c.score} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{c.title}</p>
                       <p className="font-mono text-[11px] text-muted-foreground">
-                        {fmt(c.at)} · {Math.round(c.duration)}s
+                        {fmt(c.at)} ·{" "}
+                        {Math.round((c.trim?.end ?? c.duration) - (c.trim?.start ?? 0))}s úteis
                       </p>
                     </div>
                   </div>
+                  {c.reason && <p className="mt-2 text-xs text-muted-foreground">{c.reason}</p>}
+                  {c.tags && c.tags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {c.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="rounded-full border border-border px-2 py-0.5 font-mono text-[9px] text-muted-foreground"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <div className="mt-3 flex gap-2">
                     <button
-                      onClick={() => setEditing(c)}
-                      className="flex-1 rounded-xl border border-border px-3 py-2 text-sm transition hover:bg-surface-2"
+                      onClick={() => editInCorteIA([c])}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 text-sm transition hover:bg-surface-2"
                     >
-                      editar
+                      <Pencil className="size-4" /> editar no CorteIA
                     </button>
                     <a
                       href={c.url}
@@ -350,6 +434,18 @@ function LivePage() {
               />
             </label>
             <label className="block text-sm">
+              <span className="mono-label">score mínimo recomendado: {minScore}</span>
+              <input
+                type="range"
+                min={40}
+                max={90}
+                step={5}
+                value={minScore}
+                onChange={(e) => setMinScore(Number(e.target.value))}
+                className="mt-2 w-full accent-[var(--primary)]"
+              />
+            </label>
+            <label className="block text-sm">
               <span className="mono-label">verificar a cada: {poll}s</span>
               <input
                 type="range"
@@ -368,7 +464,8 @@ function LivePage() {
                 disabled={busy}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
               >
-                {busy ? <Loader2 className="size-4 animate-spin" /> : <Radio className="size-4" />} monitorar
+                {busy ? <Loader2 className="size-4 animate-spin" /> : <Radio className="size-4" />}{" "}
+                monitorar
               </button>
             ) : (
               <button
@@ -385,145 +482,14 @@ function LivePage() {
             <ol className="list-decimal space-y-1 pl-4">
               <li>O sistema procura live pública no X, Kick, TikTok ou HLS direto.</li>
               <li>Ao encontrar, começa a gravar e fecha um corte a cada {clipLen}s.</li>
-              <li>Cada corte recebe um score por energia de fala e dinâmica.</li>
-              <li>Você edita o recorte, escolhe vertical 9:16 e baixa.</li>
+              <li>Fala, ruído, pausas, ritmo e começo/fim limpos formam o score.</li>
+              <li>
+                Os melhores cortes seguem para o CorteIA, onde podem ser ajustados e exportados.
+              </li>
             </ol>
           </div>
         </aside>
       </main>
-
-      {editing && (
-        <ClipEditor
-          clip={editing}
-          onClose={() => setEditing(null)}
-          onSaved={(blob) => {
-            setClips((prev) =>
-              prev.map((c) =>
-                c.id === editing.id ? { ...c, blob, url: URL.createObjectURL(blob) } : c,
-              ),
-            );
-            setEditing(null);
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-function ClipEditor({
-  clip,
-  onClose,
-  onSaved,
-}: {
-  clip: LiveClip;
-  onClose: () => void;
-  onSaved: (blob: Blob) => void;
-}) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [dur, setDur] = useState(clip.duration);
-  const [start, setStart] = useState(0);
-  const [end, setEnd] = useState(clip.duration);
-  const [vertical, setVertical] = useState(true);
-  const [progress, setProgress] = useState<number | null>(null);
-
-  async function save() {
-    setProgress(0);
-    try {
-      const blob = await exportClip(clip.blob, {
-        start,
-        end,
-        vertical,
-        onProgress: setProgress,
-      });
-      onSaved(blob);
-      toast.success("Corte exportado.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Falha ao exportar o corte.");
-      setProgress(null);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
-      <div className="w-full max-w-3xl space-y-4 rounded-2xl border border-border bg-surface p-4">
-        <div className="flex items-center gap-3">
-          <h3 className="font-display text-base font-bold">{clip.title}</h3>
-          <button onClick={onClose} className="ml-auto text-sm text-muted-foreground hover:text-foreground">
-            fechar
-          </button>
-        </div>
-
-        <video
-          ref={videoRef}
-          src={clip.url}
-          controls
-          onLoadedMetadata={(e) => {
-            const d = e.currentTarget.duration;
-            if (Number.isFinite(d) && d > 0) {
-              setDur(d);
-              setEnd(d);
-            }
-          }}
-          className={`w-full rounded-xl bg-black ${vertical ? "aspect-[9/16] object-cover" : "aspect-video"}`}
-        />
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="text-sm">
-            <span className="mono-label">início: {start.toFixed(1)}s</span>
-            <input
-              type="range"
-              min={0}
-              max={Math.max(0.5, dur - 0.5)}
-              step={0.1}
-              value={start}
-              onChange={(e) => {
-                const v = Math.min(Number(e.target.value), end - 0.5);
-                setStart(v);
-                if (videoRef.current) videoRef.current.currentTime = v;
-              }}
-              className="mt-2 w-full accent-[var(--primary)]"
-            />
-          </label>
-          <label className="text-sm">
-            <span className="mono-label">fim: {end.toFixed(1)}s</span>
-            <input
-              type="range"
-              min={0.5}
-              max={dur}
-              step={0.1}
-              value={end}
-              onChange={(e) => setEnd(Math.max(Number(e.target.value), start + 0.5))}
-              className="mt-2 w-full accent-[var(--primary)]"
-            />
-          </label>
-        </div>
-
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={vertical}
-            onChange={(e) => setVertical(e.target.checked)}
-            className="accent-[var(--primary)]"
-          />
-          exportar vertical 9:16 (Reels / TikTok / Shorts)
-        </label>
-
-        <button
-          onClick={() => void save()}
-          disabled={progress !== null}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
-        >
-          {progress !== null ? (
-            <>
-              <Loader2 className="size-4 animate-spin" /> exportando {Math.round(progress * 100)}%
-            </>
-          ) : (
-            <>
-              <Scissors className="size-4" /> aplicar corte
-            </>
-          )}
-        </button>
-      </div>
     </div>
   );
 }

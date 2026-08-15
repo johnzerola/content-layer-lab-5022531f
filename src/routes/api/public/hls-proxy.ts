@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { safeRemoteUrl } from "@/lib/remote-url";
+import { mediaProxyTicket, verifyMediaProxyTicket } from "@/lib/cleaner.server";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
@@ -11,7 +12,7 @@ const CORS = {
 };
 
 function proxied(u: string) {
-  return `/api/public/hls-proxy?u=${encodeURIComponent(u)}`;
+  return `/api/public/hls-proxy?t=${encodeURIComponent(mediaProxyTicket(u, {}, 10 * 60))}`;
 }
 
 /** Reescreve as URLs de um playlist HLS para passarem por este proxy. */
@@ -43,32 +44,48 @@ export const Route = createFileRoute("/api/public/hls-proxy")({
     handlers: {
       OPTIONS: async () => new Response(null, { status: 204, headers: CORS }),
       GET: async ({ request }) => {
-        const raw = new URL(request.url).searchParams.get("u");
-        if (!raw) return new Response("missing url", { status: 400, headers: CORS });
-        const target = safeRemoteUrl(raw);
+        const ticket = verifyMediaProxyTicket(new URL(request.url).searchParams.get("t"));
+        if (!ticket) return new Response("invalid or expired ticket", { status: 401, headers: CORS });
+        const target = safeRemoteUrl(ticket.url);
         if (!target) return new Response("url not allowed", { status: 400, headers: CORS });
 
         const range = request.headers.get("range");
+        const headers = new Headers(ticket.headers);
+        if (!headers.has("user-agent")) headers.set("user-agent", UA);
+        if (!headers.has("accept")) headers.set("accept", "*/*");
+        if (!headers.has("referer")) headers.set("referer", `${target.protocol}//${target.host}/`);
+        if (range) headers.set("range", range);
+
         const upstream = await fetch(target.toString(), {
-          headers: {
-            "user-agent": UA,
-            accept: "*/*",
-            referer: `${target.protocol}//${target.host}/`,
-            ...(range ? { range } : {}),
-          },
-          redirect: "follow",
+          redirect: "manual",
+          headers,
         }).catch(() => null);
 
-        if (!upstream || !upstream.ok || !upstream.body) {
+        if (upstream && upstream.status >= 300 && upstream.status < 400) {
+          const location = upstream.headers.get("location");
+          const next = location ? safeRemoteUrl(new URL(location, target).toString()) : null;
+          return next
+            ? new Response("redirect requires fresh ticket", { status: 409, headers: CORS })
+            : new Response("redirect not allowed", { status: 400, headers: CORS });
+        }
+
+        /*
+         * Do not follow redirects automatically. Each rewritten playlist entry
+         * receives its own signed ticket so the next destination is validated
+         * before the server fetches it.
+         */
+        const finalUpstream = upstream;
+
+        if (!finalUpstream || !finalUpstream.ok || !finalUpstream.body) {
           return new Response("upstream error", { status: 502, headers: CORS });
         }
 
-        const type = (upstream.headers.get("content-type") ?? "").toLowerCase();
+        const type = (finalUpstream.headers.get("content-type") ?? "").toLowerCase();
         const isPlaylist =
           /mpegurl/.test(type) || /\.m3u8(\?|$)/i.test(target.pathname + target.search);
 
         if (isPlaylist) {
-          const text = await upstream.text();
+          const text = await finalUpstream.text();
           return new Response(rewritePlaylist(text, target), {
             status: 200,
             headers: {
@@ -79,15 +96,15 @@ export const Route = createFileRoute("/api/public/hls-proxy")({
           });
         }
 
-        const headers = new Headers(CORS);
-        headers.set("content-type", type || "video/mp2t");
-        headers.set("cache-control", "no-store");
-        const len = upstream.headers.get("content-length");
-        if (len) headers.set("content-length", len);
-        const cr = upstream.headers.get("content-range");
-        if (cr) headers.set("content-range", cr);
+        const responseHeaders = new Headers(CORS);
+        responseHeaders.set("content-type", type || "video/mp2t");
+        responseHeaders.set("cache-control", "no-store");
+        const len = finalUpstream.headers.get("content-length");
+        if (len) responseHeaders.set("content-length", len);
+        const cr = finalUpstream.headers.get("content-range");
+        if (cr) responseHeaders.set("content-range", cr);
 
-        return new Response(upstream.body, { status: upstream.status, headers });
+        return new Response(finalUpstream.body, { status: finalUpstream.status, headers: responseHeaders });
       },
     },
   },

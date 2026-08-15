@@ -5,27 +5,50 @@
 
 export type HandoffTool = "lote" | "clip" | "limpar";
 
+export interface HandoffItem {
+  file: File;
+  clip?: { start: number; end: number };
+  score?: number;
+  clipTitle?: string;
+  clipReason?: string;
+  clipTags?: string[];
+}
+
 export interface HandoffPayload {
   tool: HandoffTool;
   files: File[];
   from: string;
 }
 
-const inbox = new Map<HandoffTool, File[]>();
+const inbox = new Map<HandoffTool, HandoffItem[]>();
 const listeners = new Set<(tool: HandoffTool) => void>();
 
 export function sendToTool(tool: HandoffTool, files: File[], from = "Monitora Live") {
-  if (!files.length) return;
-  inbox.set(tool, [...(inbox.get(tool) ?? []), ...files]);
+  return sendItemsToTool(
+    tool,
+    files.map((file) => ({ file })),
+    from,
+  );
+}
+
+/** Envia vídeos junto com recorte e score para reutilizar o editor de destino. */
+export function sendItemsToTool(tool: HandoffTool, items: HandoffItem[], from = "Monitora Live") {
+  if (!items.length) return;
+  inbox.set(tool, [...(inbox.get(tool) ?? []), ...items]);
   for (const l of listeners) l(tool);
-  return { tool, files, from } satisfies HandoffPayload;
+  return { tool, files: items.map((item) => item.file), from } satisfies HandoffPayload;
 }
 
 /** Retira (e limpa) os arquivos enviados para uma ferramenta. */
 export function takeHandoff(tool: HandoffTool): File[] {
-  const files = inbox.get(tool) ?? [];
+  return takeHandoffItems(tool).map((item) => item.file);
+}
+
+/** Retira os arquivos preservando score, título e limites do corte. */
+export function takeHandoffItems(tool: HandoffTool): HandoffItem[] {
+  const items = inbox.get(tool) ?? [];
   inbox.delete(tool);
-  return files;
+  return items;
 }
 
 export function hasHandoff(tool: HandoffTool) {

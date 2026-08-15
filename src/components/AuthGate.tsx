@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Loader2, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { currentUser, onAuth, signIn, signUp, type CloudUser } from "@/lib/cloud";
+import { currentUser, onAuth, resetPassword, signIn, signUp, type CloudUser } from "@/lib/cloud";
 import { toast } from "sonner";
 
 /**
@@ -42,6 +42,18 @@ export function AuthGate({ children }: { children: ReactNode }) {
       }
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível entrar.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const recover = async () => {
+    setBusy(true);
+    try {
+      await resetPassword(email);
+      toast.success("Enviamos o link de recuperação para seu e-mail.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Não foi possível enviar o link.");
     } finally {
       setBusy(false);
     }
@@ -89,6 +101,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
             Criar conta
           </Button>
         </div>
+        <Button variant="ghost" className="w-full" disabled={busy} onClick={recover}>
+          Recuperar senha
+        </Button>
       </div>
     </div>
   );

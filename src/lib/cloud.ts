@@ -56,6 +56,15 @@ export async function signOut() {
   await supabase.auth.signOut();
 }
 
+export async function resetPassword(email: string) {
+  const clean = email.trim();
+  if (!clean) throw new Error("Informe seu e-mail.");
+  const { error } = await supabase.auth.resetPasswordForEmail(clean, {
+    redirectTo: `${window.location.origin}/`,
+  });
+  if (error) throw error;
+}
+
 /** Envia todos os templates locais para a nuvem (um registro por template). */
 export async function pushTemplates(list: Template[]) {
   const user = await currentUser();

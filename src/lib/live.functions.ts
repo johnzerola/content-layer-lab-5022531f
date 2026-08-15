@@ -1,4 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
+import { mediaProxyTicket } from "@/lib/cleaner.server";
+import { safeRemoteUrl } from "@/lib/remote-url";
 
 export interface LiveCheck {
   live: boolean;
@@ -46,6 +48,21 @@ export function broadcastIdOf(input: string): string | null {
     null
   );
 }
+
+export const signedHlsProxyUrl = createServerFn({ method: "POST" })
+  .validator((input: { url: string }) => {
+    const url = String(input?.url ?? "").trim();
+    if (!url) throw new Error("playlist ausente");
+    return { url };
+  })
+  .handler(async ({ data }) => {
+    const safe = safeRemoteUrl(data.url);
+    if (!safe || !/\.m3u8(\?|$)/i.test(safe.pathname + safe.search)) {
+      throw new Error("playlist HLS invalida");
+    }
+    const ticket = mediaProxyTicket(safe.toString(), {}, 10 * 60);
+    return `/api/public/hls-proxy?t=${encodeURIComponent(ticket)}`;
+  });
 
 export function kickHandleOf(input: string): string | null {
   const clean = input.trim();

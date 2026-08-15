@@ -4,10 +4,15 @@
 // Meta), basta preencher o adaptador correspondente abaixo.
 
 export type PublishInput = {
+  accountId: string;
+  platform: "instagram" | "tiktok" | "youtube";
   kind: "reels" | "feed" | "stories";
   caption: string;
   videoUrl: string;
   username: string;
+  provider: string;
+  providerAccountId: string;
+  idempotencyKey: string;
 };
 
 export type PublishResult = { ok: true; permalink?: string } | { ok: false; error: string };
@@ -27,6 +32,12 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
         "Nenhum provedor de publicação configurado. Adicione AYRSHARE_API_KEY ou as credenciais do app Meta para ativar o envio real.",
     };
   }
+  if (input.provider !== provider || !input.providerAccountId) {
+    return {
+      ok: false,
+      error: `Conta @${input.username} nao esta conectada ao provedor ativo (${provider}). Refaca a conexao OAuth/API antes de publicar.`,
+    };
+  }
   if (provider === "ayrshare") return publishAyrshare(input);
   return publishMeta(input);
 }
@@ -44,6 +55,8 @@ async function publishAyrshare(input: PublishInput): Promise<PublishResult> {
         platforms: ["instagram"],
         mediaUrls: [input.videoUrl],
         isVideo: true,
+        profileKey: input.providerAccountId,
+        idempotencyKey: input.idempotencyKey,
         instagramOptions: input.kind === "stories" ? { stories: true } : { reels: input.kind === "reels" },
       }),
     });
@@ -58,7 +71,13 @@ async function publishAyrshare(input: PublishInput): Promise<PublishResult> {
 
 async function publishMeta(input: PublishInput): Promise<PublishResult> {
   const token = process.env["META_ACCESS_TOKEN"]!;
-  const igId = process.env["META_IG_USER_ID"]!;
+  const igId = input.providerAccountId;
+  if (igId !== process.env["META_IG_USER_ID"]) {
+    return {
+      ok: false,
+      error: `Conta @${input.username} nao corresponde a META_IG_USER_ID configurado. Publicacao bloqueada para evitar envio na conta errada.`,
+    };
+  }
   const base = `https://graph.facebook.com/v21.0/${igId}`;
   try {
     const mediaType = input.kind === "stories" ? "STORIES" : "REELS";

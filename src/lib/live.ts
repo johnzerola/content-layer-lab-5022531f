@@ -17,12 +17,27 @@ export interface LiveClip {
   /** 0..100 */
   score: number;
   title: string;
-  /** recorte escolhido pelo usuário no editor */
+  reason?: string;
+  tags?: string[];
+  /** recorte sugerido automaticamente e ajustável no editor */
   trim?: { start: number; end: number };
 }
 
+export interface LiveClipAnalysis {
+  score: number;
+  trim: { start: number; end: number };
+  reason: string;
+  tags: string[];
+  metrics: {
+    speech: number;
+    clarity: number;
+    hook: number;
+    cadence: number;
+  };
+}
+
 export function hlsProxyUrl(url: string) {
-  return `/api/public/hls-proxy?u=${encodeURIComponent(url)}`;
+  return `/api/public/hls-proxy?t=${encodeURIComponent(url)}`;
 }
 
 export function pickRecorderMime(): string {
@@ -40,7 +55,8 @@ export function pickRecorderMime(): string {
 
 /** Liga o <video> ao playlist HLS. Devolve uma função para desligar. */
 export async function attachHls(video: HTMLVideoElement, playlist: string): Promise<() => void> {
-  const src = hlsProxyUrl(playlist);
+  const { signedHlsProxyUrl } = await import("@/lib/live.functions");
+  const src = await signedHlsProxyUrl({ data: { url: playlist } });
   if (video.canPlayType("application/vnd.apple.mpegurl")) {
     video.src = src;
     await video.play().catch(() => undefined);
@@ -110,7 +126,10 @@ export class LiveClipper {
     const mime = pickRecorderMime();
     let rec: MediaRecorder;
     try {
-      rec = new MediaRecorder(this.stream, mime ? { mimeType: mime, videoBitsPerSecond: 4_000_000 } : undefined);
+      rec = new MediaRecorder(
+        this.stream,
+        mime ? { mimeType: mime, videoBitsPerSecond: 4_000_000 } : undefined,
+      );
     } catch (e) {
       this.opts.onError?.(e instanceof Error ? e.message : "não foi possível gravar a live");
       return;
@@ -129,42 +148,157 @@ export class LiveClipper {
       if (!this.stopped) this.cycle();
     };
     rec.start(1000);
-    this.timer = window.setTimeout(() => {
-      if (rec.state === "recording") rec.stop();
-    }, Math.max(5, this.opts.clipLen) * 1000);
+    this.timer = window.setTimeout(
+      () => {
+        if (rec.state === "recording") rec.stop();
+      },
+      Math.max(5, this.opts.clipLen) * 1000,
+    );
   }
 }
 
-/** Pontua o corte por energia de fala, dinâmica e picos (0..100). */
-export async function scoreClip(blob: Blob): Promise<number> {
+function clamp01(value: number) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function percentile(values: number[], p: number) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.min(sorted.length - 1, Math.max(0, Math.round((sorted.length - 1) * p)));
+  return sorted[index] ?? 0;
+}
+
+/**
+ * Pontuação determinística usada pelo monitor. Além de energia, considera fala
+ * útil, relação sinal/ruído, cadência e se o trecho começa e termina limpo.
+ */
+export function analyzeLiveRms(rms: number[], duration: number, hop = 0.1): LiveClipAnalysis {
+  const safeDuration = Math.max(hop, duration || rms.length * hop);
+  if (!rms.length) {
+    return {
+      score: 45,
+      trim: { start: 0, end: safeDuration },
+      reason: "áudio indisponível; revise o corte antes de publicar",
+      tags: ["revisão manual"],
+      metrics: { speech: 0, clarity: 0, hook: 0, cadence: 0 },
+    };
+  }
+
+  const floor = percentile(rms, 0.2);
+  const loud = Math.max(floor + 1e-6, percentile(rms, 0.9));
+  const peak = Math.max(loud, percentile(rms, 0.98));
+  const threshold = floor + (loud - floor) * 0.2;
+  const active = rms.map((value) => value > threshold);
+
+  // Une pausas curtas para não tratar cada palavra como um novo trecho.
+  const bridgeFrames = Math.max(1, Math.round(0.35 / hop));
+  for (let i = 0; i < active.length; i++) {
+    if (active[i]) continue;
+    let end = i;
+    while (end < active.length && !active[end]) end++;
+    if (i > 0 && end < active.length && end - i <= bridgeFrames) {
+      for (let j = i; j < end; j++) active[j] = true;
+    }
+    i = end - 1;
+  }
+
+  const first = active.findIndex(Boolean);
+  let last = -1;
+  for (let i = active.length - 1; i >= 0; i--) {
+    if (active[i]) {
+      last = i;
+      break;
+    }
+  }
+
+  const speech = active.filter(Boolean).length / active.length;
+  const clarity = clamp01((loud - floor) / Math.max(0.015, loud));
+  const dynamics = clamp01((peak - floor) / Math.max(0.02, peak));
+  const openingFrames = Math.max(1, Math.round(Math.min(3, safeDuration) / hop));
+  const openingSpeech = active.slice(0, openingFrames).filter(Boolean).length / openingFrames;
+  const hookEnergy = clamp01(percentile(rms.slice(0, openingFrames), 0.85) / loud);
+  const hook = clamp01(openingSpeech * 0.55 + hookEnergy * 0.45);
+
+  let transitions = 0;
+  for (let i = 1; i < active.length; i++) {
+    if (active[i] !== active[i - 1]) transitions++;
+  }
+  const transitionsPerMinute = transitions / Math.max(1 / 60, safeDuration / 60);
+  const cadence = clamp01(1 - Math.abs(transitionsPerMinute - 10) / 18);
+  const speechFit = clamp01(1 - Math.abs(speech - 0.68) / 0.68);
+
+  const leadSilence = first < 0 ? safeDuration : first * hop;
+  const tailSilence = last < 0 ? safeDuration : Math.max(0, safeDuration - (last + 1) * hop);
+  const edgeQuality = clamp01(
+    1 - (Math.max(0, leadSilence - 1.5) + Math.max(0, tailSilence - 1.8)) / 8,
+  );
+  const clippingPenalty = percentile(rms, 0.995) > 0.72 ? 8 : 0;
+
+  const quality =
+    speechFit * 0.25 +
+    clarity * 0.2 +
+    hook * 0.2 +
+    cadence * 0.12 +
+    dynamics * 0.11 +
+    edgeQuality * 0.12;
+  const score = Math.round(Math.max(18, Math.min(98, 24 + quality * 74 - clippingPenalty)));
+
+  const trimStart = first >= 0 ? Math.max(0, first * hop - 0.35) : 0;
+  const trimEnd = last >= 0 ? Math.min(safeDuration, (last + 1) * hop + 0.55) : safeDuration;
+  const trim =
+    trimEnd - trimStart >= 3
+      ? { start: Number(trimStart.toFixed(2)), end: Number(trimEnd.toFixed(2)) }
+      : { start: 0, end: Number(safeDuration.toFixed(2)) };
+
+  const tags: string[] = [];
+  if (hook >= 0.62) tags.push("gancho forte");
+  if (clarity >= 0.62) tags.push("fala clara");
+  if (cadence >= 0.58) tags.push("bom ritmo");
+  if (edgeQuality >= 0.7) tags.push("corte limpo");
+  if (speech < 0.28) tags.push("pouca fala");
+
+  const reasons: string[] = [];
+  if (hook >= 0.62) reasons.push("abre com energia");
+  if (clarity >= 0.62) reasons.push("voz bem separada do ruído");
+  if (cadence >= 0.58) reasons.push("pausas e ritmo naturais");
+  if (!reasons.length) reasons.push("trecho aproveitável, mas merece revisão");
+
+  return {
+    score,
+    trim,
+    reason: reasons.join(" · "),
+    tags,
+    metrics: { speech, clarity, hook, cadence },
+  };
+}
+
+/** Analisa o áudio do corte gravado e sugere limites sem silêncio nas pontas. */
+export async function analyzeLiveClip(blob: Blob, duration?: number): Promise<LiveClipAnalysis> {
   try {
     const buf = await blob.arrayBuffer();
     const Ctx =
-      window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ac = new Ctx();
     const audio = await ac.decodeAudioData(buf);
     void ac.close();
     const ch = audio.getChannelData(0);
-    const hop = Math.max(1, Math.floor(audio.sampleRate * 0.1));
+    const sampleWindow = Math.max(1, Math.floor(audio.sampleRate * 0.1));
     const rms: number[] = [];
-    for (let i = 0; i + hop <= ch.length; i += hop) {
-      let s = 0;
-      for (let j = i; j < i + hop; j++) s += ch[j]! * ch[j]!;
-      rms.push(Math.sqrt(s / hop));
+    for (let i = 0; i + sampleWindow <= ch.length; i += sampleWindow) {
+      let sum = 0;
+      for (let j = i; j < i + sampleWindow; j++) sum += ch[j]! * ch[j]!;
+      rms.push(Math.sqrt(sum / sampleWindow));
     }
-    if (!rms.length) return 45;
-    const mean = rms.reduce((a, b) => a + b, 0) / rms.length;
-    const peak = Math.max(...rms);
-    const sorted = [...rms].sort((a, b) => a - b);
-    const noise = sorted[Math.floor(sorted.length * 0.2)] ?? 0;
-    const speech = rms.filter((v) => v > noise * 2.2).length / rms.length;
-    const dyn = peak > 0 ? (peak - mean) / peak : 0;
-
-    const score = 35 + speech * 35 + Math.min(1, mean * 12) * 18 + dyn * 12;
-    return Math.round(Math.max(5, Math.min(99, score)));
+    return analyzeLiveRms(rms, duration ?? audio.duration, 0.1);
   } catch {
-    return 50;
+    return analyzeLiveRms([], duration ?? 0);
   }
+}
+
+/** Compatibilidade com chamadas antigas que precisam apenas do score. */
+export async function scoreClip(blob: Blob): Promise<number> {
+  return (await analyzeLiveClip(blob)).score;
 }
 
 /** Rótulo automático do corte a partir do momento em que aconteceu. */
@@ -213,7 +347,8 @@ export async function exportClip(blob: Blob, opts: TrimOptions): Promise<Blob> {
     const stream = canvas.captureStream(30);
     // leva o áudio original junto
     const Ctx =
-      window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     const ac = new Ctx();
     const source = ac.createMediaElementSource(video);
     const dest = ac.createMediaStreamDestination();
@@ -221,7 +356,10 @@ export async function exportClip(blob: Blob, opts: TrimOptions): Promise<Blob> {
     dest.stream.getAudioTracks().forEach((t) => stream.addTrack(t));
 
     const mime = pickRecorderMime();
-    const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 6_000_000 } : undefined);
+    const rec = new MediaRecorder(
+      stream,
+      mime ? { mimeType: mime, videoBitsPerSecond: 6_000_000 } : undefined,
+    );
     const chunks: BlobPart[] = [];
     rec.ondataavailable = (e) => {
       if (e.data.size) chunks.push(e.data);

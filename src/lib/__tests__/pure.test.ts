@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defaultAntiDup, makeVariation, describeVariation } from "../variation";
-import { formatTime } from "../clips";
+import { formatTime, scoreClipSignals, speechSegments } from "../clips";
+import { analyzeLiveRms } from "../live";
 import {
   applyRatio,
   createTemplate,
@@ -51,6 +52,52 @@ describe("clips", () => {
     expect(formatTime(0)).toBe("0:00");
     expect(formatTime(9.6)).toBe("0:09");
     expect(formatTime(125)).toBe("2:05");
+  });
+
+  it("une pausas curtas e mantém pausas longas como fronteiras", () => {
+    const rms = [0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1, 1];
+    expect(speechSegments(rms, 0.1, 0.25, 0.1)).toHaveLength(2);
+  });
+
+  it("usa score absoluto para não promover um trecho fraco", () => {
+    const strong = scoreClipSignals({
+      hook: 0.9,
+      energy: 0.8,
+      dynamics: 0.7,
+      motion: 0.6,
+      density: 0.68,
+      clarity: 0.85,
+      cadence: 0.75,
+      edgeQuality: 0.8,
+      lenFit: 1,
+    });
+    const weak = scoreClipSignals({
+      hook: 0.1,
+      energy: 0.15,
+      dynamics: 0.1,
+      motion: 0.1,
+      density: 0.08,
+      clarity: 0.2,
+      cadence: 0.1,
+      edgeQuality: 0.2,
+      lenFit: 1,
+    });
+    expect(strong.score).toBeGreaterThanOrEqual(80);
+    expect(weak.score).toBeLessThan(55);
+  });
+});
+
+describe("live clips", () => {
+  it("remove silêncio das pontas sem cortar a fala", () => {
+    const rms = [
+      ...Array(20).fill(0.005),
+      ...Array.from({ length: 70 }, (_, i) => (i % 8 === 0 ? 0.04 : 0.12)),
+      ...Array(10).fill(0.005),
+    ];
+    const result = analyzeLiveRms(rms, 10, 0.1);
+    expect(result.trim.start).toBeCloseTo(1.65, 1);
+    expect(result.trim.end).toBeCloseTo(9.55, 1);
+    expect(result.tags).toContain("fala clara");
   });
 });
 

@@ -18,6 +18,9 @@ export type SocialAccount = {
   avatar_url: string | null;
   provider: string;
   status: string;
+  provider_account_id: string | null;
+  scopes?: string[] | null;
+  expires_at?: string | null;
   created_at: string;
 };
 
@@ -50,7 +53,7 @@ export const STATUS_LABEL: Record<string, string> = {
 export async function listAccounts(): Promise<SocialAccount[]> {
   const { data, error } = await supabase
     .from("social_accounts")
-    .select("id,platform,username,display_name,avatar_url,provider,status,created_at")
+    .select("id,platform,username,display_name,avatar_url,provider,status,provider_account_id,scopes,expires_at,created_at")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as SocialAccount[];
@@ -68,7 +71,7 @@ export async function addAccount(username: string, displayName?: string) {
       username: handle,
       display_name: displayName?.trim() || null,
       provider: "pending",
-      status: "aguardando provedor",
+      status: "draft",
     },
     { onConflict: "user_id,platform,username" },
   );
@@ -107,11 +110,27 @@ export type NewPost = {
   videoPath?: string | null;
   videoUrl?: string | null;
   fileName?: string | null;
+  consent?: boolean;
 };
 
 export async function schedulePost(p: NewPost) {
   const user = await currentUser();
   if (!user) throw new Error("Faça login para agendar.");
+  if (!p.accountId) throw new Error("Selecione uma conta conectada para publicar.");
+  if (!p.consent) throw new Error("Confirme o consentimento para enviar este video a rede social.");
+
+  const { data: account, error: accountError } = await supabase
+    .from("social_accounts")
+    .select("id,status,provider,provider_account_id")
+    .eq("id", p.accountId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (accountError) throw accountError;
+  const connected = account?.status === "connected" || account?.status === "conectado";
+  if (!account || !connected || !account.provider_account_id || account.provider === "pending") {
+    throw new Error("Esta conta ainda nao tem conexao OAuth/API valida. Conecte pelo provedor oficial antes de agendar.");
+  }
+
   const { error } = await supabase.from("scheduled_posts").insert({
     user_id: user.id,
     account_id: p.accountId,
@@ -121,6 +140,7 @@ export async function schedulePost(p: NewPost) {
     video_path: p.videoPath ?? null,
     video_url: p.videoUrl ?? null,
     file_name: p.fileName ?? null,
+    consent_at: new Date().toISOString(),
     status: "agendado",
   });
   if (error) throw error;

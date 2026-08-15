@@ -47,7 +47,7 @@ const NAV = [
 const METRICS = [
   { value: "400+", label: "vídeos por lote" },
   { value: "9x", label: "mais rápido que editar à mão" },
-  { value: "0", label: "render na nuvem — roda no seu PC" },
+  { value: "Local", label: "render do lote roda no seu PC" },
   { value: "3–5", label: "variações únicas por vídeo" },
 ];
 
@@ -160,7 +160,7 @@ const FAQ = [
   },
   {
     q: "Onde o vídeo é renderizado?",
-    a: "No seu navegador, com WebCodecs e aceleração da própria máquina. Nada de fila em servidor: o arquivo não sobe para lugar nenhum.",
+    a: "O lote comum é renderizado no navegador com WebCodecs. Recursos como CleanerIA, importação por link e Agenda podem enviar arquivos ou URLs para VPS, Supabase ou para a rede social escolhida, sempre quando você aciona esses fluxos.",
   },
   {
     q: "Serve para qual formato?",
@@ -570,7 +570,7 @@ function Plans() {
 
       <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-2">
         <span className="flex items-center gap-2 text-xs text-muted-foreground">
-          <ShieldCheck className="size-4 text-primary" /> Seus vídeos não saem da sua máquina
+          <ShieldCheck className="size-4 text-primary" /> Transparência sobre quando VPS/Supabase são usados
         </span>
         <span className="flex items-center gap-2 text-xs text-muted-foreground">
           <Gauge className="size-4 text-primary" /> Cancele quando quiser

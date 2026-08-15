@@ -54,6 +54,7 @@ interface Props {
   fsAccess: boolean;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  onEdit: (id: string) => void;
   onProcess: (ids?: string[]) => void;
   onTogglePause: () => void;
   onCancel: () => void;
@@ -72,7 +73,8 @@ const LENGTH_PRESETS = [
 ] as const;
 
 function scoreTone(score: number) {
-  if (score >= 85) return { label: "altíssimo", cls: "text-primary border-primary/50 bg-primary/10" };
+  if (score >= 85)
+    return { label: "altíssimo", cls: "text-primary border-primary/50 bg-primary/10" };
   if (score >= 70) return { label: "alto", cls: "text-primary border-primary/30 bg-primary/5" };
   if (score >= 60) return { label: "médio", cls: "text-warn border-warn/40 bg-warn/10" };
   return { label: "baixo", cls: "text-muted-foreground border-border bg-surface-2" };
@@ -81,7 +83,9 @@ function scoreTone(score: number) {
 function ScoreBadge({ score }: { score: number }) {
   const tone = scoreTone(score);
   return (
-    <div className={`flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[11px] ${tone.cls}`}>
+    <div
+      className={`flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[11px] ${tone.cls}`}
+    >
       <Flame className="size-3" />
       {score} · {tone.label}
     </div>
@@ -95,6 +99,7 @@ function ClipCard({
   active,
   onToggle,
   onSelect,
+  onEdit,
   onRemove,
   onDownload,
 }: {
@@ -104,6 +109,7 @@ function ClipCard({
   active: boolean;
   onToggle: () => void;
   onSelect: () => void;
+  onEdit: () => void;
   onRemove: () => void;
   onDownload: () => void;
 }) {
@@ -185,7 +191,9 @@ function ClipCard({
             onToggle();
           }}
           className={`absolute left-2 top-2 grid size-6 place-items-center rounded-md border backdrop-blur ${
-            checked ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background/70"
+            checked
+              ? "border-primary bg-primary text-primary-foreground"
+              : "border-border bg-background/70"
           }`}
         >
           {checked && <Check className="size-3.5" />}
@@ -202,7 +210,9 @@ function ClipCard({
           <div className="h-1 overflow-hidden rounded-full bg-white/25">
             <div
               className="h-full bg-white"
-              style={{ width: `${(item.status === "processando" ? item.progress : pos / len) * 100}%` }}
+              style={{
+                width: `${(item.status === "processando" ? item.progress : pos / len) * 100}%`,
+              }}
             />
           </div>
           <div className="flex items-center justify-between gap-2">
@@ -244,7 +254,7 @@ function ClipCard({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onSelect();
+              onEdit();
             }}
             className="rounded-md p-1.5 hover:text-foreground"
             title="abrir no editor"
@@ -273,14 +283,20 @@ function ClipCard({
           {typeof item.score === "number" && <ScoreBadge score={item.score} />}
         </div>
         {item.clipReason && (
-          <p className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground" title={item.clipReason}>
+          <p
+            className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground"
+            title={item.clipReason}
+          >
             {item.clipReason}
           </p>
         )}
         {item.clipTags && item.clipTags.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {item.clipTags.map((t) => (
-              <span key={t} className="rounded-full border border-border px-2 py-0.5 font-mono text-[9px] text-muted-foreground">
+              <span
+                key={t}
+                className="rounded-full border border-border px-2 py-0.5 font-mono text-[9px] text-muted-foreground"
+              >
                 {t}
               </span>
             ))}
@@ -298,14 +314,15 @@ function ClipCard({
             <Download className="size-4" /> Baixar clipe
           </Button>
           <p className="text-center text-[10px] text-muted-foreground">
-            {item.blob ? "salve no seu celular ou computador" : "exporte o corte para liberar o download"}
+            {item.blob
+              ? "salve no seu celular ou computador"
+              : "exporte o corte para liberar o download"}
           </p>
         </div>
       </div>
     </div>
   );
 }
-
 
 function SelectedClip({
   item,
@@ -452,6 +469,7 @@ export function ClipStudio(props: Props) {
     fsAccess,
     selectedId,
     onSelect,
+    onEdit,
     onProcess,
     onTogglePause,
     onCancel,
@@ -471,7 +489,9 @@ export function ClipStudio(props: Props) {
   const validPicked = picked.filter((id) => clips.some((c) => c.id === id));
   const targets = validPicked.length ? validPicked : clips.map((c) => c.id);
 
-  const activePreset = LENGTH_PRESETS.find((p) => p.min === settings.minLen && p.max === settings.maxLen);
+  const activePreset = LENGTH_PRESETS.find(
+    (p) => p.min === settings.minLen && p.max === settings.maxLen,
+  );
   const ordered = [...clips].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
   return (
@@ -601,19 +621,25 @@ export function ClipStudio(props: Props) {
             <div>
               <p className="text-lg font-semibold">{clips.length} clipes encontrados</p>
               <p className="font-mono text-[11px] text-muted-foreground">
-                ordenados por potencial · {validPicked.length ? `${validPicked.length} selecionados` : "todos serão exportados"}
+                ordenados por potencial ·{" "}
+                {validPicked.length
+                  ? `${validPicked.length} selecionados`
+                  : "todos serão exportados"}
                 {eta ? ` · restam ~${eta}` : ""}
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <button
                 className="font-mono text-[11px] text-muted-foreground hover:text-foreground"
-                onClick={() => setPicked(validPicked.length === clips.length ? [] : clips.map((c) => c.id))}
+                onClick={() =>
+                  setPicked(validPicked.length === clips.length ? [] : clips.map((c) => c.id))
+                }
               >
                 {validPicked.length === clips.length ? "limpar seleção" : "selecionar todos"}
               </button>
               <Button onClick={() => onProcess(targets)} disabled={running || !targets.length}>
-                <Play className="size-4" /> {running ? "Exportando…" : `Exportar (${targets.length})`}
+                <Play className="size-4" />{" "}
+                {running ? "Exportando…" : `Exportar (${targets.length})`}
               </Button>
               {running && (
                 <>
@@ -626,7 +652,8 @@ export function ClipStudio(props: Props) {
                 </>
               )}
               <Button variant="outline" onClick={onZip} disabled={readyCount === 0 || zipping}>
-                <FileArchive className="size-4" /> {zipping ? "Compactando…" : `ZIP (${readyCount})`}
+                <FileArchive className="size-4" />{" "}
+                {zipping ? "Compactando…" : `ZIP (${readyCount})`}
               </Button>
               {fsAccess && (
                 <Button variant="outline" onClick={onSaveFolder} disabled={readyCount === 0}>
@@ -701,7 +728,6 @@ export function ClipStudio(props: Props) {
           )}
 
           <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-4">
-
             {ordered.map((c, i) => (
               <ClipCard
                 key={c.id}
@@ -710,9 +736,12 @@ export function ClipStudio(props: Props) {
                 active={selectedId === c.id}
                 checked={validPicked.includes(c.id)}
                 onToggle={() =>
-                  setPicked((prev) => (prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id]))
+                  setPicked((prev) =>
+                    prev.includes(c.id) ? prev.filter((x) => x !== c.id) : [...prev, c.id],
+                  )
                 }
                 onSelect={() => onSelect(c.id)}
+                onEdit={() => onEdit(c.id)}
                 onRemove={() => onRemove(c.id)}
                 onDownload={() => onDownload(c)}
               />

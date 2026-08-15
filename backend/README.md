@@ -46,6 +46,19 @@ devem ser usadas como backend sem permissao do operador.
 Use `CLEANER_YTDLP_COOKIES_FILE` somente para cookies de uma conta propria e
 autorizada. Conteudo privado ou protegido continua bloqueado pelo produto.
 
+Tambem existe um agente CLI para baixar o melhor arquivo publico/autorizado em
+uma pasta local da VPS:
+
+```bash
+python scripts/download_media_agent.py "https://www.tiktok.com/@perfil/video/123" --out downloads
+python scripts/download_media_agent.py "https://www.youtube.com/watch?v=..." --probe
+```
+
+Ele tenta pegar a versao original disponibilizada pela plataforma/extrator. Nao
+burla DRM, conta privada, paywall, nem remove marca d'agua que ja esteja gravada
+nos pixels; nesses casos use somente conteudo proprio/autorizado e, se precisar,
+mande o arquivo para o CleanerIA.
+
 ## Desenvolvimento
 
 ```bash

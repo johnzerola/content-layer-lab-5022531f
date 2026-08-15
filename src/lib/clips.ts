@@ -137,7 +137,12 @@ export interface SpeechSegment {
  * Detecta trechos com fala usando limiar adaptativo (percentil 20 do RMS como
  * piso de ruído). Pausas menores que `bridge` não quebram o segmento.
  */
-export function speechSegments(rms: number[], hop = HOP, bridge = 0.35, minLen = 0.4): SpeechSegment[] {
+export function speechSegments(
+  rms: number[],
+  hop = HOP,
+  bridge = 0.35,
+  minLen = 0.4,
+): SpeechSegment[] {
   if (!rms.length) return [];
   const sorted = [...rms].sort((a, b) => a - b);
   const floor = percentile(sorted, 0.2);
@@ -205,7 +210,42 @@ interface Candidate {
   dynamics: number;
   motion: number;
   density: number;
+  clarity: number;
+  cadence: number;
+  edgeQuality: number;
   tags: string[];
+}
+
+export interface ClipSignals {
+  hook: number;
+  energy: number;
+  dynamics: number;
+  motion: number;
+  density: number;
+  clarity: number;
+  cadence: number;
+  edgeQuality: number;
+  lenFit: number;
+}
+
+/** Score absoluto: um vídeo fraco não ganha nota alta só por ser o melhor do arquivo. */
+export function scoreClipSignals(signals: ClipSignals) {
+  const fit = (value: number) => Math.max(0, Math.min(1, value));
+  const speechFit = fit(1 - Math.abs(signals.density - 0.68) / 0.68);
+  const quality =
+    fit(signals.hook) * 0.19 +
+    fit(signals.energy) * 0.15 +
+    fit(signals.dynamics) * 0.11 +
+    speechFit * 0.15 +
+    fit(signals.motion) * 0.07 +
+    fit(signals.clarity) * 0.11 +
+    fit(signals.cadence) * 0.09 +
+    fit(signals.edgeQuality) * 0.08 +
+    fit(signals.lenFit) * 0.05;
+  return {
+    raw: quality,
+    score: Math.round(Math.max(18, Math.min(98, 24 + quality * 74))),
+  };
 }
 
 const HOOK_LABELS = [
@@ -220,24 +260,25 @@ const HOOK_LABELS = [
 function describe(c: Candidate, index: number, duration: number) {
   const pos = c.start / Math.max(1, duration);
   const tags = c.tags;
-  const title =
-    tags.includes("gancho")
-      ? HOOK_LABELS[0]!
-      : tags.includes("pico")
-        ? HOOK_LABELS[1]!
-        : tags.includes("reação")
-          ? HOOK_LABELS[2]!
-          : pos < 0.15
-            ? HOOK_LABELS[4]!
-            : pos > 0.8
-              ? HOOK_LABELS[5]!
-              : HOOK_LABELS[3]!;
+  const title = tags.includes("gancho")
+    ? HOOK_LABELS[0]!
+    : tags.includes("pico")
+      ? HOOK_LABELS[1]!
+      : tags.includes("reação")
+        ? HOOK_LABELS[2]!
+        : pos < 0.15
+          ? HOOK_LABELS[4]!
+          : pos > 0.8
+            ? HOOK_LABELS[5]!
+            : HOOK_LABELS[3]!;
 
   const parts: string[] = [];
   if (c.hook > 0.6) parts.push("abre com fala forte nos primeiros segundos");
   if (c.dynamics > 0.55) parts.push("boa variação de tom (não fica monótono)");
   if (c.motion > 0.5) parts.push("bastante movimento em cena");
-  if (c.density > 0.7) parts.push("fala contínua, quase sem pausas");
+  if (c.clarity > 0.6) parts.push("fala clara em relação ao ruído");
+  if (c.cadence > 0.58) parts.push("ritmo natural, com pausas aproveitáveis");
+  if (c.edgeQuality > 0.68) parts.push("começo e fim alinhados à fala");
   if (!parts.length) parts.push("trecho estável, bom para legenda e recorte vertical");
 
   return {
@@ -277,11 +318,24 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
     URL.revokeObjectURL(url);
   }
 
-  const motion = await motionCurve(file, Math.min(90, Math.max(16, Math.round(duration / 3))), opts.signal);
+  const motion = await motionCurve(
+    file,
+    Math.min(90, Math.max(16, Math.round(duration / 3))),
+    opts.signal,
+  );
   opts.onProgress?.(0.8);
 
   if (duration <= minLen * 1.2) {
-    return [{ start: 0, end: duration, score: 72, title: "Vídeo inteiro", reason: "curto demais para cortar", tags: [] }];
+    return [
+      {
+        start: 0,
+        end: duration,
+        score: 72,
+        title: "Vídeo inteiro",
+        reason: "curto demais para cortar",
+        tags: [],
+      },
+    ];
   }
 
   const segs = speechSegments(rms);
@@ -290,6 +344,8 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
   // normalizadores
   const sortedRms = [...rms].sort((a, b) => a - b);
   const loudRef = Math.max(1e-6, percentile(sortedRms, 0.95));
+  const noiseRef = percentile(sortedRms, 0.2);
+  const globalClarity = Math.max(0, Math.min(1, (loudRef - noiseRef) / Math.max(0.015, loudRef)));
   const sortedMotion = [...motion].sort((a, b) => a - b);
   const motionRef = Math.max(1e-6, percentile(sortedMotion, 0.9));
 
@@ -322,15 +378,28 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
       let voiced = 0;
       let n = 0;
       let hook = 0;
+      let openingVoiced = 0;
+      let closingVoiced = 0;
+      let edgeSamples = 0;
+      let transitions = 0;
+      let previousSpeech: boolean | null = null;
       for (let t = s; t < e; t += step) {
         const a = at(rms, t, duration) / loudRef;
         const m = at(motion, t, duration) / motionRef;
+        const speaking = speechAt(t);
         sum += a;
         mot += m;
         peak = Math.max(peak, a);
         low = Math.min(low, a);
-        if (speechAt(t)) voiced++;
+        if (speaking) voiced++;
         if (t - s < 3) hook = Math.max(hook, a);
+        if (t - s < 2) {
+          edgeSamples++;
+          if (speaking) openingVoiced++;
+        }
+        if (e - t <= 2 && speaking) closingVoiced++;
+        if (previousSpeech !== null && previousSpeech !== speaking) transitions++;
+        previousSpeech = speaking;
         n++;
       }
       if (!n) continue;
@@ -339,17 +408,42 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
       const motionAvg = Math.min(1, mot / n);
       const density = voiced / n;
       const lenFit = 1 - Math.min(1, Math.abs(realLen - sweet) / Math.max(1, maxLen));
+      const expectedTransitions = Math.max(1, realLen / 5);
+      const cadence = Math.max(
+        0,
+        Math.min(1, 1 - Math.abs(transitions - expectedTransitions) / (expectedTransitions * 1.8)),
+      );
+      const edgeQuality = Math.max(
+        0,
+        Math.min(
+          1,
+          (openingVoiced / Math.max(1, edgeSamples) + closingVoiced / Math.max(1, edgeSamples)) / 2,
+        ),
+      );
       // OpusClip evita o começo "de aquecimento" do vídeo
       const posBonus = s / duration < 0.05 ? 0.85 : 1;
 
-      const raw =
-        (hook * 0.26 + energy * 0.24 + dynamics * 0.16 + density * 0.18 + motionAvg * 0.1 + lenFit * 0.06) * posBonus;
+      const scored = scoreClipSignals({
+        hook,
+        energy,
+        dynamics,
+        motion: motionAvg,
+        density,
+        clarity: globalClarity,
+        cadence,
+        edgeQuality,
+        lenFit,
+      });
+      const raw = scored.raw * posBonus;
 
       const tags: string[] = [];
       if (hook > 0.65) tags.push("gancho");
       if (peak > 0.9) tags.push("pico");
       if (motionAvg > 0.55) tags.push("reação");
       if (density > 0.75) tags.push("fala contínua");
+      if (globalClarity > 0.62) tags.push("fala clara");
+      if (cadence > 0.58) tags.push("bom ritmo");
+      if (edgeQuality > 0.68) tags.push("corte limpo");
 
       cands.push({
         start: s,
@@ -360,6 +454,9 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
         dynamics,
         motion: motionAvg,
         density,
+        clarity: globalClarity,
+        cadence,
+        edgeQuality,
         tags,
       });
     }
@@ -379,10 +476,7 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
   }
 
   cands.sort((a, b) => b.raw - a.raw);
-  const best = cands[0]!.raw;
-  const worst = cands[cands.length - 1]!.raw;
-  const span = Math.max(1e-6, best - worst);
-  const scoreOf = (raw: number) => Math.round(52 + ((raw - worst) / span) * 47);
+  const scoreOf = (raw: number) => Math.round(Math.max(18, Math.min(98, 24 + raw * 74)));
 
   // seleção gulosa com diversidade (MMR): penaliza candidatos perto dos já escolhidos
   const chosen: Candidate[] = [];

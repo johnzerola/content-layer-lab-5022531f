@@ -38,7 +38,7 @@ import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
 import { failJob, finishJob, setJobCancel, setJobRetry, startJob, updateJob } from "@/lib/jobs";
 import { undoable } from "@/lib/undo";
-import { takeHandoff, takePendingTool, type HandoffTool } from "@/lib/handoff";
+import { takeHandoffItems, takePendingTool, type HandoffItem, type HandoffTool } from "@/lib/handoff";
 
 import {
   applyRatio,
@@ -391,7 +391,11 @@ function Home() {
 
 
 
-  const addVideos = useCallback(async (list: File[], meta?: { sourceUrl?: string }) => {
+  const addVideos = useCallback(async (
+    list: File[],
+    meta?: { sourceUrl?: string; handoff?: HandoffItem[] },
+    targetMode?: Mode,
+  ) => {
     const vids = list.filter(isVideoFile);
     const ignored = list.length - vids.length;
     if (ignored > 0) toast.warning(`${ignored} arquivo(s) ignorado(s): não são vídeos.`);
@@ -401,30 +405,50 @@ function Home() {
         `${undecodable.length} arquivo(s) em formato que o navegador pode não decodificar (ex: .avi, .mkv, .wmv). Se o preview ficar preto, converta para MP4/MOV/WebM.`,
       );
     }
-    const created: Item[] = vids.map((file) => ({
-
-      id: crypto.randomUUID(),
-      file,
-      ...(meta?.sourceUrl ? { sourceUrl: meta.sourceUrl } : {}),
-      poster: null,
-      w: 0,
-      h: 0,
-      duration: 0,
-      headline: "",
-      offsetX: 0,
-      offsetY: 0,
-      status: "pendente",
-      progress: 0,
-    }));
-    const runMode = modeRef.current;
+    const handoffByFile = new Map((meta?.handoff ?? []).map((item) => [item.file, item]));
+    const created: Item[] = vids.map((file) => {
+      const handoff = handoffByFile.get(file);
+      return {
+        id: crypto.randomUUID(),
+        file,
+        ...(meta?.sourceUrl ? { sourceUrl: meta.sourceUrl } : {}),
+        poster: null,
+        w: 0,
+        h: 0,
+        duration: handoff?.clip?.end ?? 0,
+        headline: "",
+        offsetX: 0,
+        offsetY: 0,
+        ...(handoff?.clip ? { clip: handoff.clip } : {}),
+        ...(handoff?.score !== undefined ? { score: handoff.score } : {}),
+        ...(handoff?.clipTitle ? { clipTitle: handoff.clipTitle } : {}),
+        ...(handoff?.clipReason ? { clipReason: handoff.clipReason } : {}),
+        ...(handoff?.clipTags ? { clipTags: handoff.clipTags } : {}),
+        status: "pendente",
+        progress: 0,
+      };
+    });
+    const runMode = targetMode ?? modeRef.current;
     const setQ = (upd: Item[] | ((prev: Item[]) => Item[])) => setItemsIn(runMode, upd);
     setQ((prev) => [...prev, ...created]);
-    if (!selectedIdsRef.current[runMode] && created[0]) setSelectedId(created[0].id);
+    if (!selectedIdsRef.current[runMode] && created[0]) {
+      setSelectedIds((current) => ({ ...current, [runMode]: created[0]!.id }));
+    }
     for (const it of created) {
       try {
-        const meta = await grabPoster(it.file);
+        const mediaMeta = await grabPoster(it.file, it.clip?.start ?? 0);
         setQ((prev) =>
-          prev.map((p) => (p.id === it.id ? { ...p, poster: meta.url, w: meta.w, h: meta.h, duration: meta.duration } : p)),
+          prev.map((p) =>
+            p.id === it.id
+              ? {
+                  ...p,
+                  poster: mediaMeta.url,
+                  w: mediaMeta.w,
+                  h: mediaMeta.h,
+                  duration: mediaMeta.duration,
+                }
+              : p,
+          ),
         );
         if (runMode !== "limpar" && smartRef.current) {
           const af = await autoFrame(it.file);
@@ -481,7 +505,7 @@ function Home() {
       };
       void Promise.all([worker(), worker()]);
     }
-  }, [setItemsIn, setSelectedId]);
+  }, [setItemsIn]);
 
   const addFiles = useCallback(
     (files: FileList | null) => (files ? addVideos(Array.from(files)) : Promise.resolve()),
@@ -517,10 +541,12 @@ function Home() {
   useEffect(() => {
     const pending = takePendingTool();
     const tool: HandoffTool = pending ?? "lote";
-    const files = takeHandoff(tool);
-    if (files.length) {
-      void addVideos(files);
-      toast.success(`${files.length} vídeo(s) recebido(s) de outra ferramenta`);
+    const handoff = takeHandoffItems(tool);
+    if (handoff.length) {
+      modeRef.current = tool;
+      setMode(tool);
+      void addVideos(handoff.map((item) => item.file), { handoff }, tool);
+      toast.success(`${handoff.length} vídeo(s) recebido(s) de outra ferramenta`);
     }
   }, [addVideos]);
 
@@ -535,15 +561,13 @@ function Home() {
     setLinkMsg("procurando o vídeo...");
     try {
       const res = await resolveVideoLink({ data: { url } });
-      if (!res.ok || !res.videoUrl) {
+      if (!res.ok || !res.videoUrl || !res.proxyUrl) {
         setLinkBlocked(Boolean(res.blocked));
         setLinkMsg(res.message ?? "não encontrei o vídeo nesse link");
         return;
       }
       setLinkMsg(`baixando de ${res.source ?? "origem"}...`);
-      const dl = await fetch(
-        res.proxyUrl ?? `/api/public/media-proxy?u=${encodeURIComponent(res.videoUrl)}`,
-      );
+      const dl = await fetch(res.proxyUrl);
       if (!dl.ok) {
         setLinkBlocked(true);
         setLinkMsg("a origem bloqueou o download desse arquivo");
@@ -612,7 +636,9 @@ function Home() {
       }
       for (const it of linked) {
         try {
-          const dl = await fetch(`/api/public/media-proxy?u=${encodeURIComponent(it.sourceUrl!)}`);
+          const resolved = await resolveVideoLink({ data: { url: it.sourceUrl! } });
+          if (!resolved.ok || !resolved.proxyUrl) throw new Error("origem indisponível");
+          const dl = await fetch(resolved.proxyUrl);
           if (!dl.ok) throw new Error("origem indisponível");
           const blob = await dl.blob();
           const file = new File([blob], it.name, { type: blob.type || guessMime(it.name) });
@@ -1522,6 +1548,10 @@ function Home() {
             fsAccess={fsAccessSupported()}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            onEdit={(id) => {
+              setSelectedId(id);
+              setStudioId(id);
+            }}
             onProcess={(ids) => void processAll(ids)}
             onTogglePause={togglePause}
             onCancel={cancelAll}
@@ -2474,7 +2504,10 @@ function Home() {
         )}
 
         <footer className="py-8 text-center font-mono text-xs text-muted-foreground">
-          tudo roda no navegador · nenhum vídeo sai da sua máquina
+          lote comum roda no navegador · CleanerIA, links e Agenda usam VPS/Supabase quando acionados ·{" "}
+          <a href="/privacidade" className="hover:text-foreground">privacidade</a> ·{" "}
+          <a href="/termos" className="hover:text-foreground">termos</a> ·{" "}
+          <a href="/conta" className="hover:text-foreground">conta</a>
         </footer>
       </div>
 

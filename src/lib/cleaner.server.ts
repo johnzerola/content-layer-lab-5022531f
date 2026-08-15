@@ -3,7 +3,7 @@ import { getRequest } from "@tanstack/react-start/server";
 import type { CleanerRegion } from "@/lib/cleaner";
 
 type JobTokenScope = "upload" | "control" | "result";
-type ServiceTokenScope = "media";
+type ServiceTokenScope = "media" | "publish-hook";
 type MediaHeaders = Record<string, string>;
 
 export function appOrigin(): string {
@@ -102,6 +102,24 @@ export function mediaProxyTicket(url: string, headers: MediaHeaders = {}, ttlSec
   ).toString("base64url");
   const signature = createHmac("sha256", secret()).update(`media.${payload}`).digest("hex");
   return `${payload}.${signature}`;
+}
+
+export function hookSecret(): string {
+  const value = process.env["PUBLISH_HOOK_SECRET"] ?? "";
+  if (value.length < 32 || value === "default_secret") {
+    throw new Error("PUBLISH_HOOK_SECRET ausente ou fraco");
+  }
+  return value;
+}
+
+export function authorizedHook(request: Request): boolean {
+  const configured = hookSecret();
+  const supplied =
+    request.headers.get("x-publish-hook-secret") ??
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+    "";
+  if (!supplied || supplied.length !== configured.length) return false;
+  return timingSafeEqual(Buffer.from(supplied), Buffer.from(configured));
 }
 
 export function verifyMediaProxyTicket(ticket: string | null): {

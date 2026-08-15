@@ -74,6 +74,7 @@ function AgendaPage() {
   const [kind, setKind] = useState<PostKind>("reels");
   const [caption, setCaption] = useState("");
   const [when, setWhen] = useState(() => localInput(new Date(Date.now() + 60 * 60 * 1000)));
+  const [consent, setConsent] = useState(false);
   const [sending, setSending] = useState(false);
 
   const refresh = useCallback(async () => {
@@ -121,7 +122,7 @@ function AgendaPage() {
     try {
       await addAccount(handle);
       setHandle("");
-      toast.success("Conta adicionada à lista.");
+      toast.success("Conta adicionada como rascunho. Conecte via provedor oficial antes de publicar.");
       await refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível adicionar.");
@@ -144,9 +145,11 @@ function AgendaPage() {
         videoPath: up.path,
         videoUrl: up.url,
         fileName: file.name,
+        consent,
       });
       setFile(null);
       setCaption("");
+      setConsent(false);
       toast.success("Publicação agendada.");
       await refresh();
     } catch (e) {
@@ -184,9 +187,9 @@ function AgendaPage() {
             Seus vídeos vão ao ar sozinhos
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-            Envie o MP4 pronto, escolha a conta, o formato e a hora. O servidor publica na fila sem você
-            precisar abrir o app. A conexão real com o Instagram é ligada assim que o provedor de publicação
-            for configurado — até lá os posts ficam agendados e sinalizam o motivo.
+            Envie o MP4 pronto, escolha a conta, o formato e a hora. A publicação automática só roda em
+            contas conectadas por OAuth/API oficial; contas digitadas manualmente ficam como rascunho até a
+            conexão real ser configurada.
           </p>
         </section>
 
@@ -211,7 +214,7 @@ function AgendaPage() {
                     <input
                       value={handle}
                       onChange={(e) => setHandle(e.target.value)}
-                      placeholder="@suapagina"
+                      placeholder="@suapagina para preparar"
                       className="w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted-foreground"
                     />
                   </div>
@@ -235,7 +238,9 @@ function AgendaPage() {
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">@{a.username}</span>
                         <span className="block truncate font-mono text-[10px] text-muted-foreground">
-                          {a.status}
+                          {a.status === "connected" || a.status === "conectado"
+                            ? `conectada via ${a.provider}`
+                            : "rascunho; falta OAuth/API"}
                         </span>
                       </span>
                       <button
@@ -325,6 +330,19 @@ function AgendaPage() {
                     onChange={(e) => setWhen(e.target.value)}
                     className="rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm outline-none"
                   />
+                </label>
+
+                <label className="mt-3 flex items-start gap-2 rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={consent}
+                    onChange={(e) => setConsent(e.target.checked)}
+                    className="mt-0.5 accent-[var(--primary)]"
+                  />
+                  <span>
+                    Confirmo que tenho direito de publicar este vídeo e autorizo o envio do arquivo à rede social
+                    escolhida no horário agendado.
+                  </span>
                 </label>
 
                 <button

@@ -421,11 +421,13 @@ async def delete_job(job_id: str, x_job_token: Optional[str] = Header(None)):
 
 
 @app.get("/v1/jobs/{job_id}/result")
-async def get_result(job_id: str, token: Optional[str] = Query(None)):
+async def get_result(job_id: str, background_tasks: BackgroundTasks, token: Optional[str] = Query(None)):
     verify_token(job_id, token, "result")
-    path = job_dir(SETTINGS.storage_dir, job_id) / "output.mp4"
+    directory = job_dir(SETTINGS.storage_dir, job_id)
+    path = directory / "output.mp4"
     if not path.is_file():
         raise HTTPException(404, "resultado ainda nao disponivel")
+    background_tasks.add_task(shutil.rmtree, directory, True)
     return FileResponse(
         path,
         media_type="video/mp4",
