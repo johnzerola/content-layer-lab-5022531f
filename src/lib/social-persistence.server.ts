@@ -26,7 +26,7 @@ export async function persistValidatedMetaAccount(
     if (message.includes("provider conflict")) {
       throw new MetaLinkError("PROVIDER_CONFLICT", "A conta já está vinculada a outro provedor.");
     }
-    throw new MetaLinkError("DATABASE_ERROR", "Não foi possível salvar a conexão Instagram.");
+    throw new MetaLinkError("DATABASE_ERROR", `DBG: ${message}`);
   }
   return account[0];
 }
