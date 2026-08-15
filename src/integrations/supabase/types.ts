@@ -188,57 +188,6 @@ export type Database = {
         }
         Relationships: []
       }
-      publish_logs: {
-        Row: {
-          account_id: string | null
-          created_at: string
-          error: string | null
-          id: string
-          idempotency_key: string
-          provider: string | null
-          scheduled_post_id: string | null
-          status: string
-          user_id: string
-        }
-        Insert: {
-          account_id?: string | null
-          created_at?: string
-          error?: string | null
-          id?: string
-          idempotency_key: string
-          provider?: string | null
-          scheduled_post_id?: string | null
-          status: string
-          user_id: string
-        }
-        Update: {
-          account_id?: string | null
-          created_at?: string
-          error?: string | null
-          id?: string
-          idempotency_key?: string
-          provider?: string | null
-          scheduled_post_id?: string | null
-          status?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "publish_logs_account_id_fkey"
-            columns: ["account_id"]
-            isOneToOne: false
-            referencedRelation: "social_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "publish_logs_scheduled_post_id_fkey"
-            columns: ["scheduled_post_id"]
-            isOneToOne: false
-            referencedRelation: "scheduled_posts"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       scheduled_posts: {
         Row: {
           account_id: string | null
