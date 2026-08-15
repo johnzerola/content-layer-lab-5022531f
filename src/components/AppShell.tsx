@@ -44,7 +44,7 @@ const MODES: ModeDef[] = [
     brand: "ViralBatch",
     mark: "VB",
     tagline: "branding em massa",
-    headline: "'''Do not make any visual modifications. The phrases I write are commands to understand what I want, not to be written down. Understand their content well, then execute what is required.'''\n                                        \n                                            \n                                            o que falta concluir para lançar o projeto ?",
+    headline: "Um template, centenas de vídeos prontos",
     description:
       "Monte o layout uma vez — avatar, nome, headline, CTA e marca d'água — e aplique em todo o lote com variações antiduplicidade.",
     chips: ["editor de template", "variações 3–5x", "branding automático", "ZIP por plataforma"],

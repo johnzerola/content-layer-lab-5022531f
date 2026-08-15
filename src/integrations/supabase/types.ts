@@ -195,16 +195,15 @@ export type Database = {
           caption: string
           created_at: string
           error: string | null
+          error_code: string | null
           file_name: string | null
           id: string
-          error_code: string | null
-          last_attempt_at: string | null
-          locked_at: string | null
-          lock_id: string | null
-          next_attempt_at: string | null
-          provider_post_id: string | null
           kind: string
+          lock_id: string | null
+          locked_at: string | null
+          next_attempt_at: string | null
           permalink: string | null
+          provider_post_id: string | null
           published_at: string | null
           scheduled_at: string
           status: string
@@ -219,16 +218,15 @@ export type Database = {
           caption?: string
           created_at?: string
           error?: string | null
+          error_code?: string | null
           file_name?: string | null
           id?: string
-          error_code?: string | null
-          last_attempt_at?: string | null
-          locked_at?: string | null
-          lock_id?: string | null
-          next_attempt_at?: string | null
-          provider_post_id?: string | null
           kind?: string
+          lock_id?: string | null
+          locked_at?: string | null
+          next_attempt_at?: string | null
           permalink?: string | null
+          provider_post_id?: string | null
           published_at?: string | null
           scheduled_at?: string
           status?: string
@@ -243,16 +241,15 @@ export type Database = {
           caption?: string
           created_at?: string
           error?: string | null
+          error_code?: string | null
           file_name?: string | null
           id?: string
-          error_code?: string | null
-          last_attempt_at?: string | null
-          locked_at?: string | null
-          lock_id?: string | null
-          next_attempt_at?: string | null
-          provider_post_id?: string | null
           kind?: string
+          lock_id?: string | null
+          locked_at?: string | null
+          next_attempt_at?: string | null
           permalink?: string | null
+          provider_post_id?: string | null
           published_at?: string | null
           scheduled_at?: string
           status?: string
@@ -318,12 +315,8 @@ export type Database = {
           created_at: string
           expires_at: string | null
           id: string
-          metadata: Json
           provider: string
           provider_account_id: string | null
-          refresh_secret_ref: string | null
-          scopes: string[]
-          secret_ref: string | null
           social_account_id: string
           status: string
           updated_at: string
@@ -333,31 +326,33 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
-          metadata?: Json
-          provider: string
+          provider?: string
           provider_account_id?: string | null
-          refresh_secret_ref?: string | null
-          scopes?: string[]
-          secret_ref?: string | null
           social_account_id: string
           status?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          created_at?: string
           expires_at?: string | null
-          metadata?: Json
+          id?: string
           provider?: string
           provider_account_id?: string | null
-          refresh_secret_ref?: string | null
-          scopes?: string[]
-          secret_ref?: string | null
           social_account_id?: string
           status?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "social_connections_social_account_id_fkey"
+            columns: ["social_account_id"]
+            isOneToOne: true
+            referencedRelation: "social_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       template_versions: {
         Row: {
@@ -431,12 +426,21 @@ export type Database = {
     Functions: {
       claim_due_scheduled_posts: {
         Args: {
-          p_limit?: number
+          p_limit: number
           p_lock_id: string
-          p_lock_timeout_seconds?: number
-          p_max_attempts?: number
+          p_lock_timeout_seconds: number
+          p_max_attempts: number
         }
-        Returns: Database["public"]["Tables"]["scheduled_posts"]["Row"][]
+        Returns: {
+          account_id: string
+          attempts: number
+          caption: string
+          id: string
+          kind: string
+          user_id: string
+          video_path: string
+          video_url: string
+        }[]
       }
     }
     Enums: {

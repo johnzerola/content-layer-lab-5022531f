@@ -1,0 +1,2 @@
+REVOKE ALL ON FUNCTION public.claim_due_scheduled_posts(UUID, INTEGER, INTEGER, INTEGER) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_due_scheduled_posts(UUID, INTEGER, INTEGER, INTEGER) TO service_role;
