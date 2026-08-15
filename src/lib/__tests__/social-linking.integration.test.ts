@@ -109,7 +109,7 @@ describe("authenticated Meta linking to scheduled publishing", () => {
       expect.objectContaining({ status: "publicado", provider_post_id: "published-id" }),
     );
     expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual([
-      "https://graph.instagram.com/v26.0/ig-validated?fields=id,username",
+      "https://graph.instagram.com/v26.0/me?fields=id,username",
       "https://graph.instagram.com/v26.0/ig-validated/media",
       "https://graph.instagram.com/v26.0/container-id?fields=status_code",
       "https://graph.instagram.com/v26.0/ig-validated/media_publish",
@@ -120,13 +120,11 @@ describe("authenticated Meta linking to scheduled publishing", () => {
     process.env["AYRSHARE_API_KEY"] = "ayrshare-test-key";
     process.env["META_ACCESS_TOKEN"] = "meta-test-token";
     process.env["META_IG_USER_ID"] = "ig-validated";
-    const fetchMock = vi
-      .spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(
-        jsonResponse(200, {
-          postIds: [{ id: "ayrshare-post", postUrl: "https://instagram.test/post" }],
-        }),
-      );
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
+      jsonResponse(200, {
+        postIds: [{ id: "ayrshare-post", postUrl: "https://instagram.test/post" }],
+      }),
+    );
 
     const result = await publish({
       kind: "reels",
