@@ -78,7 +78,12 @@ export interface PreEdit {
   grayscale: number;
   /** px */
   blur: number;
+  /** 0..150 (%) */
+  voiceLevel?: number;
+  /** 0..150 (%) */
+  musicLevel?: number;
 }
+
 
 export function defaultPreEdit(): PreEdit {
   return {
@@ -103,8 +108,11 @@ export function defaultPreEdit(): PreEdit {
     sepia: 0,
     grayscale: 0,
     blur: 0,
+    voiceLevel: 100,
+    musicLevel: 100,
   };
 }
+
 
 export const LAYOUTS: { id: LayoutKind; label: string; hint: string }[] = [
   { id: "auto", label: "Automático", hint: "Preenche quando a orientação bate, senão mostra inteiro" },

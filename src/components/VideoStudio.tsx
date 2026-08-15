@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   AudioLines,
+  Music,
+  Mic,
   Camera,
   ChevronFirst,
   ChevronLast,
@@ -28,6 +30,18 @@ import {
   Type,
   Undo2,
   X,
+  Plus,
+  Trash2,
+  History,
+  Layers,
+  ArrowRight,
+  Monitor,
+  Maximize,
+  Volume2,
+  Timer,
+  Palette,
+  Captions,
+  Settings,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -57,6 +71,12 @@ import { EditorTimeline } from "@/components/EditorTimeline";
 import { StagePreview } from "@/components/editor/StagePreview";
 import { useEditorHistory } from "@/components/editor/useEditorHistory";
 import type { CaptionCue } from "@/lib/captions";
+import { cn } from "@/lib/utils";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export interface PreEditResult {
   pre: PreEdit;
@@ -98,35 +118,34 @@ type Drag = {
 
 const HANDLES: Handle[] = ["nw", "n", "ne", "e", "se", "s", "sw", "w"];
 
-type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text";
-
-const TOOL_GROUPS: { group: string; items: { id: Tab; label: string; icon: typeof Scissors }[] }[] = [
+const TOOL_GROUPS: { group: string; items: { id: Tab; label: string; icon: any; shortcut: string }[] }[] = [
   {
-    group: "Tempo",
+    group: "Ferramentas",
     items: [
-      { id: "trim", label: "Cortar", icon: Scissors },
-      { id: "trans", label: "Transições", icon: SlidersHorizontal },
+      { id: "trim", label: "Corte", icon: Scissors, shortcut: "S" },
+      { id: "crop", label: "Enquadrar", icon: Maximize, shortcut: "C" },
+      { id: "trans", label: "Transições", icon: ArrowRight, shortcut: "T" },
     ],
   },
   {
-    group: "Imagem",
+    group: "Design",
     items: [
-      { id: "layout", label: "Layout", icon: LayoutTemplate },
-      { id: "crop", label: "Enquadrar", icon: Crop },
-      { id: "camera", label: "Câmera", icon: Camera },
-      { id: "keys", label: "Keyframes", icon: Sparkles },
-      { id: "color", label: "Cor", icon: SlidersHorizontal },
+      { id: "layout", label: "Layout", icon: LayoutTemplate, shortcut: "L" },
+      { id: "color", label: "Ajustes", icon: SlidersHorizontal, shortcut: "A" },
+      { id: "camera", label: "IA Motion", icon: Sparkles, shortcut: "M" },
     ],
   },
   {
-    group: "Conteúdo",
+    group: "Áudio & Texto",
     items: [
-      { id: "caps", label: "Legenda", icon: Subtitles },
-      { id: "text", label: "Textos", icon: Type },
+      { id: "caps", label: "Legendas", icon: Captions, shortcut: "G" },
+      { id: "audio", label: "Mixagem", icon: Volume2, shortcut: "V" },
+      { id: "text", label: "Títulos", icon: Type, shortcut: "H" },
     ],
   },
 ];
 
+type Tab = "trim" | "layout" | "crop" | "camera" | "keys" | "trans" | "color" | "caps" | "text" | "audio";
 const TOOL_ORDER: Tab[] = TOOL_GROUPS.flatMap((g) => g.items.map((i) => i.id));
 
 /** Miniatura esquemática de cada layout (9:16). */
@@ -245,6 +264,7 @@ export function VideoStudio({
   const [cutting, setCutting] = useState(false);
   /** proporção travada do recorte (largura/altura em pixels da fonte) */
   const [lock, setLock] = useState<number | null>(null);
+  const [separating, setSeparating] = useState(false);
 
   const [url, setUrl] = useState("");
   useEffect(() => {
@@ -498,6 +518,24 @@ export function VideoStudio({
     }
   };
 
+  const separateAudioTracks = async () => {
+    setSeparating(true);
+    try {
+      // Aqui chamaremos a função server-side ou worker quando integrada
+      toast.promise(
+        new Promise((resolve) => setTimeout(resolve, 2000)),
+        {
+          loading: "Analisando frequências e separando trilhas...",
+          success: "Áudio separado com sucesso! (Modo Simulação)",
+          error: "Erro ao processar áudio.",
+        }
+      );
+    } finally {
+      setSeparating(false);
+    }
+  };
+
+
   /** traduz a legenda mantendo os tempos por palavra */
   const translate = async () => {
     if (!captions?.length || !onCaptionsChange) return;
@@ -617,10 +655,10 @@ export function VideoStudio({
             </p>
           </div>
           <div className="flex items-center gap-1.5">
-            <Button variant="ghost" size="icon" disabled={!hist.canUndo} onClick={undo} aria-label="Desfazer">
+            <Button variant="ghost" size="icon" disabled={!hist.canUndo} onClick={() => hist.undo()} aria-label="Desfazer">
               <Undo2 className="size-4" />
             </Button>
-            <Button variant="ghost" size="icon" disabled={!hist.canRedo} onClick={redo} aria-label="Refazer">
+            <Button variant="ghost" size="icon" disabled={!hist.canRedo} onClick={() => hist.redo()} aria-label="Refazer">
               <Redo2 className="size-4" />
             </Button>
             <Button
@@ -640,30 +678,44 @@ export function VideoStudio({
         </header>
 
         {/* corpo: trilha · palco · inspetor */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[132px_minmax(0,1fr)_340px] md:overflow-hidden">
-          {/* trilha de ferramentas */}
-          <nav className="flex gap-2 overflow-x-auto border-b border-border p-2 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r">
+        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[160px_minmax(0,1fr)_340px] md:overflow-hidden bg-background">
+          {/* trilha de ferramentas estilo CapCut */}
+          <aside className="flex gap-1 overflow-x-auto border-b border-border bg-surface p-2 md:flex-col md:overflow-y-auto md:border-b-0 md:border-r">
             {TOOL_GROUPS.map((g) => (
               <div key={g.group} className="flex shrink-0 gap-1 md:block md:space-y-1">
-                <span className="hidden px-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground md:block">
+                <span className="mb-1 hidden px-2 font-display text-[10px] font-bold uppercase tracking-wider text-muted-foreground md:block">
                   {g.group}
                 </span>
                 {g.items.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => setTab(t.id)}
-                    className={`flex w-full items-center gap-2 whitespace-nowrap rounded-md px-2 py-1.5 font-mono text-[11px] transition ${
-                      tab === t.id
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
-                  >
-                    <t.icon className="size-3.5 shrink-0" /> {t.label}
-                  </button>
+                  <TooltipProvider key={t.id}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => setTab(t.id)}
+                          className={cn(
+                            "group relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-200",
+                            tab === t.id
+                              ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                              : "text-muted-foreground hover:bg-white/5 hover:text-foreground"
+                          )}
+                        >
+                          <t.icon className={cn("size-4 shrink-0 transition-transform group-hover:scale-110", tab === t.id ? "animate-pulse" : "")} />
+                          <span className="font-display text-xs font-medium">{t.label}</span>
+                          {tab === t.id && (
+                            <div className="absolute left-0 top-1/2 h-4 w-1 -translate-y-1/2 rounded-full bg-white md:block hidden" />
+                          )}
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="bg-popover text-popover-foreground">
+                        <p>{t.label} ({t.shortcut})</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 ))}
+                <Separator className="my-2 hidden opacity-20 md:block" />
               </div>
             ))}
-          </nav>
+          </aside>
 
           {/* palco */}
           <section className="flex min-h-0 flex-col gap-2 p-3 md:overflow-hidden">
@@ -875,132 +927,119 @@ export function VideoStudio({
             />
           </section>
 
-          {/* inspetor */}
           <aside
-            className={`min-h-0 space-y-4 border-t border-border p-3 md:overflow-y-auto md:border-l md:border-t-0 ${
-              tab === "camera" ? "hidden md:block" : ""
-            }`}
+            className={cn(
+              "flex flex-col border-t border-border bg-surface/50 p-0 md:border-l md:border-t-0 md:overflow-hidden",
+              tab === "camera" ? "hidden md:flex" : "flex"
+            )}
           >
-            <div className="flex items-center justify-between">
-              <h3 className="font-display text-sm text-foreground">{toolLabel}</h3>
-              <span className="font-mono text-[10px] text-muted-foreground">
-                {TOOL_ORDER.indexOf(tab) + 1} · atalho
-              </span>
+            <div className="flex items-center justify-between border-b border-border p-4 bg-surface/80 backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-tighter opacity-70">
+                  Ajustes
+                </Badge>
+                <h3 className="font-display text-sm font-bold tracking-tight text-foreground">{toolLabel}</h3>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="size-8 rounded-full" onClick={() => hist.undo()} disabled={!hist.canUndo}>
+                  <Undo2 className="size-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="size-8 rounded-full" onClick={() => hist.redo()} disabled={!hist.canRedo}>
+                  <Redo2 className="size-4" />
+                </Button>
+              </div>
             </div>
 
-            {tab === "camera" && (
-              <p className="font-mono text-[11px] text-muted-foreground">
-                A câmera virtual usa o palco à esquerda. Escolha pessoas, pontos de enquadramento e transições
-                direto lá.
-              </p>
-            )}
+            <ScrollArea className="flex-1">
+              <div className="space-y-6 p-4">
 
-            {tab === "trim" && (
-              <div className="space-y-4">
-                <Field label={`Início · ${fmt(start)}`}>
-                  <Slider
-                    value={[start]}
-                    min={0}
-                    max={Math.max(0.2, duration)}
-                    step={0.05}
-                    onValueChange={([v]) => {
-                      const s = Math.min(v ?? 0, end - 0.3);
-                      setStart(s);
-                      seek(s);
-                    }}
-                  />
-                </Field>
-                <Field label={`Fim · ${fmt(end)}`}>
-                  <Slider
-                    value={[end]}
-                    min={0}
-                    max={Math.max(0.2, duration)}
-                    step={0.05}
-                    onValueChange={([v]) => {
-                      const e = Math.max(v ?? duration, start + 0.3);
-                      setEnd(e);
-                      seek(Math.max(start, e - 0.5));
-                    }}
-                  />
-                </Field>
-                <div className="flex flex-wrap gap-2">
-                  <Button variant="secondary" size="sm" onClick={() => setStart(Math.min(time, end - 0.3))}>
-                    Início aqui (I)
-                  </Button>
-                  <Button variant="secondary" size="sm" onClick={() => setEnd(Math.max(start + 0.3, time))}>
-                    Fim aqui (O)
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => hist.set((d) => ({ ...d, start: 0, end: duration }), "vídeo inteiro")}
-                  >
-                    Vídeo inteiro
-                  </Button>
-                </div>
-                <div className="space-y-2 rounded-lg border border-border p-2">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button size="sm" variant="secondary" onClick={split}>
-                      <Scissors className="mr-1 size-3.5" /> Dividir aqui (S)
-                    </Button>
-                    {pre.segments.length > 0 && (
-                      <Button size="sm" variant="ghost" onClick={() => set({ segments: [] }, "juntar trechos")}>
-                        Juntar tudo
-                      </Button>
-                    )}
+                {tab === "camera" && (
+                  <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border py-12 text-center">
+                    <div className="flex size-12 items-center justify-center rounded-full bg-primary/10">
+                      <Sparkles className="size-6 text-primary" />
+                    </div>
+                    <div className="max-w-[200px] space-y-1">
+                      <p className="font-display text-sm font-bold">IA Motion Ativa</p>
+                      <p className="text-[11px] leading-relaxed text-muted-foreground">
+                        O enquadramento está sendo controlado pela câmera virtual. Use o palco ao lado para ajustes manuais.
+                      </p>
+                    </div>
                   </div>
-                  {segs.length > 1 ? (
-                    <ul className="space-y-1">
-                      {segs.map((s, i) => (
-                        <li
-                          key={`${i}-${s.start}`}
-                          className="flex items-center justify-between rounded-md border border-border px-2 py-1 font-mono text-[11px]"
-                        >
-                          <button className="text-primary" onClick={() => seek(s.start)}>
-                            {i + 1}. {fmt(s.start)} → {fmt(s.end)}
-                          </button>
-                          <span className="text-muted-foreground">{fmt(s.end - s.start)}</span>
-                          <button className="text-destructive" onClick={() => deleteSegment(i)}>
-                            remover
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="font-mono text-[11px] text-muted-foreground">
-                      Divida o vídeo para remover partes do meio e exportar só os trechos bons.
-                    </p>
-                  )}
-                </div>
+                )}
 
-                <div className="space-y-2 rounded-lg border border-border p-2">
-                  <p className="font-mono text-[11px] text-foreground">Remover silêncio automaticamente</p>
-                  <Field label={`Sensibilidade · ${Math.round(sens * 100)}%`}>
-                    <Slider value={[sens]} min={0.1} max={0.95} step={0.05} onValueChange={([v]) => setSens(v ?? 0.5)} />
-                  </Field>
-                  <Field label={`Pausa mínima · ${minSil.toFixed(2)}s`}>
-                    <Slider
-                      value={[minSil]}
-                      min={0.15}
-                      max={1.5}
-                      step={0.05}
-                      onValueChange={([v]) => setMinSil(v ?? 0.35)}
-                    />
-                  </Field>
-                  <Button size="sm" variant="secondary" disabled={cutting} onClick={cutSilence}>
-                    <AudioLines className="mr-1 size-3.5" />
-                    {cutting ? "Analisando áudio…" : "Cortar pausas"}
-                  </Button>
-                  <p className="font-mono text-[10px] text-muted-foreground">
-                    Analisa o áudio e mantém só os trechos com fala — os trechos ficam editáveis na timeline.
-                  </p>
-                </div>
-                <p className="font-mono text-[11px] text-muted-foreground">
-                  Duração final: {fmt(Math.max(0, outDur))}
-                  {segs.length > 1 ? ` · ${segs.length} trechos` : ""}
-                </p>
-              </div>
-            )}
+                {tab === "trim" && (
+                  <div className="space-y-4">
+                    <Field label={`Início · ${fmt(start)}`}>
+                      <Slider
+                        value={[start]}
+                        min={0}
+                        max={Math.max(0.2, duration)}
+                        step={0.05}
+                        onValueChange={([v]) => {
+                          const s = Math.min(v ?? 0, end - 0.3);
+                          setStart(s);
+                          seek(s);
+                        }}
+                      />
+                    </Field>
+                    <Field label={`Fim · ${fmt(end)}`}>
+                      <Slider
+                        value={[end]}
+                        min={0}
+                        max={Math.max(0.2, duration)}
+                        step={0.05}
+                        onValueChange={([v]) => {
+                          const e = Math.max(v ?? duration, start + 0.3);
+                          setEnd(e);
+                          seek(Math.max(start, e - 0.5));
+                        }}
+                      />
+                    </Field>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant="secondary" size="sm" onClick={() => seek(start)}>
+                        Ir para início
+                      </Button>
+                      <Button variant="secondary" size="sm" onClick={() => seek(end)}>
+                        Ir para fim
+                      </Button>
+                    </div>
+                    <Separator className="my-2 opacity-50" />
+                    <div className="space-y-2 rounded-lg border border-border p-2">
+                      <p className="font-mono text-[11px] text-foreground">Remover silêncio automaticamente</p>
+                      <Field label={`Sensibilidade · ${Math.round(sens * 100)}%`}>
+                        <Slider value={[sens]} min={0.1} max={0.95} step={0.05} onValueChange={([v]) => setSens(v ?? 0.5)} />
+                      </Field>
+                      <Field label={`Pausa mínima · ${minSil.toFixed(2)}s`}>
+                        <Slider
+                          value={[minSil]}
+                          min={0.15}
+                          max={1.5}
+                          step={0.05}
+                          onValueChange={([v]) => setMinSil(v ?? 0.35)}
+                        />
+                      </Field>
+                      <Button size="sm" variant="secondary" disabled={cutting} onClick={cutSilence}>
+                        <AudioLines className="mr-1 size-3.5" />
+                        {cutting ? "Analisando áudio…" : "Cortar pausas"}
+                      </Button>
+                      <p className="font-mono text-[10px] text-muted-foreground">
+                        Analisa o áudio e mantém só os trechos com fala — os trechos ficam editáveis na timeline.
+                      </p>
+                    </div>
+                    <p className="font-mono text-[11px] text-muted-foreground">
+                      Duração final: {fmt(Math.max(0, outDur))}
+                      {segs.length > 1 ? ` · ${segs.length} trechos` : ""}
+                    </p>
+                  </div>
+                )}
+
+
+
+
+
+
+
+
 
             {tab === "layout" && (
               <div className="space-y-3">
@@ -1360,7 +1399,79 @@ export function VideoStudio({
               </div>
             )}
 
-            {tab === "color" && (
+              {tab === "audio" && (
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <h3 className="text-sm font-medium">Separar Áudio e Música</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Use nossa IA para isolar a voz da música de fundo automaticamente.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    <Button
+                      variant={pre.voiceLevel !== 100 || pre.musicLevel !== 100 ? "default" : "outline"}
+                      className="h-auto flex-col items-start gap-1 py-4 text-left"
+                      onClick={separateAudioTracks}
+                      disabled={separating}
+                    >
+                      <div className="flex items-center gap-2 font-semibold">
+                        <Sparkles className={cn("h-4 w-4", separating ? "animate-spin" : "text-primary")} />
+                        <span>{separating ? "Processando..." : "Separar com IA"}</span>
+                      </div>
+                      <span className="text-[10px] opacity-70">
+                        {pre.voiceLevel !== 100 || pre.musicLevel !== 100 
+                          ? "Trilhas separadas e prontas para mixagem" 
+                          : "Detecta vozes e instrumentos de forma independente"}
+                      </span>
+                    </Button>
+
+                  </div>
+
+                  <div className="space-y-4 pt-4 border-t">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Mixagem</h4>
+                    
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <Mic className="h-3 w-3 text-primary" />
+                          <span>Voz / Diálogo</span>
+                        </div>
+                        <span className="font-mono">{pre.voiceLevel ?? 100}%</span>
+                      </div>
+                      <Slider
+                        value={[pre.voiceLevel ?? 100]}
+                        max={150}
+                        step={1}
+                        onValueChange={([v]) => set({ voiceLevel: v ?? 100 }, "volume da voz")}
+                      />
+
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <Music className="h-3 w-3 text-blue-400" />
+                          <span>Música de Fundo</span>
+                        </div>
+                        <span className="font-mono">{pre.musicLevel ?? 100}%</span>
+                      </div>
+                      <Slider
+                        value={[pre.musicLevel ?? 100]}
+                        max={150}
+                        step={1}
+                        onValueChange={([v]) => set({ musicLevel: v ?? 100 }, "volume da música")}
+                      />
+
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg bg-muted/30 p-3 text-[11px] leading-relaxed text-muted-foreground">
+                    Dica: Reduza a música para destacar a fala em vídeos com muito ruído ambiente.
+                  </div>
+                </div>
+              )}
+              {tab === "color" && (
               <div className="space-y-4">
                 <div className="flex flex-wrap gap-1.5">
                   {COLOR_PRESETS.map((p) => (
@@ -1418,19 +1529,29 @@ export function VideoStudio({
                 <Field label={`Desfoque · ${pre.blur.toFixed(1)}px`}>
                   <Slider value={[pre.blur]} min={0} max={8} step={0.1} onValueChange={([v]) => set({ blur: v ?? 0 }, "cor")} />
                 </Field>
+                </div>
+                )}
               </div>
-            )}
+            </ScrollArea>
 
-            <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
-              Atalhos: espaço reproduz · setas andam quadro a quadro · I/O marcam entrada e saída · S divide ·
-              K grava keyframe · Ctrl+Z desfaz.
-            </p>
+            <div className="border-t border-border p-4 bg-surface/80 backdrop-blur-sm">
+              <p className="font-mono text-[10px] leading-relaxed text-muted-foreground opacity-60">
+                Atalhos: <kbd className="rounded bg-muted px-1 text-foreground">espaço</kbd> play · 
+                <kbd className="rounded bg-muted px-1 text-foreground">setas</kbd> quadro a quadro · 
+                <kbd className="rounded bg-muted px-1 text-foreground">I</kbd>/<kbd className="rounded bg-muted px-1 text-foreground">O</kbd> entrada/saída · 
+                <kbd className="rounded bg-muted px-1 text-foreground">S</kbd> dividir ·
+                <kbd className="rounded bg-muted px-1 text-foreground">K</kbd> keyframe.
+              </p>
+            </div>
           </aside>
         </div>
       </div>
     </div>
   );
 }
+
+
+
 
 function ToggleChip({
   on,

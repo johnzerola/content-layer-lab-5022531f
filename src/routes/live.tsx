@@ -1,17 +1,12 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+﻿import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import {
-  ArrowLeft,
-  Download,
-  Loader2,
-  Pencil,
-  Radio,
-  Scissors,
-  Sparkles,
-  Square,
-  Trash2,
-} from "lucide-react";
+import { Download, Loader2, Pencil, Radio, Scissors, Sparkles, Square, Trash2 } from "lucide-react";
+import { AppShell, type AppMode } from "@/components/AppShell";
+import { TemplateLibrary } from "@/components/TemplateLibrary";
+import { CloudPanel } from "@/components/CloudPanel";
+import { listJobs } from "@/lib/jobs";
+import type { Template } from "@/lib/template";
 import { checkXLive, type LiveCheck } from "@/lib/live.functions";
 import { LiveClipper, analyzeLiveClip, attachHls, clipTitle, type LiveClip } from "@/lib/live";
 import { markPendingTool, sendItemsToTool } from "@/lib/handoff";
@@ -21,13 +16,13 @@ export const Route = createFileRoute("/live")({
   component: LivePage,
   head: () => ({
     meta: [
-      { title: "Monitora Live — cortes automáticos de lives do X" },
+      { title: "Monitora Live â€” cortes automÃ¡ticos de lives do X" },
       {
         name: "description",
         content:
-          "Monitore transmissões públicas do X, Kick, TikTok ou HLS direto, gere cortes automáticos pontuados por energia de fala e edite cada corte antes de baixar.",
+          "Monitore transmissÃµes pÃºblicas do X, Kick, TikTok ou HLS direto, gere cortes automÃ¡ticos pontuados por energia de fala e edite cada corte antes de baixar.",
       },
-      { property: "og:title", content: "Monitora Live — cortes automáticos de lives" },
+      { property: "og:title", content: "Monitora Live â€” cortes automÃ¡ticos de lives" },
       {
         property: "og:description",
         content: "Acompanhe uma live do X e receba cortes prontos, com score e editor de recorte.",
@@ -73,6 +68,11 @@ function ScoreRing({ value }: { value: number }) {
 
 function LivePage() {
   const navigate = useNavigate();
+  const [mode, setMode] = useState<AppMode>("lote");
+  const [libOpen, setLibOpen] = useState(false);
+  const [cloudOpen, setCloudOpen] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const jobs = listJobs();
   const [target, setTarget] = useState("");
   const [clipLen, setClipLen] = useState(45);
   const [minScore, setMinScore] = useState(65);
@@ -129,7 +129,7 @@ function LivePage() {
 
   function editInCorteIA(selected: LiveClip[]) {
     if (!selected.length) {
-      toast.info("Nenhum corte atingiu o score atual. Reduza o score mínimo ou escolha um corte.");
+      toast.info("Nenhum corte atingiu o score atual. Reduza o score mÃ­nimo ou escolha um corte.");
       return;
     }
     sendItemsToTool(
@@ -162,7 +162,7 @@ function LivePage() {
       const capture = (video as HTMLVideoElement & { captureStream?: () => MediaStream })
         .captureStream;
       if (!capture) {
-        toast.error("Este navegador não permite gravar a live (use Chrome ou Edge).");
+        toast.error("Este navegador nÃ£o permite gravar a live (use Chrome ou Edge).");
         return;
       }
       const stream = capture.call(video);
@@ -184,7 +184,7 @@ function LivePage() {
     if (res.live && res.hls && !clipperRef.current && runningRef.current) {
       setStatus("ao-vivo");
       await startCapture(res.hls);
-      toast.success("Live encontrada — cortando automaticamente.");
+      toast.success("Live encontrada â€” cortando automaticamente.");
     } else if (!res.live) {
       setStatus(runningRef.current ? "procurando" : "parado");
     }
@@ -251,32 +251,29 @@ function LivePage() {
   };
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
-      <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-6">
-          <Link
-            to="/"
-            className="flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-sm text-muted-foreground transition hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" /> Voltar
-          </Link>
+    <AppShell
+      mode={mode}
+      onMode={setMode}
+      count={jobs.length}
+      onLibrary={() => setLibOpen(true)}
+      onCloud={() => setCloudOpen(true)}
+    >
+      <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="flex items-center justify-between gap-3 lg:col-span-2">
           <div className="min-w-0">
             <h1 className="truncate font-display text-lg font-bold tracking-tight">
               Monitora Live
             </h1>
             <p className="truncate font-mono text-[11px] text-muted-foreground">
-              cortes automáticos de X, Kick, TikTok e HLS
+              cortes automaticos de X, Kick, TikTok e HLS
             </p>
           </div>
           <span
-            className={`ml-auto rounded-full border px-3 py-1 font-mono text-[11px] ${statusChip[status]}`}
+            className={`rounded-full border px-3 py-1 font-mono text-[11px] ${statusChip[status]}`}
           >
             {status}
           </span>
         </div>
-      </header>
-
-      <main className="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <section className="space-y-4">
           <div className="overflow-hidden rounded-2xl border border-border bg-surface">
             <video
@@ -291,8 +288,8 @@ function LivePage() {
                 <Radio className="size-3.5" />
                 {info?.title ??
                   (info?.handle
-                    ? `${info.platform === "kick" ? "Kick" : info.platform === "tiktok" ? "TikTok" : "X"} · @${info.handle}`
-                    : "aguardando transmissão")}
+                    ? `${info.platform === "kick" ? "Kick" : info.platform === "tiktok" ? "TikTok" : "X"} Â· @${info.handle}`
+                    : "aguardando transmissÃ£o")}
               </span>
               <button
                 onClick={() => clipperRef.current?.cutNow()}
@@ -367,8 +364,8 @@ function LivePage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{c.title}</p>
                       <p className="font-mono text-[11px] text-muted-foreground">
-                        {fmt(c.at)} ·{" "}
-                        {Math.round((c.trim?.end ?? c.duration) - (c.trim?.start ?? 0))}s úteis
+                        {fmt(c.at)} Â·{" "}
+                        {Math.round((c.trim?.end ?? c.duration) - (c.trim?.start ?? 0))}s Ãºteis
                       </p>
                     </div>
                   </div>
@@ -414,7 +411,7 @@ function LivePage() {
 
         <aside className="space-y-4">
           <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
-            <p className="mono-label">Transmissão</p>
+            <p className="mono-label">TransmissÃ£o</p>
             <input
               value={target}
               onChange={(e) => setTarget(e.target.value)}
@@ -422,7 +419,7 @@ function LivePage() {
               className="w-full rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary/50"
             />
             <label className="block text-sm">
-              <span className="mono-label">duração do corte: {clipLen}s</span>
+              <span className="mono-label">duraÃ§Ã£o do corte: {clipLen}s</span>
               <input
                 type="range"
                 min={15}
@@ -434,7 +431,7 @@ function LivePage() {
               />
             </label>
             <label className="block text-sm">
-              <span className="mono-label">score mínimo recomendado: {minScore}</span>
+              <span className="mono-label">score mÃ­nimo recomendado: {minScore}</span>
               <input
                 type="range"
                 min={40}
@@ -480,9 +477,9 @@ function LivePage() {
           <div className="rounded-2xl border border-border bg-surface p-4 text-sm text-muted-foreground">
             <p className="mono-label mb-2">como funciona</p>
             <ol className="list-decimal space-y-1 pl-4">
-              <li>O sistema procura live pública no X, Kick, TikTok ou HLS direto.</li>
-              <li>Ao encontrar, começa a gravar e fecha um corte a cada {clipLen}s.</li>
-              <li>Fala, ruído, pausas, ritmo e começo/fim limpos formam o score.</li>
+              <li>O sistema procura live pÃºblica no X, Kick, TikTok ou HLS direto.</li>
+              <li>Ao encontrar, comeÃ§a a gravar e fecha um corte a cada {clipLen}s.</li>
+              <li>Fala, ruÃ­do, pausas, ritmo e comeÃ§o/fim limpos formam o score.</li>
               <li>
                 Os melhores cortes seguem para o CorteIA, onde podem ser ajustados e exportados.
               </li>
@@ -490,6 +487,28 @@ function LivePage() {
           </div>
         </aside>
       </main>
-    </div>
+
+      {libOpen && (
+        <TemplateLibrary
+          templates={templates}
+          activeId=""
+          onClose={() => setLibOpen(false)}
+          onChangeList={setTemplates}
+          onUse={() => {}}
+          onCommit={(t) => t}
+        />
+      )}
+
+      {cloudOpen && (
+        <CloudPanel
+          templates={templates}
+          onClose={() => setCloudOpen(false)}
+          onChangeList={setTemplates}
+          mode={mode}
+          buildSnapshot={() => ({ items: [] })}
+          onRestore={() => {}}
+        />
+      )}
+    </AppShell>
   );
 }

@@ -19,7 +19,6 @@ ALTER TABLE public.social_accounts
   ADD COLUMN IF NOT EXISTS last_checked_at timestamptz;
 
 ALTER TABLE public.scheduled_posts
-  ADD COLUMN IF NOT EXISTS locked_at timestamptz,
   ADD COLUMN IF NOT EXISTS idempotency_key text,
   ADD COLUMN IF NOT EXISTS consent_at timestamptz,
   ADD COLUMN IF NOT EXISTS deleted_storage_at timestamptz;
@@ -34,9 +33,6 @@ ALTER TABLE public.scheduled_posts
 
 CREATE UNIQUE INDEX IF NOT EXISTS scheduled_posts_idempotency_key_idx
   ON public.scheduled_posts (idempotency_key);
-
-CREATE INDEX IF NOT EXISTS scheduled_posts_processing_lock_idx
-  ON public.scheduled_posts (status, locked_at);
 
 CREATE TABLE IF NOT EXISTS public.publish_logs (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
