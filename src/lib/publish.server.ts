@@ -127,40 +127,56 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
   const token = process.env["META_ACCESS_TOKEN"];
   const igId = process.env["META_IG_USER_ID"];
   if (!token || !igId) {
-    return { ok: false, code: "AUTH_INVALID", retryable: false, error: "Credencial Meta não configurada." };
+    return {
+      ok: false,
+      code: "AUTH_INVALID",
+      retryable: false,
+      error: "Credencial Meta não configurada.",
+    };
   }
-  const base = `https://graph.facebook.com/v21.0/${igId}`;
+  const configuredVersion = process.env["META_GRAPH_VERSION"]?.trim();
+  const graphVersion =
+    configuredVersion && /^v\d+\.\d+$/.test(configuredVersion) ? configuredVersion : "v26.0";
+  const graphBase = `https://graph.instagram.com/${graphVersion}`;
+  const accountBase = `${graphBase}/${igId}`;
+  const authorization = { authorization: `Bearer ${token}` };
   try {
     const mediaType = input.kind === "stories" ? "STORIES" : "REELS";
-    const create = await fetch(`${base}/media`, {
+    const create = await fetch(`${accountBase}/media`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...authorization },
       body: JSON.stringify({
         media_type: mediaType,
         video_url: input.videoUrl,
         caption: input.kind === "stories" ? undefined : input.caption,
-        access_token: token,
       }),
     });
     const created: unknown = await create.json().catch(() => null);
     const creationId = nestedString(created, ["id"]);
-    if (!create.ok || !creationId) return providerFailure("Meta criar container", create.status, created);
+    if (!create.ok || !creationId)
+      return providerFailure("Meta criar container", create.status, created);
 
     let finished = false;
     for (let i = 0; i < 20; i++) {
       await new Promise((resolve) => setTimeout(resolve, 3000));
-      const statusResponse = await fetch(
-        `https://graph.facebook.com/v21.0/${creationId}?fields=status_code&access_token=${token}`,
-      );
+      const statusResponse = await fetch(`${graphBase}/${creationId}?fields=status_code`, {
+        headers: authorization,
+      });
       const statusPayload: unknown = await statusResponse.json().catch(() => null);
-      if (!statusResponse.ok) return providerFailure("Meta consultar container", statusResponse.status, statusPayload);
+      if (!statusResponse.ok)
+        return providerFailure("Meta consultar container", statusResponse.status, statusPayload);
       const statusCode = nestedString(statusPayload, ["status_code"]);
       if (statusCode === "FINISHED") {
         finished = true;
         break;
       }
       if (statusCode === "ERROR") {
-        return { ok: false, code: "MEDIA_INVALID", retryable: false, error: "Meta não processou o vídeo." };
+        return {
+          ok: false,
+          code: "MEDIA_INVALID",
+          retryable: false,
+          error: "Meta não processou o vídeo.",
+        };
       }
     }
     if (!finished) {
@@ -172,10 +188,10 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
       };
     }
 
-    const publishResponse = await fetch(`${base}/media_publish`, {
+    const publishResponse = await fetch(`${accountBase}/media_publish`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ creation_id: creationId, access_token: token }),
+      headers: { "content-type": "application/json", ...authorization },
+      body: JSON.stringify({ creation_id: creationId }),
     });
     const published: unknown = await publishResponse.json().catch(() => null);
     const providerPostId = nestedString(published, ["id"]);
