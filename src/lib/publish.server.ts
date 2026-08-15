@@ -1,4 +1,5 @@
 import type { PostKind, PublishErrorCode, SocialProvider } from "@/lib/publishing";
+import { globalMetaCredentials, metaGraphBase } from "@/lib/meta.server";
 
 export type PublishInput = {
   kind: PostKind;
@@ -124,9 +125,8 @@ async function publishAyrshare(input: PublishInput): Promise<PublishResult> {
 }
 
 async function publishMeta(input: PublishInput): Promise<PublishResult> {
-  const token = process.env["META_ACCESS_TOKEN"];
-  const igId = process.env["META_IG_USER_ID"];
-  if (!token || !igId) {
+  const credentials = globalMetaCredentials();
+  if (!credentials) {
     return {
       ok: false,
       code: "AUTH_INVALID",
@@ -134,10 +134,8 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
       error: "Credencial Meta não configurada.",
     };
   }
-  const configuredVersion = process.env["META_GRAPH_VERSION"]?.trim();
-  const graphVersion =
-    configuredVersion && /^v\d+\.\d+$/.test(configuredVersion) ? configuredVersion : "v26.0";
-  const graphBase = `https://graph.instagram.com/${graphVersion}`;
+  const { accessToken: token, igUserId: igId } = credentials;
+  const graphBase = metaGraphBase();
   const accountBase = `${graphBase}/${igId}`;
   const authorization = { authorization: `Bearer ${token}` };
   try {
