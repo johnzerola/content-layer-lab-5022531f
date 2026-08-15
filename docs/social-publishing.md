@@ -126,6 +126,13 @@ O fallback global existente continua disponível para Instagram:
 - Ayrshare: `AYRSHARE_API_KEY`;
 - Meta: `META_ACCESS_TOKEN` + `META_IG_USER_ID`.
 
+Durante o estágio atual de teste/administração, a vinculação Meta valida no
+servidor o `id` e o `username` retornados por `graph.instagram.com` e persiste
+somente `provider = meta`, `provider_account_id` e o estado `conectado`. O token
+global permanece exclusivamente no ambiente do servidor; nenhum `secret_ref`
+falso é criado. Uma `social_connection` explícita sempre tem prioridade sobre
+o fallback global, que existe apenas para registros legados `pending`.
+
 Uma conexão por conta pode selecionar `meta` ou `ayrshare`, mas credenciais por
 usuário só devem ser ativadas depois que o secret store estiver disponível.
 

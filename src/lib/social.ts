@@ -17,6 +17,7 @@ export type SocialAccount = {
   display_name: string | null;
   avatar_url: string | null;
   provider: string;
+  provider_account_id: string | null;
   status: string;
   created_at: string;
 };
@@ -50,29 +51,10 @@ export const STATUS_LABEL: Record<string, string> = {
 export async function listAccounts(): Promise<SocialAccount[]> {
   const { data, error } = await supabase
     .from("social_accounts")
-    .select("id,platform,username,display_name,avatar_url,provider,status,created_at")
+    .select("id,platform,username,display_name,avatar_url,provider,provider_account_id,status,created_at")
     .order("created_at", { ascending: true });
   if (error) throw error;
   return (data ?? []) as SocialAccount[];
-}
-
-export async function addAccount(username: string, displayName?: string) {
-  const user = await currentUser();
-  if (!user) throw new Error("Faça login para conectar uma conta.");
-  const handle = username.trim().replace(/^@/, "").toLowerCase();
-  if (!handle) throw new Error("Informe o @ da conta.");
-  const { error } = await supabase.from("social_accounts").upsert(
-    {
-      user_id: user.id,
-      platform: "instagram",
-      username: handle,
-      display_name: displayName?.trim() || null,
-      provider: "pending",
-      status: "aguardando provedor",
-    },
-    { onConflict: "user_id,platform,username" },
-  );
-  if (error) throw error;
 }
 
 export async function removeAccount(id: string) {

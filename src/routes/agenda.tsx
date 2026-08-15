@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CalendarClock, Instagram, Loader2, Plus, Trash2, UploadCloud, X } from "lucide-react";
@@ -10,7 +11,6 @@ import type { Template } from "@/lib/template";
 import {
   KIND_LABEL,
   STATUS_LABEL,
-  addAccount,
   cancelPost,
   deletePost,
   listAccounts,
@@ -22,6 +22,7 @@ import {
   type ScheduledPost,
   type SocialAccount,
 } from "@/lib/social";
+import { addAccount } from "@/lib/social.functions";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/agenda")({
@@ -70,6 +71,8 @@ function AgendaPage() {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(false);
+  const [linkingAccount, setLinkingAccount] = useState(false);
+  const linkAccount = useServerFn(addAccount);
 
   const [handle, setHandle] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -121,13 +124,16 @@ function AgendaPage() {
   }, [posts]);
 
   async function onAddAccount() {
+    setLinkingAccount(true);
     try {
-      await addAccount(handle);
+      await linkAccount({ data: { username: handle } });
       setHandle("");
-      toast.success("Conta adicionada à lista.");
+      toast.success("Conta Instagram conectada.");
       await refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível adicionar.");
+    } finally {
+      setLinkingAccount(false);
     }
   }
 
@@ -209,9 +215,11 @@ function AgendaPage() {
                   </div>
                   <button
                     onClick={onAddAccount}
+                    disabled={linkingAccount}
                     className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground"
                   >
-                    <Plus className="size-4" /> Add
+                    {linkingAccount ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+                    {linkingAccount ? "Validando…" : "Add"}
                   </button>
                 </div>
 
