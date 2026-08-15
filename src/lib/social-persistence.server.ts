@@ -16,7 +16,6 @@ export async function persistValidatedMetaAccount(
   });
   if (error || !account?.[0]) {
     const message = error?.message ?? "";
-    console.error("META_LINK_RPC_ERROR", JSON.stringify(error));
     if (message.includes("account ownership mismatch")) {
       throw new MetaLinkError(
         "ACCOUNT_OWNERSHIP_INVALID",
@@ -26,7 +25,7 @@ export async function persistValidatedMetaAccount(
     if (message.includes("provider conflict")) {
       throw new MetaLinkError("PROVIDER_CONFLICT", "A conta já está vinculada a outro provedor.");
     }
-    throw new MetaLinkError("DATABASE_ERROR", `DBG: ${message}`);
+    throw new MetaLinkError("DATABASE_ERROR", "Não foi possível salvar a conexão Instagram.");
   }
   return account[0];
 }
