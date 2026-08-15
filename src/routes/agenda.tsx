@@ -16,6 +16,7 @@ import {
   listAccounts,
   listPosts,
   removeAccount,
+  resolveAccountLinkUi,
   schedulePost,
   uploadPostVideo,
   type PostKind,
@@ -127,7 +128,13 @@ function AgendaPage() {
   async function onAddAccount() {
     setLinkingAccount(true);
     try {
-      await linkAccount({ data: { username: handle } });
+      const result = await linkAccount({ data: { username: handle } });
+      const ui = resolveAccountLinkUi(accounts, result);
+      if (!ui.ok) {
+        toast.error(ui.error);
+        return;
+      }
+      setAccounts(ui.accounts);
       setHandle("");
       toast.success("Conta Instagram conectada.");
       await refresh();

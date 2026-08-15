@@ -13,6 +13,10 @@ export type LinkedSocialAccount = {
   created_at: string;
 };
 
+export type LinkAccountResult =
+  | { ok: true; account: LinkedSocialAccount }
+  | { ok: false; code: MetaLinkErrorCode; error: string };
+
 export type MetaLinkErrorCode =
   | "LOGIN_REQUIRED"
   | "HANDLE_INVALID"
@@ -25,6 +29,7 @@ export type MetaLinkErrorCode =
   | "META_ACCOUNT_MISMATCH"
   | "ACCOUNT_OWNERSHIP_INVALID"
   | "PROVIDER_CONFLICT"
+  | "SERVER_CONFIG_MISSING"
   | "DATABASE_ERROR";
 
 export class MetaLinkError extends Error {
@@ -59,6 +64,12 @@ export function configuredMetaCredentials(
   return { accessToken, igUserId };
 }
 
+export function linkingServerRuntimeReady(environment: NodeJS.ProcessEnv = process.env): boolean {
+  return Boolean(
+    environment["SUPABASE_URL"]?.trim() && environment["SUPABASE_SERVICE_ROLE_KEY"]?.trim(),
+  );
+}
+
 type MetaIdentity = { id: string; username: string };
 
 export async function fetchConfiguredMetaIdentity(
@@ -68,7 +79,7 @@ export async function fetchConfiguredMetaIdentity(
   let response: Response;
   try {
     response = await dependencies.fetch(
-      `${metaGraphBase(dependencies.environment)}/${encodeURIComponent(credentials.igUserId)}?fields=id,username`,
+      `${metaGraphBase(dependencies.environment)}/me?fields=id,username`,
       { headers: { authorization: `Bearer ${credentials.accessToken}` } },
     );
   } catch {
@@ -155,4 +166,40 @@ export async function linkConfiguredInstagramAccount(input: {
       providerAccountId: identity.id,
     }),
   };
+}
+
+export async function executeInstagramAccountLink(input: {
+  userId: string;
+  requestedHandle: string;
+  environment?: NodeJS.ProcessEnv;
+  fetch?: typeof fetch;
+  persist: (data: {
+    userId: string;
+    handle: string;
+    providerAccountId: string;
+  }) => Promise<LinkedSocialAccount>;
+}): Promise<LinkAccountResult> {
+  try {
+    const credentials = configuredMetaCredentials(input.environment);
+    return {
+      ok: true,
+      ...(await linkConfiguredInstagramAccount({
+        userId: input.userId,
+        requestedHandle: input.requestedHandle,
+        credentials,
+        ...(input.fetch ? { fetch: input.fetch } : {}),
+        ...(input.environment ? { environment: input.environment } : {}),
+        persist: input.persist,
+      })),
+    };
+  } catch (error) {
+    if (error instanceof MetaLinkError) {
+      return { ok: false, code: error.code, error: error.message };
+    }
+    return {
+      ok: false,
+      code: "DATABASE_ERROR",
+      error: "Não foi possível conectar a conta Instagram.",
+    };
+  }
 }

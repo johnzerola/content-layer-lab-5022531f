@@ -1,6 +1,7 @@
 ﻿/** Contas sociais conectadas e fila de publicaÃ§Ãµes agendadas (Lovable Cloud). */
 import { supabase } from "@/integrations/supabase/client";
 import { currentUser } from "@/lib/cloud";
+import type { LinkAccountResult } from "@/lib/social-linking.server";
 
 export type PostKind = "reels" | "feed" | "stories";
 
@@ -47,6 +48,17 @@ export const STATUS_LABEL: Record<string, string> = {
   falhou: "Falhou",
   cancelado: "Cancelado",
 };
+
+export function resolveAccountLinkUi(
+  accounts: SocialAccount[],
+  result: LinkAccountResult,
+): { ok: true; accounts: SocialAccount[] } | { ok: false; error: string } {
+  if (!result.ok) return { ok: false, error: result.error };
+  return {
+    ok: true,
+    accounts: [...accounts.filter((account) => account.id !== result.account.id), result.account],
+  };
+}
 
 /* ------------------------------- contas -------------------------------- */
 

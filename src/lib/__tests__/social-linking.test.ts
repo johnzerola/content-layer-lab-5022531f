@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   configuredMetaCredentials,
+  executeInstagramAccountLink,
   fetchConfiguredMetaIdentity,
   linkConfiguredInstagramAccount,
   MetaLinkError,
+  linkingServerRuntimeReady,
   normalizeInstagramHandle,
   type LinkedSocialAccount,
 } from "@/lib/social-linking.server";
@@ -115,13 +117,96 @@ describe("Meta identity validation", () => {
 
     expect(identity).toEqual({ id: "ig-123", username: "madereiracarvalhos" });
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(String(url)).toBe("https://graph.instagram.com/v26.0/ig-123?fields=id,username");
+    expect(String(url)).toBe("https://graph.instagram.com/v26.0/me?fields=id,username");
     expect(String(url)).not.toContain(credentials.accessToken);
     expect(new Headers(init?.headers).get("authorization")).toBe(
       `Bearer ${credentials.accessToken}`,
     );
     expect(JSON.stringify(identity)).not.toContain(credentials.accessToken);
     expect(logSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe("explicit server function contract", () => {
+  const environment = {
+    META_ACCESS_TOKEN: credentials.accessToken,
+    META_IG_USER_ID: credentials.igUserId,
+    META_GRAPH_VERSION: "v26.0",
+  };
+
+  it("returns ok true only after persistence succeeds", async () => {
+    const result = await executeInstagramAccountLink({
+      userId: "user-1",
+      requestedHandle: "@madereiracarvalhos",
+      environment,
+      fetch: validFetch(),
+      persist: vi.fn().mockResolvedValue(account()),
+    });
+
+    expect(result).toEqual({ ok: true, account: account() });
+  });
+
+  it("returns an explicit sanitized failure when Meta rejects the account", async () => {
+    const result = await executeInstagramAccountLink({
+      userId: "user-1",
+      requestedHandle: "wrongaccount",
+      environment,
+      fetch: validFetch(),
+      persist: vi.fn(),
+    });
+
+    expect(result).toMatchObject({ ok: false, code: "META_ACCOUNT_MISMATCH" });
+    expect(JSON.stringify(result)).not.toContain(credentials.accessToken);
+  });
+
+  it("returns explicit errors for missing Meta runtime credentials", async () => {
+    const persist = vi.fn();
+    const missingToken = await executeInstagramAccountLink({
+      userId: "user-1",
+      requestedHandle: "madereiracarvalhos",
+      environment: { META_IG_USER_ID: "ig-123" },
+      fetch: validFetch(),
+      persist,
+    });
+    const missingId = await executeInstagramAccountLink({
+      userId: "user-1",
+      requestedHandle: "madereiracarvalhos",
+      environment: { META_ACCESS_TOKEN: "token" },
+      fetch: validFetch(),
+      persist,
+    });
+
+    expect(missingToken).toMatchObject({ ok: false, code: "META_TOKEN_MISSING" });
+    expect(missingId).toMatchObject({ ok: false, code: "META_IG_ID_MISSING" });
+    expect(persist).not.toHaveBeenCalled();
+  });
+
+  it("returns ok false and never reports connected when the RPC persistence fails", async () => {
+    const result = await executeInstagramAccountLink({
+      userId: "user-1",
+      requestedHandle: "madereiracarvalhos",
+      environment,
+      fetch: validFetch(),
+      persist: async () => {
+        throw new MetaLinkError("DATABASE_ERROR", "Não foi possível salvar a conexão Instagram.");
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "DATABASE_ERROR",
+      error: "Não foi possível salvar a conexão Instagram.",
+    });
+  });
+
+  it("checks the server-only Supabase runtime without exposing values", () => {
+    expect(linkingServerRuntimeReady({ SUPABASE_URL: "https://db.test" })).toBe(false);
+    expect(
+      linkingServerRuntimeReady({
+        SUPABASE_URL: "https://db.test",
+        SUPABASE_SERVICE_ROLE_KEY: "server-secret",
+      }),
+    ).toBe(true);
   });
 });
 
