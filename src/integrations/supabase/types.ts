@@ -449,13 +449,13 @@ export type Database = {
           p_username: string
         }
         Returns: {
-          avatar_url: string | null
+          avatar_url: string
           created_at: string
-          display_name: string | null
+          display_name: string
           id: string
           platform: string
           provider: string
-          provider_account_id: string | null
+          provider_account_id: string
           status: string
           username: string
         }[]
