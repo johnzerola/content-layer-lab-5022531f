@@ -143,9 +143,10 @@ function LivePage() {
         clip: clip.trim ?? { start: 0, end: clip.duration },
         score: clip.score,
         clipTitle: clip.title,
-        clipReason: clip.reason,
-        clipTags: clip.tags,
+        ...(clip.reason ? { clipReason: clip.reason } : {}),
+        ...(clip.tags ? { clipTags: clip.tags } : {}),
       })),
+
       "Monitora Live",
     );
     markPendingTool("clip");
