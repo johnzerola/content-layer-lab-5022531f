@@ -30,9 +30,6 @@ export interface EncodeOptions {
   jobId?: string | undefined;
 }
 
-export interface EncodeOptions extends Omit<EncodeInput, "onProgress"> {
-  onProgress?: (p: number) => void;
-  jobId?: string;
 }
 
 type VideoWithRvfc = HTMLVideoElement & {

@@ -340,6 +340,7 @@ function Home() {
     fails: { name: string; error: string }[];
   } | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [autoScheduleConfig, setAutoScheduleConfig] = useState<any>(null);
 
   const smartRef = useRef(smartFrame);
 
@@ -1123,7 +1124,10 @@ function Home() {
                     : x,
                 ),
               );
-              updateJob(id, { stage: stageLabel });
+              updateJob(id, {
+                stage: stageLabel,
+                meta: autoScheduleConfig ? { nextAction: autoScheduleConfig } : undefined,
+              });
               const { blob, ext } = await renderVideo(sourceFile, tpl, {
                 variation: variationOf(item, k),
                 offsetX: item.offsetX,
@@ -2720,7 +2724,7 @@ function Home() {
           }}
           onClose={() => setStudioId(null)}
 
-          onSave={({ pre, clip }) => {
+          onSave={({ pre, clip }, schedule) => {
             setItems((p) =>
               p.map((x) =>
                 x.id === studioItem.id
@@ -2729,7 +2733,12 @@ function Home() {
               ),
             );
             setStudioId(null);
-            toast.success("EdiÃ§Ã£o aplicada â€” vale no preview e na exportaÃ§Ã£o");
+            if (schedule) {
+              // Trigger single-item schedule modal or mark for auto-schedule
+              setScheduleOpen(true);
+            } else {
+              toast.success("EdiÃ§Ã£o aplicada â€” vale no preview e na exportaÃ§Ã£o");
+            }
           }}
         />
       )}
