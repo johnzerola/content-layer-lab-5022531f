@@ -100,7 +100,7 @@ const MODES: ModeDef[] = [
     brand: "VaiViral",
     mark: "VV",
     tagline: "plataforma completa",
-    headline: "Painel de Controle",
+    headline: "Cortes Automáticos de Lives",
     description: "Gerencie seus vídeos, templates e automações.",
     chips: [],
     icon: Sparkle,
