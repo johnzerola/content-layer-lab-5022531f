@@ -1,4 +1,4 @@
-﻿import { createFileRoute, useNavigate } from "@tanstack/react-router";
+﻿import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Download, Loader2, Pencil, Radio, Scissors, Sparkles, Square, Trash2 } from "lucide-react";
@@ -18,7 +18,7 @@ import { AuthGate } from "@/components/AuthGate";
 export const Route = createFileRoute("/live")({
   beforeLoad: async () => {
     const user = await currentUser();
-    if (!user) throw new Error("Unauthorized");
+    if (!user) throw redirect({ to: "/" });
   },
   errorComponent: ({ error }) => {
     if (error.message === "Unauthorized") {

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -32,7 +32,7 @@ import { AuthGate } from "@/components/AuthGate";
 export const Route = createFileRoute("/agenda")({
   beforeLoad: async () => {
     const user = await currentUser();
-    if (!user) throw new Error("Unauthorized");
+    if (!user) throw redirect({ to: "/" });
   },
   errorComponent: ({ error }) => {
     if (error.message === "Unauthorized") {

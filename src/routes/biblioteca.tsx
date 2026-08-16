@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { ResultLibrary } from "@/components/ResultLibrary";
@@ -12,7 +12,7 @@ import { AuthGate } from "@/components/AuthGate";
 export const Route = createFileRoute("/biblioteca")({
   beforeLoad: async () => {
     const user = await currentUser();
-    if (!user) throw new Error("Unauthorized");
+    if (!user) throw redirect({ to: "/" });
   },
   errorComponent: ({ error }) => {
     if (error.message === "Unauthorized") {
