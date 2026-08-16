@@ -44,7 +44,8 @@ export function AutoScheduleModal({
   onOpenChange,
   items,
   onComplete,
-}: AutoScheduleModalProps) {
+  onAutoConfig,
+}: AutoScheduleModalProps & { onAutoConfig?: (config: any) => void }) {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [accountId, setAccountId] = useState("");
   const [kind, setKind] = useState<PostKind>("reels");
