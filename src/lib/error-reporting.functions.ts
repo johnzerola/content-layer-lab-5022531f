@@ -5,14 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export const reportClientError = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .validator((input: any) => 
-    z.object({ 
-      message: z.string(), 
-      stack: z.string().optional(),
-      route: z.string().optional(),
-      context: z.record(z.unknown()).optional()
-    }).parse(input)
-  )
+  .validator((input: any) => input)
   .handler(async ({ data, context }: any) => {
     console.error(`[ClientError] User: ${context.userId} | Route: ${data.route}`, data.message, data.stack);
     return { ok: true };
