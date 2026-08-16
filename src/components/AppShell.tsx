@@ -99,7 +99,7 @@ const MODES: ModeDef[] = [
     hint: "dashboard",
     brand: "VaiViral",
     mark: "VV",
-    tagline: "plataforma completa",
+    tagline: "clipagem em tempo real",
     headline: "Cortes Automáticos de Lives",
     description: "Gerencie seus vídeos, templates e automações.",
     chips: [],
