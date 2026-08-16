@@ -313,7 +313,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
         </header>
 
         <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
-          {mode === "external" || (typeof window !== "undefined" && ["/live", "/biblioteca", "/agenda", "/integracoes", "/armazenamento"].includes(window.location.pathname)) ? null : (
+          {mode === "external" || (typeof window !== "undefined" && ["/live", "/biblioteca", "/agenda", "/integracoes", "/armazenamento", "/metricas"].includes(window.location.pathname)) ? null : (
             <section
               key={current.id}
               className="mb-6 overflow-hidden rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5 shadow-[var(--shadow-panel)] sm:p-6"
