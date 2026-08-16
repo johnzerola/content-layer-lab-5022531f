@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle2, Facebook, Instagram, Settings2, TriangleAlert, Youtube } from "lucide-react";
+import { CheckCircle2, Facebook, Instagram, Settings2, TriangleAlert, Youtube } from "lucide-react";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { listAccounts, type SocialAccount } from "@/lib/social";
+import { AppShell, type AppMode } from "@/components/AppShell";
+import { listJobs } from "@/lib/jobs";
 
 export const Route = createFileRoute("/integracoes")({
   component: IntegrationsPage,
@@ -49,6 +51,8 @@ const INTEGRATIONS: IntegrationCard[] = [
 ];
 
 function IntegrationsPage() {
+  const [mode, setMode] = useState<AppMode>("external");
+  const jobs = listJobs();
   const [user, setUser] = useState<CloudUser | null>(null);
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
 
@@ -66,22 +70,13 @@ function IntegrationsPage() {
   }, [user]);
 
   return (
-    <div className="theme-lote min-h-dvh bg-background">
-      <header className="sticky top-0 z-30 border-b border-border/70 bg-background/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-5xl items-center gap-3 px-4 py-3 sm:px-6">
-          <Link
-            to="/"
-            className="flex items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 py-1.5 text-sm text-muted-foreground transition hover:text-foreground"
-          >
-            <ArrowLeft className="size-4" /> Voltar
-          </Link>
-          <div>
-            <h1 className="font-display text-lg font-bold tracking-tight">Integrações</h1>
-            <p className="font-mono text-[11px] text-muted-foreground">conexões e capacidades de publicação</p>
-          </div>
-        </div>
-      </header>
-
+    <AppShell
+      mode={mode}
+      onMode={setMode}
+      count={jobs.length}
+      onLibrary={() => {}}
+      onCloud={() => {}}
+    >
       <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
         <section className="mb-6 rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5">
           <p className="mono-label text-primary">Configurações · APIs sociais</p>
@@ -161,6 +156,6 @@ function IntegrationsPage() {
           </div>
         )}
       </main>
-    </div>
+    </AppShell>
   );
 }
