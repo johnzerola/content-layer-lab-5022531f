@@ -45,7 +45,7 @@ const fmt = (ts?: number) =>
 const LIMIT = 5 * 1024 * 1024; // quota típica do localStorage
 
 function StoragePage() {
-  const [mode, setMode] = useState<AppMode>("lote");
+  const [mode, setMode] = useState<AppMode>("external");
   const [libOpen, setLibOpen] = useState(false);
   const [cloudOpen, setCloudOpen] = useState(false);
   const jobs = listJobs();

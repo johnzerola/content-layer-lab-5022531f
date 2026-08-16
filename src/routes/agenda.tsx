@@ -62,7 +62,7 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 function AgendaPage() {
-  const [mode, setMode] = useState<AppMode>("lote");
+  const [mode, setMode] = useState<AppMode>("external");
   const [libOpen, setLibOpen] = useState(false);
   const [cloudOpen, setCloudOpen] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
