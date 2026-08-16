@@ -18,7 +18,7 @@ import {
   Settings2,
 } from "lucide-react";
 
-export type AppMode = "lote" | "clip" | "limpar" | "limpar-ia";
+export type AppMode = "lote" | "clip" | "limpar" | "limpar-ia" | "external";
 
 type ModeDef = {
   id: AppMode;
