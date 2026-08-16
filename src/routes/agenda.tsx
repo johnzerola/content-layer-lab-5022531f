@@ -16,6 +16,7 @@ import {
   listAccounts,
   listPosts,
   removeAccount,
+  reschedulePost,
   resolveAccountLinkUi,
   schedulePost,
   uploadPostVideo,
@@ -23,6 +24,7 @@ import {
   type ScheduledPost,
   type SocialAccount,
 } from "@/lib/social";
+
 import { addAccount } from "@/lib/social.functions";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 
@@ -247,9 +249,12 @@ function AgendaPage() {
                         <span className="block truncate font-mono text-[10px] text-muted-foreground">
                           {a.status === "connected" || a.status === "conectado"
                             ? `conectada via ${a.provider}`
-                            : "rascunho; falta OAuth/API"}
+                            : a.status === "aguardando provedor"
+                              ? "pendente: aguardando configuração da API"
+                              : "rascunho; falta OAuth/API"}
                         </span>
                       </span>
+
                       <button
                         onClick={async () => {
                           await removeAccount(a.id);
@@ -403,7 +408,13 @@ function AgendaPage() {
                                   {p.caption}
                                 </p>
                               )}
-                              {p.error && <p className="mt-1 text-xs text-red-400">{p.error}</p>}
+                              {p.error && (
+                                <div className="mt-2 rounded-lg border border-red-500/20 bg-red-500/5 p-2">
+                                  <p className="font-mono text-[10px] leading-tight text-red-400">
+                                    ERRO: {p.error}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                             <span
                               className={`shrink-0 rounded-full border px-2 py-0.5 font-mono text-[10px] ${
@@ -413,10 +424,27 @@ function AgendaPage() {
                               {STATUS_LABEL[p.status] ?? p.status}
                             </span>
                           </div>
-                          <div className="mt-2 flex justify-end gap-2">
+                          <div className="mt-3 flex justify-end gap-2 border-t border-border/50 pt-2">
+                            {p.status === "falhou" && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await reschedulePost(p.id, new Date(Date.now() + 5 * 60 * 1000));
+                                    toast.success("Publicação reenviada para a fila.");
+                                    await refresh();
+                                  } catch (e) {
+                                    toast.error("Falha ao re-agendar.");
+                                  }
+                                }}
+                                className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/20"
+                              >
+                                Tentar agora
+                              </button>
+                            )}
                             {p.status === "agendado" && (
                               <button
                                 onClick={async () => {
+
                                   await cancelPost(p.id);
                                   await refresh();
                                 }}
