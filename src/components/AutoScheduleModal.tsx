@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Calendar,
   Clock,
+  ArrowRight,
 } from "lucide-react";
 import {
   listAccounts,
@@ -35,6 +36,7 @@ interface AutoScheduleModalProps {
   onOpenChange: (open: boolean) => void;
   items: { blob: Blob; fileName: string; headline?: string }[];
   onComplete: () => void;
+  onAutoConfig?: (config: any) => void;
 }
 
 export function AutoScheduleModal({

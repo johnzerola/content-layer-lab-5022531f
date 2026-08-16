@@ -1126,7 +1126,7 @@ function Home() {
               );
               updateJob(id, {
                 stage: stageLabel,
-                meta: autoScheduleConfig ? { nextAction: autoScheduleConfig } : undefined,
+                meta: autoScheduleConfig ? { nextAction: autoScheduleConfig } : {},
               });
               const { blob, ext } = await renderVideo(sourceFile, tpl, {
                 variation: variationOf(item, k),
@@ -1158,16 +1158,15 @@ function Home() {
           }
 
           doneCount.current++;
-          const first = outputs[0]!;
-          await finishJob(id, `${outputs.length} arquivo(s) prontos`, { blob: first.blob, fileName: item.file.name });
-          const first = outputs[0]!;
+          const firstOut = outputs[0]!;
+          await finishJob(id, `${outputs.length} arquivo(s) prontos`, { blob: firstOut.blob, fileName: item.file.name });
           setItems((p) =>
             p.map((x) =>
               x.id === id
                 ? {
                     ...x,
                     status: "pronto",
-                    blob: first.blob,
+                    blob: firstOut.blob,
                     ext: first.ext,
                     outputs,
                     progress: 1,
