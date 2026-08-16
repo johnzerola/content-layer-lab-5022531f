@@ -122,8 +122,6 @@ interface Props {
 export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, children }: Props) {
   const [open, setOpen] = useState(true);
   const current = MODES.find((m) => m.id === mode) || MODES[0];
-  const Badge = current.badge;
-  const Icon = current.icon;
 
   // mantém portais (modais, toasts) na mesma identidade de cor
   useEffect(() => {
@@ -309,7 +307,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <p className="mono-label flex items-center gap-2 text-primary">
-                    <Badge className="size-3.5" />
+                    <current.badge className="size-3.5" />
                     ferramenta independente
                   </p>
                   <h2 className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">
