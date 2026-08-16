@@ -16,11 +16,7 @@ export const reportClientError = createServerFn({ method: "POST" })
       context: z.record(z.unknown()).optional()
     }).parse(input)
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }: { data: any, context: any }) => {
     console.error(`[ClientError] User: ${context.userId} | Route: ${data.route}`, data.message, data.stack);
-    
-    // Opcional: Gravar na tabela 'client_logs' se existir
-    // await context.supabase.from('client_logs').insert({ ... });
-
     return { ok: true };
   });
