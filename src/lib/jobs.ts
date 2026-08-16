@@ -142,18 +142,37 @@ export function updateJob(
   emit();
 }
 
-export async function finishJob(id: string, stage = "pronto") {
+export async function finishJob(id: string, stage = "pronto", result?: { blob: Blob; fileName: string }) {
   const job = jobs.get(id);
   const action = job?.meta?.nextAction;
 
-  if (action && action.type === "schedule" && job.status !== "pronto") {
+  if (action && action.type === "schedule" && job.status !== "pronto" && result) {
     try {
+      updateJob(id, { stage: "enviando vÃ­deo..." });
+      const { uploadPostVideo, schedulePost } = await import("@/lib/social");
+      const { path, url } = await uploadPostVideo(result.blob, result.fileName);
+      
       updateJob(id, { stage: "agendando..." });
-      // We need to fetch the blob from somewhere or have it passed.
-      // For now, this is a placeholder for the automated hand-off.
-      // The actual call will likely happen in the tool that manages the job.
+      const scheduledAt = new Date();
+      if (action.intervalDays) scheduledAt.setDate(scheduledAt.getDate() + action.intervalDays);
+      if (action.intervalHours) scheduledAt.setHours(scheduledAt.getHours() + action.intervalHours);
+      if (!action.intervalDays && !action.intervalHours) scheduledAt.setMinutes(scheduledAt.getMinutes() + 5);
+
+      await schedulePost({
+        accountId: action.accountId,
+        kind: action.kind,
+        caption: action.caption ?? "",
+        scheduledAt,
+        videoPath: path,
+        videoUrl: url,
+        fileName: result.fileName,
+        consent: true,
+      });
+      
+      updateJob(id, { stage: "agendado com sucesso" });
     } catch (e) {
       console.error("Auto-schedule failed:", e);
+      updateJob(id, { error: `Render OK, mas agendamento falhou: ${String(e)}` });
     }
   }
 
