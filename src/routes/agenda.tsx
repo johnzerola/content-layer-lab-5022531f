@@ -27,6 +27,7 @@ import {
 
 import { addAccount } from "@/lib/social.functions";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
+import { AuthGate } from "@/components/AuthGate";
 
 export const Route = createFileRoute("/agenda")({
   beforeLoad: async () => {
