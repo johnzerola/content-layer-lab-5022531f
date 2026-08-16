@@ -18,6 +18,7 @@ import { Route as IntegracoesRouteImport } from './routes/integracoes'
 import { Route as LimparIaRouteImport } from './routes/limpar-ia'
 import { Route as LiveRouteImport } from './routes/live'
 import { Route as McpRouteImport } from './routes/mcp'
+import { Route as MetricasRouteImport } from './routes/metricas'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as TermosRouteImport } from './routes/termos'
 import { Route as VendasRouteImport } from './routes/vendas'
@@ -74,6 +75,11 @@ const LiveRoute = LiveRouteImport.update({
 const McpRoute = McpRouteImport.update({
   id: '/mcp',
   path: '/mcp',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MetricasRoute = MetricasRouteImport.update({
+  id: '/metricas',
+  path: '/metricas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacidadeRoute = PrivacidadeRouteImport.update({
@@ -152,6 +158,7 @@ export interface FileRoutesByFullPath {
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
+  '/metricas': typeof MetricasRoute
   '/privacidade': typeof PrivacidadeRoute
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
@@ -175,6 +182,7 @@ export interface FileRoutesByTo {
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
+  '/metricas': typeof MetricasRoute
   '/privacidade': typeof PrivacidadeRoute
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
@@ -199,6 +207,7 @@ export interface FileRoutesById {
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
+  '/metricas': typeof MetricasRoute
   '/privacidade': typeof PrivacidadeRoute
   '/termos': typeof TermosRoute
   '/vendas': typeof VendasRoute
@@ -224,6 +233,7 @@ export interface FileRouteTypes {
     | '/limpar-ia'
     | '/live'
     | '/mcp'
+    | '/metricas'
     | '/privacidade'
     | '/termos'
     | '/vendas'
@@ -247,6 +257,7 @@ export interface FileRouteTypes {
     | '/limpar-ia'
     | '/live'
     | '/mcp'
+    | '/metricas'
     | '/privacidade'
     | '/termos'
     | '/vendas'
@@ -270,6 +281,7 @@ export interface FileRouteTypes {
     | '/limpar-ia'
     | '/live'
     | '/mcp'
+    | '/metricas'
     | '/privacidade'
     | '/termos'
     | '/vendas'
@@ -294,6 +306,7 @@ export interface RootRouteChildren {
   LimparIaRoute: typeof LimparIaRoute
   LiveRoute: typeof LiveRoute
   McpRoute: typeof McpRoute
+  MetricasRoute: typeof MetricasRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   TermosRoute: typeof TermosRoute
   VendasRoute: typeof VendasRoute
@@ -371,6 +384,13 @@ declare module '@tanstack/react-router' {
       path: '/mcp'
       fullPath: '/mcp'
       preLoaderRoute: typeof McpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/metricas': {
+      id: '/metricas'
+      path: '/metricas'
+      fullPath: '/metricas'
+      preLoaderRoute: typeof MetricasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacidade': {
@@ -470,6 +490,7 @@ const rootRouteChildren: RootRouteChildren = {
   LimparIaRoute: LimparIaRoute,
   LiveRoute: LiveRoute,
   McpRoute: McpRoute,
+  MetricasRoute: MetricasRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   TermosRoute: TermosRoute,
   VendasRoute: VendasRoute,
