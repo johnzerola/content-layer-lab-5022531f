@@ -10,6 +10,15 @@
 export type JobTool = "lote" | "clip" | "limpar" | "limpar-ia" | "live";
 export type JobStatus = "na fila" | "processando" | "pronto" | "erro" | "cancelado";
 
+export type NextAction = {
+  type: "schedule";
+  accountId: string;
+  kind: "reels" | "feed" | "stories" | "shorts";
+  caption?: string;
+  intervalHours?: number;
+  intervalDays?: number;
+};
+
 export interface JobStep {
   label: string;
   /** ms desde o início do trabalho */
@@ -32,7 +41,7 @@ export interface Job {
   endedAt?: number;
   error?: string;
   steps: JobStep[];
-  meta: Record<string, unknown>;
+  meta: Record<string, unknown> & { nextAction?: NextAction };
   /** true quando o trabalho já rodou em modo seguro */
   safeMode?: boolean;
 }
@@ -81,7 +90,7 @@ export function startJob(input: {
   tool: JobTool;
   name: string;
   stage?: string;
-  meta?: Record<string, unknown>;
+  meta?: Record<string, unknown> & { nextAction?: NextAction };
 }): string {
   const now = Date.now();
   const id = input.id ?? crypto.randomUUID();
@@ -106,7 +115,7 @@ export function startJob(input: {
 export function updateJob(
   id: string,
   patch: Partial<Pick<Job, "status" | "progress" | "stage" | "error" | "safeMode">> & {
-    meta?: Record<string, unknown>;
+    meta?: Record<string, unknown> & { nextAction?: NextAction };
   },
 ) {
   const job = jobs.get(id);
