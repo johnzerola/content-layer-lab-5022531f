@@ -265,8 +265,24 @@ export function AutoScheduleModal({
               <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
                 Cancelar
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  onAutoConfig?.({
+                    accountId,
+                    kind,
+                    caption: baseCaption,
+                    intervalHours: intervalType === "hours" ? intervalValue : 0,
+                    intervalDays: intervalType === "days" ? intervalValue : 0,
+                  });
+                  onOpenChange(false);
+                }}
+                disabled={loading || accounts.length === 0}
+              >
+                Agendar no Lote
+              </Button>
               <Button onClick={handleSchedule} disabled={loading || accounts.length === 0}>
-                {loading ? "Processando..." : "Confirmar Agendamento"}
+                {loading ? "Processando..." : "Confirmar Agendamento Agora"}
               </Button>
             </>
           ) : null}
