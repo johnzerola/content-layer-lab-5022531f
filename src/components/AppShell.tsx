@@ -101,7 +101,7 @@ const MODES: ModeDef[] = [
     mark: "VV",
     tagline: "clipagem em tempo real",
     headline: "Cortes Automáticos de Lives",
-    description: "Gerencie seus vídeos, templates e automações.",
+    description: "Monitore transmissÃµes do X, Kick e TikTok e gere cortes automÃ¡ticos baseados em IA sem precisar de templates.",
     chips: [],
     icon: Sparkle,
     badge: Sparkle,
