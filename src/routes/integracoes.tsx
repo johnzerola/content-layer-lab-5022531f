@@ -1,8 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle2, Facebook, Instagram, Settings2, TriangleAlert, Youtube } from "lucide-react";
+import { CheckCircle2, Facebook, Instagram, Settings2, TriangleAlert, Youtube } from "lucide-react";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { listAccounts, type SocialAccount } from "@/lib/social";
+import { AppShell, type AppMode } from "@/components/AppShell";
+import { listJobs } from "@/lib/jobs";
 
 export const Route = createFileRoute("/integracoes")({
   component: IntegrationsPage,
@@ -75,7 +77,6 @@ function IntegrationsPage() {
       onLibrary={() => {}}
       onCloud={() => {}}
     >
-
       <main className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6">
         <section className="mb-6 rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5">
           <p className="mono-label text-primary">Configurações · APIs sociais</p>
