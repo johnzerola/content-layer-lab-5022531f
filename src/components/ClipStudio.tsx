@@ -201,8 +201,13 @@ function ClipCard({
 
         {/* score grande no canto, como no OpusClip */}
         {typeof item.score === "number" && (
-          <div className="absolute bottom-12 right-2 rounded-lg bg-primary px-2.5 py-1 text-lg font-extrabold leading-none text-primary-foreground shadow-lg">
-            {(item.score / 10).toFixed(1)}
+          <div className="absolute bottom-12 right-2 flex flex-col items-end gap-1">
+            <div className="rounded-lg bg-primary px-2.5 py-1 text-2xl font-black leading-none text-primary-foreground shadow-xl ring-1 ring-white/20">
+              {item.score}
+            </div>
+            <div className="rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tighter text-white/90 backdrop-blur-sm">
+              Viral Score
+            </div>
           </div>
         )}
 

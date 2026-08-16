@@ -235,13 +235,13 @@ export function analyzeLiveRms(rms: number[], duration: number, hop = 0.1): Live
   const clippingPenalty = percentile(rms, 0.995) > 0.72 ? 8 : 0;
 
   const quality =
-    speechFit * 0.25 +
-    clarity * 0.2 +
-    hook * 0.2 +
-    cadence * 0.12 +
-    dynamics * 0.11 +
-    edgeQuality * 0.12;
-  const score = Math.round(Math.max(18, Math.min(98, 24 + quality * 74 - clippingPenalty)));
+    speechFit * 0.22 +
+    clarity * 0.12 +
+    hook * 0.28 + // Mais peso no gancho para lives
+    cadence * 0.15 +
+    dynamics * 0.1 +
+    edgeQuality * 0.13;
+  const score = Math.round(Math.max(12, Math.min(99, 15 + quality * 84 - clippingPenalty)));
 
   const trimStart = first >= 0 ? Math.max(0, first * hop - 0.35) : 0;
   const trimEnd = last >= 0 ? Math.min(safeDuration, (last + 1) * hop + 0.55) : safeDuration;
@@ -258,10 +258,11 @@ export function analyzeLiveRms(rms: number[], duration: number, hop = 0.1): Live
   if (speech < 0.28) tags.push("pouca fala");
 
   const reasons: string[] = [];
-  if (hook >= 0.62) reasons.push("abre com energia");
-  if (clarity >= 0.62) reasons.push("voz bem separada do ruído");
-  if (cadence >= 0.58) reasons.push("pausas e ritmo naturais");
-  if (!reasons.length) reasons.push("trecho aproveitável, mas merece revisão");
+  if (hook >= 0.65) reasons.push("gancho de abertura forte");
+  if (clarity >= 0.65) reasons.push("diálogo limpo e inteligível");
+  if (cadence >= 0.6) reasons.push("bom ritmo narrativo");
+  if (speechFit >= 0.7) reasons.push("excelente densidade de fala");
+  if (!reasons.length) reasons.push("trecho capturado automaticamente");
 
   return {
     score,
@@ -277,8 +278,8 @@ export async function analyzeLiveClip(blob: Blob, duration?: number): Promise<Li
   try {
     const buf = await blob.arrayBuffer();
     const Ctx =
-      window.AudioContext ??
-      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      typeof window !== "undefined" ? (window.AudioContext ?? (window as any).webkitAudioContext) : (global as any).AudioContext;
+    if (!Ctx) throw new Error("AudioContext not supported");
     const ac = new Ctx();
     const audio = await ac.decodeAudioData(buf);
     void ac.close();

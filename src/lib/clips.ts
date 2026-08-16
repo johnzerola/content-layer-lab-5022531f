@@ -49,7 +49,7 @@ interface AudioAnalysis {
 
 async function loudnessCurve(file: File, step = HOP): Promise<AudioAnalysis> {
   const buf = await file.arrayBuffer();
-  const tmp = new (window.AudioContext ?? window.webkitAudioContext)();
+  const tmp = new (typeof window !== "undefined" ? (window.AudioContext ?? (window as any).webkitAudioContext) : (global as any).AudioContext)();
   let audio: AudioBuffer;
   try {
     audio = await tmp.decodeAudioData(buf.slice(0));
@@ -224,23 +224,26 @@ export interface ClipSignals {
   lenFit: number;
 }
 
-/** Score absoluto: um vídeo fraco não ganha nota alta só por ser o melhor do arquivo. */
+/**
+ * Score absoluto: um vídeo fraco não ganha nota alta só por ser o melhor do arquivo.
+ * Pesos refinados para OpusClip Style: ganchos e densidade de fala são prioritários.
+ */
 export function scoreClipSignals(signals: ClipSignals) {
   const fit = (value: number) => Math.max(0, Math.min(1, value));
-  const speechFit = fit(1 - Math.abs(signals.density - 0.68) / 0.68);
+  const speechFit = fit(1 - Math.abs(signals.density - 0.72) / 0.72);
   const quality =
-    fit(signals.hook) * 0.19 +
-    fit(signals.energy) * 0.15 +
-    fit(signals.dynamics) * 0.11 +
-    speechFit * 0.15 +
-    fit(signals.motion) * 0.07 +
-    fit(signals.clarity) * 0.11 +
-    fit(signals.cadence) * 0.09 +
-    fit(signals.edgeQuality) * 0.08 +
-    fit(signals.lenFit) * 0.05;
+    fit(signals.hook) * 0.28 + // Gancho é o principal fator de viralização
+    fit(signals.energy) * 0.12 +
+    fit(signals.dynamics) * 0.1 +
+    speechFit * 0.18 + // Densidade de fala para retenção
+    fit(signals.motion) * 0.08 +
+    fit(signals.clarity) * 0.08 +
+    fit(signals.cadence) * 0.12 + // Cadência narrativa
+    fit(signals.edgeQuality) * 0.04 +
+    fit(signals.lenFit) * 0.08;
   return {
     raw: quality,
-    score: Math.round(Math.max(18, Math.min(98, 24 + quality * 74))),
+    score: Math.round(Math.max(12, Math.min(99, 15 + quality * 84))),
   };
 }
 
@@ -269,17 +272,21 @@ function describe(c: Candidate, index: number, duration: number) {
             : HOOK_LABELS[3]!;
 
   const parts: string[] = [];
-  if (c.hook > 0.6) parts.push("gancho de retenção inicial forte");
-  if (c.dynamics > 0.55) parts.push("cadência de voz ideal para shorts");
-  if (c.motion > 0.5) parts.push("foco visual dinâmico (Face Tracking)");
-  if (c.clarity > 0.6) parts.push("clareza narrativa e áudio limpo");
-  if (c.cadence > 0.58) parts.push("roteiro fluido com pausas naturais");
-  if (c.edgeQuality > 0.68) parts.push("alinhamento de ganchos e palavras-chave");
-  if (!parts.length) parts.push("destaque automático com potencial viral");
+  if (c.hook > 0.65) parts.push("gancho inicial impactante detectado");
+  else if (c.hook > 0.45) parts.push("início promissor com boa energia");
+
+  if (c.dynamics > 0.6) parts.push("cadência de voz ideal para vídeos curtos");
+  if (c.motion > 0.55) parts.push("visual dinâmico com foco na ação");
+  if (c.clarity > 0.7) parts.push("diálogo extremamente claro e sem ruído");
+  if (c.cadence > 0.65) parts.push("fluxo narrativo completo com ganchos internos");
+  if (c.density > 0.75) parts.push("alta densidade de informação");
+  if (c.edgeQuality > 0.75) parts.push("corte perfeito entre frases");
+
+  if (!parts.length) parts.push("momento de destaque com potencial de retenção");
 
   return {
     title: `${title} · #${index + 1}`,
-    reason: parts.join(" · "),
+    reason: parts.slice(0, 3).join(" · "),
   };
 }
 
