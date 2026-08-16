@@ -30,8 +30,6 @@ export interface EncodeOptions {
   jobId?: string | undefined;
 }
 
-}
-
 type VideoWithRvfc = HTMLVideoElement & {
   requestVideoFrameCallback?: (
     cb: (now: number, metadata: { mediaTime: number; presentedFrames: number }) => void,

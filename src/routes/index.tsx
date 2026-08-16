@@ -1158,7 +1158,8 @@ function Home() {
           }
 
           doneCount.current++;
-          finishJob(id, `${outputs.length} arquivo(s) prontos`);
+          const first = outputs[0]!;
+          await finishJob(id, `${outputs.length} arquivo(s) prontos`, { blob: first.blob, fileName: item.file.name });
           const first = outputs[0]!;
           setItems((p) =>
             p.map((x) =>
