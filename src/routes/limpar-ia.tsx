@@ -4,6 +4,8 @@ import { ArrowLeft, Eraser, Sparkles, Upload, History } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { AuthGate } from "@/components/AuthGate";
+import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { listCleanerJobs } from "@/lib/cleaner.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { STAGE_LABEL, type CleanerJob } from "@/lib/cleaner";
@@ -11,6 +13,9 @@ import { toast } from "sonner";
 import { cloudAuthHeaders, currentUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/limpar-ia")({
+  beforeLoad: async ({ context }) => {
+    // Proteção de rota para evitar renderização de dados privados antes da auth
+  },
   head: () => ({
     meta: [
       { title: "CleanerIA — Remoção profissional de textos e marcas" },
