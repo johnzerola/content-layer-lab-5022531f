@@ -249,7 +249,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             {open && "Armazenamento"}
           </Link>
           <Link
-            to="/metricas"
+            to={"/metricas" as any}
             title="Métricas de performance"
             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
           >
