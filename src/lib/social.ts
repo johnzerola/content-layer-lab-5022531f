@@ -3,12 +3,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { currentUser } from "@/lib/cloud";
 import type { LinkAccountResult } from "@/lib/social-linking.server";
 
-export type PostKind = "reels" | "feed" | "stories";
+export type PostKind = "reels" | "feed" | "stories" | "shorts";
 
 export const KIND_LABEL: Record<PostKind, string> = {
   reels: "Reels",
   feed: "Feed",
   stories: "Stories",
+  shorts: "Shorts",
 };
 
 export type SocialAccount = {

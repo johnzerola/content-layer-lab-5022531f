@@ -33,9 +33,9 @@ export const PLATFORM_CAPABILITIES: Record<SocialPlatform, PlatformCapabilities>
     canRefreshToken: false,
   },
   facebook: {
-    canPublishReels: false,
+    canPublishReels: true,
     canPublishStories: false,
-    canPublishFeed: false,
+    canPublishFeed: true,
     canPublishShorts: false,
     canRefreshToken: false,
   },
@@ -50,8 +50,8 @@ export const PLATFORM_CAPABILITIES: Record<SocialPlatform, PlatformCapabilities>
     canPublishReels: false,
     canPublishStories: false,
     canPublishFeed: false,
-    canPublishShorts: false,
-    canRefreshToken: false,
+    canPublishShorts: true,
+    canRefreshToken: true,
   },
 };
 

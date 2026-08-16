@@ -155,7 +155,12 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           {open && <p className="mono-label px-2 pb-2 pt-3">Ferramentas</p>}
           {MODES.filter(m => m.id !== "external").map((m) => {
             const active = m.id === mode;
-            return (
+  useEffect(() => {
+    // Fix for SSR 'window is not defined' error in components that might be using it in initial state or render
+    if (typeof window === 'undefined') return;
+  }, []);
+
+  return (
               <button
                 key={m.id}
                 onClick={() => onMode(m.id)}

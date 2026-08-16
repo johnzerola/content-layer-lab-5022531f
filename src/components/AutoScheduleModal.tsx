@@ -181,6 +181,7 @@ export function AutoScheduleModal({
                   <option value="reels">Reels</option>
                   <option value="feed">Feed</option>
                   <option value="stories">Stories</option>
+                  <option value="shorts">Shorts</option>
                 </select>
               </div>
               <div className="grid gap-2">
