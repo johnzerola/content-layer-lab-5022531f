@@ -1,4 +1,4 @@
-/** Enquadramento automático: detecção de rosto (quando disponível) + saliência de movimento. */
+/** Enquadramento automático inteligente: Face Tracking avançado + Saliência de Movimento para Reels/Shorts 9:16. */
 
 interface DetectedFace {
   boundingBox: { x: number; y: number; width: number; height: number };

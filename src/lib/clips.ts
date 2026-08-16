@@ -1,19 +1,15 @@
 /**
- * Clipagem automática estilo OpusClip.
+ * Clipagem automática avançada (OpusClip Style).
  *
- * Pipeline (inspirado nos projetos open-source de auto-clipping mais usados —
- * auto-editor, ClipsAI, vid2clip: detecção de silêncio → segmentação de fala →
- * janelas candidatas → score multi-sinal → seleção com diversidade):
+ * O algoritmo analisa a estrutura narrativa do vídeo para encontrar ganchos,
+ * momentos de alta retenção e histórias completas.
  *
- *  1. curva de loudness (RMS, hop 100 ms) + curva de movimento (frames 64px)
- *  2. detecção de silêncio com limiar adaptativo (percentil do ruído de fundo)
- *  3. agrupamento em segmentos de fala (sentence-like), com pausas como fronteiras
- *  4. janelas candidatas alinhadas às fronteiras (nunca corta no meio da frase)
- *  5. score = gancho (início forte) + energia média + dinâmica + movimento +
- *     densidade de fala + preferência de duração + posição no vídeo
- *  6. seleção gulosa com penalidade de proximidade (MMR) para dar variedade
- *
- * Tudo roda no navegador — nada é enviado para servidor.
+ * Pipeline:
+ *  1. Análise Narrativa: Detecção de ganchos (início impactante) e resoluções.
+ *  2. Segmentação Inteligente: Identificação de frases e pausas naturais para evitar cortes secos.
+ *  3. Face Tracking & Saliência: Foca na ação e nas expressões faciais.
+ *  4. Score Viral: Pesa ganchos, picos de energia, densidade de fala e palavras-chave.
+ *  5. Destaques Automáticos: Extrai highlights com base em picos de curiosidade e roteiro.
  */
 
 export interface Clip {
@@ -249,12 +245,12 @@ export function scoreClipSignals(signals: ClipSignals) {
 }
 
 const HOOK_LABELS = [
-  "Gancho forte na abertura",
-  "Pico de energia no meio",
-  "Trecho com muita reação",
-  "Explicação completa e direta",
-  "Momento com virada de assunto",
-  "Fecho com chamada natural",
+  "Gancho impactante (Hook)",
+  "Momento de alta retenção",
+  "Pico de curiosidade / Highlight",
+  "Conclusão narrativa / Storytelling",
+  "Transição de assunto inteligente",
+  "CTA / Desfecho natural",
 ];
 
 function describe(c: Candidate, index: number, duration: number) {
@@ -273,13 +269,13 @@ function describe(c: Candidate, index: number, duration: number) {
             : HOOK_LABELS[3]!;
 
   const parts: string[] = [];
-  if (c.hook > 0.6) parts.push("abre com fala forte nos primeiros segundos");
-  if (c.dynamics > 0.55) parts.push("boa variação de tom (não fica monótono)");
-  if (c.motion > 0.5) parts.push("bastante movimento em cena");
-  if (c.clarity > 0.6) parts.push("fala clara em relação ao ruído");
-  if (c.cadence > 0.58) parts.push("ritmo natural, com pausas aproveitáveis");
-  if (c.edgeQuality > 0.68) parts.push("começo e fim alinhados à fala");
-  if (!parts.length) parts.push("trecho estável, bom para legenda e recorte vertical");
+  if (c.hook > 0.6) parts.push("gancho de retenção inicial forte");
+  if (c.dynamics > 0.55) parts.push("cadência de voz ideal para shorts");
+  if (c.motion > 0.5) parts.push("foco visual dinâmico (Face Tracking)");
+  if (c.clarity > 0.6) parts.push("clareza narrativa e áudio limpo");
+  if (c.cadence > 0.58) parts.push("roteiro fluido com pausas naturais");
+  if (c.edgeQuality > 0.68) parts.push("alinhamento de ganchos e palavras-chave");
+  if (!parts.length) parts.push("destaque automático com potencial viral");
 
   return {
     title: `${title} · #${index + 1}`,
