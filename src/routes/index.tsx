@@ -1167,7 +1167,7 @@ function Home() {
                     ...x,
                     status: "pronto",
                     blob: firstOut.blob,
-                    ext: first.ext,
+                    ext: firstOut.ext,
                     outputs,
                     progress: 1,
                     stage: `${outputs.length} arquivo(s) prontos`,
@@ -1468,6 +1468,20 @@ function Home() {
                 {savedFlash && <span className="ml-2 text-primary">â— salvo</span>}
               </p>
             </div>
+            {autoScheduleConfig && (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+                <p className="mono-label text-primary">Agendamento AutomÃ¡tico Ativo</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Os vÃ­deos serÃ£o agendados apÃ³s o processamento.
+                </p>
+                <button
+                  className="mt-2 font-mono text-[10px] text-muted-foreground underline"
+                  onClick={() => setAutoScheduleConfig(null)}
+                >
+                  desativar
+                </button>
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               {templates.length > 0 && (
                 <select
