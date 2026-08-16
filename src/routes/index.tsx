@@ -1,4 +1,4 @@
-﻿import { createFileRoute } from "@tanstack/react-router";
+﻿import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Upload,
@@ -41,6 +41,7 @@ import {
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
 import { AuthGate } from "@/components/AuthGate";
+import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { AutoScheduleModal } from "@/components/AutoScheduleModal";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
@@ -221,7 +222,13 @@ const ACTIVE_KEY = "vv.active-template";
 function Home() {
   const [mode, setMode] = useState<Mode>("lote");
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [active, setActive] = useState<Template>(() => createTemplate("PadrÃ£o"));
+  const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
+  const [user, setUser] = useState<CloudUser | null>(null);
+
+  useEffect(() => {
+    void currentUser().then(setUser);
+    return onAuth(setUser);
+  }, []);
   const [editing, setEditing] = useState(false);
   const [studioId, setStudioId] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -2792,6 +2799,23 @@ function Home() {
             headline: i.headline,
           }))}
       />
+
+      {!user && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-background/40 backdrop-blur-md p-4">
+          <div className="w-full max-w-md scale-105 transform shadow-2xl">
+            <div className="mb-6 flex flex-col items-center text-center">
+              <div className="mb-4 grid size-16 place-items-center rounded-2xl bg-primary/10 text-primary">
+                <Sparkles className="size-8" />
+              </div>
+              <h2 className="text-2xl font-bold tracking-tight">VaiViral Pro</h2>
+              <p className="mt-2 text-muted-foreground">Entre para começar a criar conteúdos virais em massa.</p>
+            </div>
+            <AuthGate>
+              <div className="hidden">Logado!</div>
+            </AuthGate>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

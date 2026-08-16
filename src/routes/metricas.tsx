@@ -1,6 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getMetrics, refreshPostMetrics, type PostInsight } from '@/lib/metrics.functions';
+import { currentUser } from '@/lib/cloud';
+import { AuthGate } from '@/components/AuthGate';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { 
@@ -29,6 +31,22 @@ import {
 import { AppShell } from '@/components/AppShell';
 
 export const Route = createFileRoute('/metricas')({
+  beforeLoad: async () => {
+    const user = await currentUser();
+    if (!user) throw redirect({ to: "/" });
+  },
+  errorComponent: ({ error }) => {
+    if (error.message === "Unauthorized") {
+      return (
+        <div className="flex min-h-dvh flex-col items-center justify-center p-4">
+          <AuthGate>
+            <div className="hidden">Autenticado com sucesso!</div>
+          </AuthGate>
+        </div>
+      );
+    }
+    return <div>Erro ao carregar métricas: {error.message}</div>;
+  },
   component: MetricsPage,
 });
 

@@ -122,6 +122,15 @@ interface Props {
 
 export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, children }: Props) {
   const [open, setOpen] = useState(true);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    import("@/lib/cloud").then(({ currentUser, onAuth }) => {
+      void currentUser().then(setUser);
+      return onAuth(setUser);
+    });
+  }, []);
+
   const current = MODES.find((m) => m.id === mode)!;
 
   // mantém portais (modais, toasts) na mesma identidade de cor
