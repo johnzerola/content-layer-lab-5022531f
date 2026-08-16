@@ -83,6 +83,9 @@ function LivePage() {
   const [info, setInfo] = useState<LiveCheck | null>(null);
   const [clips, setClips] = useState<LiveClip[]>([]);
   const [busy, setBusy] = useState(false);
+  const [user, setUser] = useState<CloudUser | null>(null);
+  const [posts, setPosts] = useState<ScheduledPost[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const detachRef = useRef<(() => void) | null>(null);
