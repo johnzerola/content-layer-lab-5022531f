@@ -41,6 +41,7 @@ import {
 import { ClipStudio } from "@/components/ClipStudio";
 import { VideoStudio } from "@/components/VideoStudio";
 import { AuthGate } from "@/components/AuthGate";
+import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { CleanerIAStudio } from "@/components/CleanerIAStudio";
 import { AutoScheduleModal } from "@/components/AutoScheduleModal";
 import { defaultPreEdit, hasPreEdit, type PreEdit } from "@/lib/preedit";
