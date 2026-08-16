@@ -24,7 +24,7 @@ export const Route = createFileRoute("/biblioteca")({
 });
 
 function BibliotecaPage() {
-  const [mode, setMode] = useState<AppMode>("lote");
+  const [mode, setMode] = useState<AppMode>("external");
   const [libOpen, setLibOpen] = useState(false);
   const [cloudOpen, setCloudOpen] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
