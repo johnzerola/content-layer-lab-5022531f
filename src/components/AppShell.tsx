@@ -287,38 +287,40 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
         </header>
 
         <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
-          <section
-            key={current.id}
-            className="mb-6 overflow-hidden rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5 shadow-[var(--shadow-panel)] sm:p-6"
-          >
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <p className="mono-label flex items-center gap-2 text-primary">
-                  <Badge className="size-3.5" />
-                  ferramenta independente
-                </p>
-                <h2 className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                  {current.headline}
-                </h2>
-                <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-                  {current.description}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {current.chips.map((c) => (
-                    <span
-                      key={c}
-                      className="rounded-full border border-border bg-surface-2 px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground"
-                    >
-                      {c}
-                    </span>
-                  ))}
+          {mode !== "clip" && mode !== "lote" && mode !== "limpar" && mode !== "limpar-ia" ? null : (
+            <section
+              key={current.id}
+              className="mb-6 overflow-hidden rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5 shadow-[var(--shadow-panel)] sm:p-6"
+            >
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <p className="mono-label flex items-center gap-2 text-primary">
+                    <Badge className="size-3.5" />
+                    ferramenta independente
+                  </p>
+                  <h2 className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">
+                    {current.headline}
+                  </h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                    {current.description}
+                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {current.chips.map((c) => (
+                      <span
+                        key={c}
+                        className="rounded-full border border-border bg-surface-2 px-3 py-1 font-mono text-[10px] uppercase tracking-wide text-muted-foreground"
+                      >
+                        {c}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid size-16 shrink-0 place-items-center rounded-2xl border border-primary/30 bg-primary/12 text-primary shadow-[var(--shadow-glow)]">
+                  <current.icon className="size-7" />
                 </div>
               </div>
-              <div className="grid size-16 shrink-0 place-items-center rounded-2xl border border-primary/30 bg-primary/12 text-primary shadow-[var(--shadow-glow)]">
-                <current.icon className="size-7" />
-              </div>
-            </div>
-          </section>
+            </section>
+          )}
 
           {children}
         </div>
