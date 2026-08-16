@@ -11,6 +11,8 @@ import { checkXLive, type LiveCheck } from "@/lib/live.functions";
 import { LiveClipper, analyzeLiveClip, attachHls, clipTitle, type LiveClip } from "@/lib/live";
 import { markPendingTool, sendItemsToTool } from "@/lib/handoff";
 import { downloadAsZip } from "@/lib/zip";
+import { listPosts, STATUS_LABEL, type ScheduledPost } from "@/lib/social";
+import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/live")({
   component: LivePage,
@@ -81,6 +83,9 @@ function LivePage() {
   const [info, setInfo] = useState<LiveCheck | null>(null);
   const [clips, setClips] = useState<LiveClip[]>([]);
   const [busy, setBusy] = useState(false);
+  const [user, setUser] = useState<CloudUser | null>(null);
+  const [posts, setPosts] = useState<ScheduledPost[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const detachRef = useRef<(() => void) | null>(null);
@@ -100,6 +105,35 @@ function LivePage() {
   }, []);
 
   useEffect(() => () => teardown(), [teardown]);
+
+  const refreshPosts = useCallback(async () => {
+    setLoadingPosts(true);
+    try {
+      const p = await listPosts();
+      setPosts(p);
+    } catch (e) {
+      console.error("Falha ao carregar posts na Live:", e);
+    } finally {
+      setLoadingPosts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void currentUser().then(setUser);
+    return onAuth(setUser);
+  }, []);
+
+  useEffect(() => {
+    if (user) void refreshPosts();
+    else setPosts([]);
+  }, [user, refreshPosts]);
+
+  const postStats = useMemo(() => {
+    const total = posts.length;
+    const published = posts.filter((p) => p.status === "publicado").length;
+    const pending = posts.filter((p) => p.status === "agendado" || p.status === "processando").length;
+    return { total, published, pending };
+  }, [posts]);
 
   const onClipReady = useCallback(async (blob: Blob, at: number, duration: number) => {
     const analysis = await analyzeLiveClip(blob, duration);
@@ -472,6 +506,46 @@ function LivePage() {
               >
                 <Square className="size-4" /> parar
               </button>
+            )}
+          </div>
+
+          <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
+            <div className="flex items-center justify-between">
+              <p className="mono-label">PublicaÃ§Ãµes</p>
+              {loadingPosts && <Loader2 className="size-3 animate-spin text-muted-foreground" />}
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="rounded-xl border border-border bg-surface-2 p-2">
+                <span className="block text-lg font-bold text-primary">{postStats.published}</span>
+                <span className="font-mono text-[9px] uppercase text-muted-foreground">feitas</span>
+              </div>
+              <div className="rounded-xl border border-border bg-surface-2 p-2">
+                <span className="block text-lg font-bold text-amber-400">{postStats.pending}</span>
+                <span className="font-mono text-[9px] uppercase text-muted-foreground">aguardando</span>
+              </div>
+            </div>
+            
+            {posts.length > 0 ? (
+              <ul className="max-h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {posts.slice(0, 10).map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-surface-2/50 px-2 py-1.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-mono text-[10px] text-foreground">
+                        {new Date(p.scheduled_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[8px] uppercase ${
+                      p.status === 'publicado' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' :
+                      p.status === 'falhou' ? 'border-red-500/30 bg-red-500/10 text-red-400' :
+                      'border-amber-500/30 bg-amber-500/10 text-amber-400'
+                    }`}>
+                      {STATUS_LABEL[p.status] ?? p.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="py-2 text-center font-mono text-[10px] text-muted-foreground">nenhum agendamento</p>
             )}
           </div>
 
