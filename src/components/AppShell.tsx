@@ -123,6 +123,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
   const [open, setOpen] = useState(true);
   const current = MODES.find((m) => m.id === mode) || MODES[0];
   const Badge = current.badge;
+  const Icon = current.icon;
 
   // mantém portais (modais, toasts) na mesma identidade de cor
   useEffect(() => {
