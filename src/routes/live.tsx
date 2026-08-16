@@ -70,7 +70,7 @@ function ScoreRing({ value }: { value: number }) {
 
 function LivePage() {
   const navigate = useNavigate();
-  const [mode, setMode] = useState<AppMode>("external");
+  const [mode, setMode] = useState<AppMode>("clip");
   const [libOpen, setLibOpen] = useState(false);
   const [cloudOpen, setCloudOpen] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
