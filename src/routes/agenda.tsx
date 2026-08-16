@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarClock, Instagram, Loader2, Plus, Trash2, UploadCloud, X } from "lucide-react";
+import { CalendarClock, Instagram, Loader2, Plus, Trash2, UploadCloud, X, Youtube, Video } from "lucide-react";
 import { AppShell, type AppMode } from "@/components/AppShell";
 import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
@@ -217,11 +217,18 @@ function AgendaPage() {
                 <p className="mono-label pb-3">Contas conectadas</p>
                 <div className="flex gap-2">
                   <div className="flex flex-1 items-center gap-2 rounded-xl border border-border bg-surface-2 px-3">
-                    <Instagram className="size-4 shrink-0 text-muted-foreground" />
+                    <select 
+                      className="bg-transparent text-sm outline-none border-r border-border mr-1"
+                      onChange={(e) => setHandle(`@${e.target.value}`)}
+                    >
+                      <option value="instagram">Instagram</option>
+                      <option value="youtube">YouTube</option>
+                      <option value="tiktok">TikTok</option>
+                    </select>
                     <input
                       value={handle}
                       onChange={(e) => setHandle(e.target.value)}
-                      placeholder="@suapagina para preparar"
+                      placeholder="@suapagina"
                       className="w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted-foreground"
                     />
                   </div>
@@ -242,7 +249,7 @@ function AgendaPage() {
                       className="flex items-center gap-3 rounded-xl border border-border bg-surface-2 px-3 py-2.5"
                     >
                       <span className="grid size-8 shrink-0 place-items-center rounded-lg border border-primary/35 bg-primary/12 text-primary">
-                        <Instagram className="size-4" />
+                        {a.platform === "youtube" ? <Youtube className="size-4" /> : a.platform === "tiktok" ? <Video className="size-4" /> : <Instagram className="size-4" />}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium">@{a.username}</span>
@@ -319,6 +326,7 @@ function AgendaPage() {
                       <option value="reels">Reels</option>
                       <option value="feed">Feed</option>
                       <option value="stories">Stories</option>
+                      <option value="shorts">Shorts</option>
                     </select>
                   </label>
                 </div>
