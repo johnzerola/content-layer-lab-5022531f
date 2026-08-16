@@ -548,23 +548,6 @@ function LivePage() {
               <p className="py-2 text-center font-mono text-[10px] text-muted-foreground">nenhum agendamento</p>
             )}
           </div>
-              <button
-                onClick={() => void start()}
-                disabled={busy}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
-              >
-                {busy ? <Loader2 className="size-4 animate-spin" /> : <Radio className="size-4" />}{" "}
-                monitorar
-              </button>
-            ) : (
-              <button
-                onClick={stop}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold transition hover:bg-surface-2"
-              >
-                <Square className="size-4" /> parar
-              </button>
-            )}
-          </div>
 
           <div className="rounded-2xl border border-border bg-surface p-4 text-sm text-muted-foreground">
             <p className="mono-label mb-2">como funciona</p>
