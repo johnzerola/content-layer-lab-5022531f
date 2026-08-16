@@ -2757,6 +2757,10 @@ function Home() {
       <AutoScheduleModal
         open={scheduleOpen}
         onOpenChange={setScheduleOpen}
+        onAutoConfig={(config) => {
+          setAutoScheduleConfig(config);
+          toast.success("Agendamento automÃ¡tico configurado para este lote.");
+        }}
         onComplete={() => {
           setReport(null);
           // Optional: navigate to agenda
