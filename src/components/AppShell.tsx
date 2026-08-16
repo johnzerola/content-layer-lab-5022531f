@@ -102,7 +102,7 @@ const MODES: ModeDef[] = [
     tagline: "clipagem em tempo real",
     headline: "Cortes Automáticos de Lives",
     description: "Monitore transmissÃµes do X, Kick e TikTok e gere cortes automÃ¡ticos baseados em IA sem precisar de templates.",
-    chips: [],
+    chips: ["monitoramento HLS", "score viral IA", "exportação rápida"],
     icon: Sparkle,
     badge: Sparkle,
   },
