@@ -442,16 +442,32 @@ function AgendaPage() {
                               </button>
                             )}
                             {p.status === "agendado" && (
-                              <button
-                                onClick={async () => {
-
-                                  await cancelPost(p.id);
-                                  await refresh();
-                                }}
-                                className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground transition hover:text-foreground"
-                              >
-                                <X className="size-3" /> cancelar
-                              </button>
+                              <>
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      // Para publicação imediata, agendamos para o passado
+                                      await reschedulePost(p.id, new Date(Date.now() - 60000));
+                                      toast.success("Enviando para publicação imediata...");
+                                      await refresh();
+                                    } catch (e) {
+                                      toast.error("Falha ao forçar publicação.");
+                                    }
+                                  }}
+                                  className="flex items-center gap-1 rounded-lg bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/20"
+                                >
+                                  Tentar agora
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    await cancelPost(p.id);
+                                    await refresh();
+                                  }}
+                                  className="flex items-center gap-1 rounded-lg border border-border px-2 py-1 font-mono text-[10px] text-muted-foreground transition hover:text-foreground"
+                                >
+                                  <X className="size-3" /> cancelar
+                                </button>
+                              </>
                             )}
                             <button
                               onClick={async () => {
