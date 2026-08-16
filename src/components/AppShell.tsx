@@ -16,6 +16,7 @@ import {
   HardDrive,
   Radio,
   Settings2,
+  BarChart3,
 } from "lucide-react";
 
 export type AppMode = "lote" | "clip" | "limpar" | "limpar-ia" | "external";
