@@ -3,12 +3,9 @@ import { z } from "zod";
 import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-/**
- * Reporta um erro ocorrido no cliente para o servidor para depuração.
- */
 export const reportClientError = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .inputValidator((input: unknown) => 
+  .validator((input: any) => 
     z.object({ 
       message: z.string(), 
       stack: z.string().optional(),
@@ -16,7 +13,7 @@ export const reportClientError = createServerFn({ method: "POST" })
       context: z.record(z.unknown()).optional()
     }).parse(input)
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data, context }: any) => {
     console.error(`[ClientError] User: ${context.userId} | Route: ${data.route}`, data.message, data.stack);
     return { ok: true };
   });
