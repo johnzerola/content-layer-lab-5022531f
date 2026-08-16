@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Calendar,
   Clock,
+  ArrowRight,
 } from "lucide-react";
 import {
   listAccounts,
@@ -35,6 +36,7 @@ interface AutoScheduleModalProps {
   onOpenChange: (open: boolean) => void;
   items: { blob: Blob; fileName: string; headline?: string }[];
   onComplete: () => void;
+  onAutoConfig?: (config: any) => void;
 }
 
 export function AutoScheduleModal({
@@ -42,7 +44,8 @@ export function AutoScheduleModal({
   onOpenChange,
   items,
   onComplete,
-}: AutoScheduleModalProps) {
+  onAutoConfig,
+}: AutoScheduleModalProps & { onAutoConfig?: (config: any) => void }) {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [accountId, setAccountId] = useState("");
   const [kind, setKind] = useState<PostKind>("reels");
@@ -263,8 +266,24 @@ export function AutoScheduleModal({
               <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={loading}>
                 Cancelar
               </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  onAutoConfig?.({
+                    accountId,
+                    kind,
+                    caption: baseCaption,
+                    intervalHours: intervalType === "hours" ? intervalValue : 0,
+                    intervalDays: intervalType === "days" ? intervalValue : 0,
+                  });
+                  onOpenChange(false);
+                }}
+                disabled={loading || accounts.length === 0}
+              >
+                Agendar no Lote
+              </Button>
               <Button onClick={handleSchedule} disabled={loading || accounts.length === 0}>
-                {loading ? "Processando..." : "Confirmar Agendamento"}
+                {loading ? "Processando..." : "Confirmar Agendamento Agora"}
               </Button>
             </>
           ) : null}

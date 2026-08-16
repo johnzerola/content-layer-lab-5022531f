@@ -97,7 +97,7 @@ type Props = {
   texts?: { headline: string; name: string; handle: string; cta: string } | undefined;
   onTextsChange?: ((t: { headline: string; name: string; handle: string; cta: string }) => void) | undefined;
   onClose: () => void;
-  onSave: (v: PreEditResult) => void;
+  onSave: (v: PreEditResult, schedule?: boolean) => void;
 };
 
 const fmt = (s: number) => {
@@ -1542,6 +1542,21 @@ export function VideoStudio({
                 <kbd className="rounded bg-muted px-1 text-foreground">S</kbd> dividir ·
                 <kbd className="rounded bg-muted px-1 text-foreground">K</kbd> keyframe.
               </p>
+            </div>
+            <div className="flex gap-2 border-t border-border p-4 bg-surface/80 backdrop-blur-sm">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => onSave({ pre, clip: clipWindow })}
+              >
+                Salvar
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={() => onSave({ pre, clip: clipWindow }, true)}
+              >
+                Salvar e Agendar
+              </Button>
             </div>
           </aside>
         </div>

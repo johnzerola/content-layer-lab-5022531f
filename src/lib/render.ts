@@ -21,6 +21,7 @@ export interface RenderOptions {
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null | undefined;
   onProgress?: ((p: number) => void) | undefined;
   signal?: AbortSignal | undefined;
+  jobId?: string | undefined;
 }
 
 function pickMime() {
@@ -163,6 +164,7 @@ export async function renderVideo(
         plate: opts.plate,
         onProgress: opts.onProgress,
         signal: opts.signal,
+        jobId: opts.jobId,
       });
       return { blob, ext: "mp4" };
     } catch (err) {

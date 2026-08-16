@@ -27,6 +27,7 @@ export interface EncodeOptions {
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null | undefined;
   onProgress?: ((p: number) => void) | undefined;
   signal?: AbortSignal | undefined;
+  jobId?: string | undefined;
 }
 
 type VideoWithRvfc = HTMLVideoElement & {
@@ -418,7 +419,14 @@ export async function encodeMp4(opts: EncodeOptions): Promise<Blob> {
     opts.onProgress?.(1);
     const raw = muxer.target.buffer as ArrayBuffer;
     const clean = t.antiDup?.cleanMetadata === false ? raw : cleanMp4Metadata(raw);
-    return new Blob([clean], { type: "video/mp4" });
+    const blob = new Blob([clean], { type: "video/mp4" });
+
+    if (opts.jobId) {
+      const { finishJob } = await import("./jobs");
+      void finishJob(opts.jobId, "pronto", { blob, fileName: opts.file.name });
+    }
+
+    return blob;
   } finally {
     URL.revokeObjectURL(url);
     video.src = "";

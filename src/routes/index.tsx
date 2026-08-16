@@ -340,6 +340,7 @@ function Home() {
     fails: { name: string; error: string }[];
   } | null>(null);
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  const [autoScheduleConfig, setAutoScheduleConfig] = useState<any>(null);
 
   const smartRef = useRef(smartFrame);
 
@@ -1123,7 +1124,10 @@ function Home() {
                     : x,
                 ),
               );
-              updateJob(id, { stage: stageLabel });
+              updateJob(id, {
+                stage: stageLabel,
+                meta: autoScheduleConfig ? { nextAction: autoScheduleConfig } : {},
+              });
               const { blob, ext } = await renderVideo(sourceFile, tpl, {
                 variation: variationOf(item, k),
                 offsetX: item.offsetX,
@@ -1154,16 +1158,16 @@ function Home() {
           }
 
           doneCount.current++;
-          finishJob(id, `${outputs.length} arquivo(s) prontos`);
-          const first = outputs[0]!;
+          const firstOut = outputs[0]!;
+          await finishJob(id, `${outputs.length} arquivo(s) prontos`, { blob: firstOut.blob, fileName: item.file.name });
           setItems((p) =>
             p.map((x) =>
               x.id === id
                 ? {
                     ...x,
                     status: "pronto",
-                    blob: first.blob,
-                    ext: first.ext,
+                    blob: firstOut.blob,
+                    ext: firstOut.ext,
                     outputs,
                     progress: 1,
                     stage: `${outputs.length} arquivo(s) prontos`,
@@ -1464,6 +1468,20 @@ function Home() {
                 {savedFlash && <span className="ml-2 text-primary">â— salvo</span>}
               </p>
             </div>
+            {autoScheduleConfig && (
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
+                <p className="mono-label text-primary">Agendamento AutomÃ¡tico Ativo</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Os vÃ­deos serÃ£o agendados apÃ³s o processamento.
+                </p>
+                <button
+                  className="mt-2 font-mono text-[10px] text-muted-foreground underline"
+                  onClick={() => setAutoScheduleConfig(null)}
+                >
+                  desativar
+                </button>
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               {templates.length > 0 && (
                 <select
@@ -2720,7 +2738,7 @@ function Home() {
           }}
           onClose={() => setStudioId(null)}
 
-          onSave={({ pre, clip }) => {
+          onSave={({ pre, clip }, schedule) => {
             setItems((p) =>
               p.map((x) =>
                 x.id === studioItem.id
@@ -2729,7 +2747,12 @@ function Home() {
               ),
             );
             setStudioId(null);
-            toast.success("EdiÃ§Ã£o aplicada â€” vale no preview e na exportaÃ§Ã£o");
+            if (schedule) {
+              // Trigger single-item schedule modal or mark for auto-schedule
+              setScheduleOpen(true);
+            } else {
+              toast.success("EdiÃ§Ã£o aplicada â€” vale no preview e na exportaÃ§Ã£o");
+            }
           }}
         />
       )}
@@ -2748,6 +2771,10 @@ function Home() {
       <AutoScheduleModal
         open={scheduleOpen}
         onOpenChange={setScheduleOpen}
+        onAutoConfig={(config) => {
+          setAutoScheduleConfig(config);
+          toast.success("Agendamento automÃ¡tico configurado para este lote.");
+        }}
         onComplete={() => {
           setReport(null);
           // Optional: navigate to agenda
