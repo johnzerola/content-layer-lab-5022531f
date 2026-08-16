@@ -171,7 +171,11 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
     });
     const created: unknown = await create.json().catch(() => null);
     const creationId = nestedString(created, ["id"]);
-    if (!create.ok || !creationId) return providerFailure("Meta criar container", create.status, created);
+    if (!create.ok || !creationId) {
+      const errorMsg = nestedString(created, ["error", "message"]) || "erro desconhecido";
+      return providerFailure("Meta criar container", create.status, { detail: errorMsg });
+    }
+
 
     let finished = false;
     for (let i = 0; i < 20; i++) {
@@ -180,20 +184,26 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
         headers: authorization,
       });
       const statusPayload: unknown = await statusResponse.json().catch(() => null);
-      if (!statusResponse.ok) return providerFailure("Meta consultar container", statusResponse.status, statusPayload);
+      if (!statusResponse.ok) {
+        const errorMsg = nestedString(statusPayload, ["error", "message"]) || "erro ao consultar status";
+        return providerFailure("Meta consultar container", statusResponse.status, { detail: errorMsg });
+      }
       const statusCode = nestedString(statusPayload, ["status_code"]);
+
       if (statusCode === "FINISHED") {
         finished = true;
         break;
       }
       if (statusCode === "ERROR") {
+        const errorMsg = nestedString(statusPayload, ["error_description"]) || "Meta nao processou o video (formato invalido ou erro interno).";
         return {
           ok: false,
           code: "MEDIA_INVALID",
           retryable: false,
-          error: "Meta nao processou o video.",
+          error: errorMsg,
         };
       }
+
     }
     if (!finished) {
       return {
@@ -211,8 +221,12 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
     });
     const published: unknown = await publishResponse.json().catch(() => null);
     const providerPostId = nestedString(published, ["id"]);
-    if (!publishResponse.ok || !providerPostId) return providerFailure("Meta publicar", publishResponse.status, published);
+    if (!publishResponse.ok || !providerPostId) {
+      const errorMsg = nestedString(published, ["error", "message"]) || "erro ao publicar";
+      return providerFailure("Meta publicar", publishResponse.status, { detail: errorMsg });
+    }
     return { ok: true, providerPostId };
+
   } catch (error) {
     return {
       ok: false,
