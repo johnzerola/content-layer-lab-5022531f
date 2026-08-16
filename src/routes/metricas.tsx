@@ -28,7 +28,7 @@ import {
 } from 'recharts';
 import { AppShell } from '@/components/AppShell';
 
-export const Route = createFileRoute('/metricas' as any)({
+export const Route = createFileRoute('/metricas')({
   component: MetricsPage,
 });
 
