@@ -106,6 +106,35 @@ function LivePage() {
 
   useEffect(() => () => teardown(), [teardown]);
 
+  const refreshPosts = useCallback(async () => {
+    setLoadingPosts(true);
+    try {
+      const p = await listPosts();
+      setPosts(p);
+    } catch (e) {
+      console.error("Falha ao carregar posts na Live:", e);
+    } finally {
+      setLoadingPosts(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void currentUser().then(setUser);
+    return onAuth(setUser);
+  }, []);
+
+  useEffect(() => {
+    if (user) void refreshPosts();
+    else setPosts([]);
+  }, [user, refreshPosts]);
+
+  const postStats = useMemo(() => {
+    const total = posts.length;
+    const published = posts.filter((p) => p.status === "publicado").length;
+    const pending = posts.filter((p) => p.status === "agendado" || p.status === "processando").length;
+    return { total, published, pending };
+  }, [posts]);
+
   const onClipReady = useCallback(async (blob: Blob, at: number, duration: number) => {
     const analysis = await analyzeLiveClip(blob, duration);
     const id = crypto.randomUUID();
