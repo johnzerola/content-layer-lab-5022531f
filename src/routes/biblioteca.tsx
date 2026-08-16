@@ -6,8 +6,26 @@ import { TemplateLibrary } from "@/components/TemplateLibrary";
 import { CloudPanel } from "@/components/CloudPanel";
 import { listJobs } from "@/lib/jobs";
 import type { Template } from "@/lib/template";
+import { currentUser } from "@/lib/cloud";
+import { AuthGate } from "@/components/AuthGate";
 
 export const Route = createFileRoute("/biblioteca")({
+  beforeLoad: async () => {
+    const user = await currentUser();
+    if (!user) throw new Error("Unauthorized");
+  },
+  errorComponent: ({ error }) => {
+    if (error.message === "Unauthorized") {
+      return (
+        <div className="flex min-h-dvh flex-col items-center justify-center p-4">
+          <AuthGate>
+            <div className="hidden">Autenticado com sucesso!</div>
+          </AuthGate>
+        </div>
+      );
+    }
+    return <div>Erro ao carregar biblioteca: {error.message}</div>;
+  },
   component: BibliotecaPage,
   head: () => ({
     meta: [

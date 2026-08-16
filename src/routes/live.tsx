@@ -13,8 +13,25 @@ import { markPendingTool, sendItemsToTool } from "@/lib/handoff";
 import { downloadAsZip } from "@/lib/zip";
 import { listPosts, STATUS_LABEL, type ScheduledPost } from "@/lib/social";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
+import { AuthGate } from "@/components/AuthGate";
 
 export const Route = createFileRoute("/live")({
+  beforeLoad: async () => {
+    const user = await currentUser();
+    if (!user) throw new Error("Unauthorized");
+  },
+  errorComponent: ({ error }) => {
+    if (error.message === "Unauthorized") {
+      return (
+        <div className="flex min-h-dvh flex-col items-center justify-center p-4">
+          <AuthGate>
+            <div className="hidden">Autenticado com sucesso!</div>
+          </AuthGate>
+        </div>
+      );
+    }
+    return <div>Erro ao carregar monitoramento: {error.message}</div>;
+  },
   component: LivePage,
   head: () => ({
     meta: [

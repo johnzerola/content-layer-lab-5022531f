@@ -13,8 +13,21 @@ import { toast } from "sonner";
 import { cloudAuthHeaders, currentUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/limpar-ia")({
-  beforeLoad: async ({ context }) => {
-    // Proteção de rota para evitar renderização de dados privados antes da auth
+  beforeLoad: async () => {
+    const user = await currentUser();
+    if (!user) throw new Error("Unauthorized");
+  },
+  errorComponent: ({ error }) => {
+    if (error.message === "Unauthorized") {
+      return (
+        <div className="flex min-h-dvh flex-col items-center justify-center p-4">
+          <AuthGate>
+            <div className="hidden">Autenticado com sucesso!</div>
+          </AuthGate>
+        </div>
+      );
+    }
+    return <div>Erro ao carregar ferramenta: {error.message}</div>;
   },
   head: () => ({
     meta: [
@@ -160,9 +173,7 @@ function LimparIAPage() {
               </a>
             )}
           </div>
-          <AuthGate>
-            <CleanerIAStudio item={item} onComplete={(url) => setResultUrl(url)} />
-          </AuthGate>
+          <CleanerIAStudio item={item} onComplete={(url) => setResultUrl(url)} />
         </div>
       </div>
     );

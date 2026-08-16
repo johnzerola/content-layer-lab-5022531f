@@ -29,6 +29,22 @@ import { addAccount } from "@/lib/social.functions";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 
 export const Route = createFileRoute("/agenda")({
+  beforeLoad: async () => {
+    const user = await currentUser();
+    if (!user) throw new Error("Unauthorized");
+  },
+  errorComponent: ({ error }) => {
+    if (error.message === "Unauthorized") {
+      return (
+        <div className="flex min-h-dvh flex-col items-center justify-center p-4">
+          <AuthGate>
+            <div className="hidden">Autenticado com sucesso!</div>
+          </AuthGate>
+        </div>
+      );
+    }
+    return <div>Erro ao carregar agenda: {error.message}</div>;
+  },
   component: AgendaPage,
   head: () => ({
     meta: [
