@@ -1,4 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { mediaProxyTicket } from "@/lib/cleaner.server";
 import { safeRemoteUrl } from "@/lib/remote-url";
 
@@ -50,11 +53,10 @@ export function broadcastIdOf(input: string): string | null {
 }
 
 export const signedHlsProxyUrl = createServerFn({ method: "POST" })
-  .validator((input: { url: string }) => {
-    const url = String(input?.url ?? "").trim();
-    if (!url) throw new Error("playlist ausente");
-    return { url };
-  })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .validator((input: unknown) => 
+    z.object({ url: z.string().min(1) }).parse(input)
+  )
   .handler(async ({ data }) => {
     const safe = safeRemoteUrl(data.url);
     if (!safe || !/\.m3u8(\?|$)/i.test(safe.pathname + safe.search)) {
@@ -177,11 +179,10 @@ async function fromTikTokPage(input: string, handle?: string): Promise<LiveCheck
  * e devolve o playlist HLS para o monitor gravar.
  */
 export const checkXLive = createServerFn({ method: "POST" })
-  .validator((input: { target: string }) => {
-    const target = String(input?.target ?? "").trim();
-    if (!target) throw new Error("informe o @ ou o link da live");
-    return { target: target.slice(0, 300) };
-  })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .validator((input: unknown) => 
+    z.object({ target: z.string().min(1).max(300) }).parse(input)
+  )
   .handler(async ({ data }): Promise<LiveCheck> => {
     const target = data.target;
 
