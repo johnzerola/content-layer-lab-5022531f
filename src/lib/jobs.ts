@@ -142,7 +142,21 @@ export function updateJob(
   emit();
 }
 
-export function finishJob(id: string, stage = "pronto") {
+export async function finishJob(id: string, stage = "pronto") {
+  const job = jobs.get(id);
+  const action = job?.meta?.nextAction;
+
+  if (action && action.type === "schedule" && job.status !== "pronto") {
+    try {
+      updateJob(id, { stage: "agendando..." });
+      // We need to fetch the blob from somewhere or have it passed.
+      // For now, this is a placeholder for the automated hand-off.
+      // The actual call will likely happen in the tool that manages the job.
+    } catch (e) {
+      console.error("Auto-schedule failed:", e);
+    }
+  }
+
   updateJob(id, { status: "pronto", progress: 1, stage });
 }
 

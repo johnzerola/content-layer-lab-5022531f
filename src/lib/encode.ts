@@ -27,6 +27,7 @@ export interface EncodeOptions {
   plate?: { canvas: HTMLCanvasElement; ok: Set<string> } | null | undefined;
   onProgress?: ((p: number) => void) | undefined;
   signal?: AbortSignal | undefined;
+  jobId?: string | undefined;
 }
 
 type VideoWithRvfc = HTMLVideoElement & {
