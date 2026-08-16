@@ -222,7 +222,13 @@ const ACTIVE_KEY = "vv.active-template";
 function Home() {
   const [mode, setMode] = useState<Mode>("lote");
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [active, setActive] = useState<Template>(() => createTemplate("PadrÃ£o"));
+  const [active, setActive] = useState<Template>(() => createTemplate("Padrão"));
+  const [user, setUser] = useState<CloudUser | null>(null);
+
+  useEffect(() => {
+    void currentUser().then(setUser);
+    return onAuth(setUser);
+  }, []);
   const [editing, setEditing] = useState(false);
   const [studioId, setStudioId] = useState<string | null>(null);
   const [libraryOpen, setLibraryOpen] = useState(false);
