@@ -1,14 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /**
  * Transcreve um trecho de áudio (WAV base64) usando a Lovable AI.
  * Retorna apenas o texto — os tempos são calculados no cliente por segmento.
  */
 export const transcribeChunk = createServerFn({ method: "POST" })
-  .validator((input: { audio: string; language?: string }) => {
-    if (!input?.audio || typeof input.audio !== "string") throw new Error("áudio ausente");
-    return input;
-  })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .validator((input: unknown) => 
+    z.object({ 
+      audio: z.string().min(100), 
+      language: z.string().optional() 
+    }).parse(input)
+  )
   .handler(async ({ data }) => {
     const key = process.env["LOVABLE_API_KEY"];
     if (!key) throw new Error("A IA de transcrição não está configurada neste projeto (chave ausente).");

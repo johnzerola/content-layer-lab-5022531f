@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 export type PostInsight = {
   id: string;
@@ -21,9 +22,10 @@ export type PostInsight = {
 };
 
 export const getMetrics = createServerFn({ method: "GET" })
-  .handler(async () => {
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .handler(async ({ context }) => {
     // Note: We use "any" as a fallback since post_insights is not yet in generated types
-    const { data, error } = await (supabase.from("post_insights" as any) as any)
+    const { data, error } = await (context.supabase.from("post_insights" as any) as any)
       .select(`
         *,
         scheduled_posts (
@@ -51,10 +53,12 @@ export const getMetrics = createServerFn({ method: "GET" })
   });
 
 export const refreshPostMetrics = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ postId: z.string() }).parse(d))
-  .handler(async ({ data: { postId } }) => {
-    const { error } = await (supabase.from("post_insights" as any) as any)
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .inputValidator((d) => z.object({ postId: z.string().uuid() }).parse(d))
+  .handler(async ({ data: { postId }, context }) => {
+    const { error } = await (context.supabase.from("post_insights" as any) as any)
       .upsert({
+        user_id: context.userId,
         post_id: postId,
         views: Math.floor(Math.random() * 5000) + 1000,
         likes: Math.floor(Math.random() * 500) + 100,

@@ -1,16 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 /**
  * Traduz as palavras da legenda mantendo a mesma quantidade de itens,
  * para que os tempos por palavra continuem válidos (estilo Clipzi).
  */
 export const translateWords = createServerFn({ method: "POST" })
-  .validator((input: { words: string[]; language: string }) => {
-    if (!Array.isArray(input?.words) || input.words.length === 0) throw new Error("nada para traduzir");
-    if (input.words.length > 1200) throw new Error("Trecho grande demais para traduzir de uma vez.");
-    if (!input?.language) throw new Error("idioma ausente");
-    return input;
-  })
+  .middleware([attachSupabaseAuth, requireSupabaseAuth])
+  .validator((input: unknown) => 
+    z.object({ 
+      words: z.array(z.string()).min(1).max(1200), 
+      language: z.string().min(2) 
+    }).parse(input)
+  )
   .handler(async ({ data }) => {
     const key = process.env["LOVABLE_API_KEY"];
     if (!key) throw new Error("A IA de tradução não está configurada neste projeto (chave ausente).");

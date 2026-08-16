@@ -1,30 +1,38 @@
-# Plan: SaaS Professionalization & Scalability Architecture
+# SaaS Professionalization & Scalability Architecture
 
-This plan establishes a professional foundation for the SaaS, ensuring the code is maintainable for future developers, scalable for many concurrent users, and robust against common bugs.
+Este plano foca em transformar o MVP em um sistema SaaS robusto, seguro e escalável para múltiplos usuários, garantindo que o backend e o frontend sigam padrões profissionais de desenvolvimento.
 
-## Technical Improvements
+## Core Goals
+- **Multi-tenancy**: Garantir isolamento total de dados entre usuários via RLS.
+- **Resiliência**: Implementar tratamento de erros unificado e logs de depuração.
+- **Desempenho**: Otimizar renderização e exportação de vídeos longos.
+- **Documentação**: Centralizar o conhecimento técnico para futuros desenvolvedores.
 
-### 1. Robust Type Safety & Error Handling
-- **Global Error Boundaries**: Implement a unified error tracking system in `src/lib/lovable-error-reporting.ts` to capture and log client-side crashes to the backend for developer review.
-- **Strict Zod Validation**: Ensure every `createServerFn` has a `zod` input validator to prevent malformed data from reaching the database.
+## Proposed Changes
 
-### 2. Multi-tenant Data Protection (Supabase & RLS)
-- **RLS Audit**: Verify and reinforce Row Level Security on all public tables (`templates`, `projects`, `batches`, `exports`, `post_insights`).
-- **Policy Enforcement**: Ensure that every `CREATE TABLE` migration includes explicit `GRANT` and `POLICY` statements tied to `auth.uid()`.
+### 1. Robust Type Safety & Error Reporting
+- Implementar um sistema de log centralizado no servidor para erros capturados no cliente.
+- Validar rigorosamente todas as entradas de `createServerFn` usando Zod.
+- Adicionar middleware de autenticação em todas as funções que acessam dados sensíveis.
 
-### 3. Scalable Asset Management
-- **Cloud Storage Fallback**: Enhance the `localStorage` fallback logic to automatically migrate user settings and drafts to Supabase when browser storage is constrained.
-- **Job Queue Efficiency**: Refine the `src/lib/jobs.ts` engine to handle multiple concurrent uploads and render tasks without blocking the main UI thread.
+### 2. Multi-tenant Protection (RLS)
+- Auditar e reforçar políticas de Row Level Security (RLS) em todas as tabelas:
+  - `cleaner_jobs`: Acesso apenas ao proprietário.
+  - `scheduled_posts`: Acesso apenas ao proprietário.
+  - `templates` e `projects`: Acesso apenas ao proprietário.
+- Garantir que `GRANT` statements estejam presentes em todas as migrações futuras.
 
-### 4. Developer Handoff & Documentation
-- **API Reference**: Update `.lovable/docs/architecture/` with a new `api-reference.md` mapping all `createServerFn` endpoints.
-- **Component Documentation**: Add JSDoc comments to core components (`VideoStudio`, `ClipStudio`, `CleanerIAStudio`) explaining their state lifecycle and handoff points.
+### 3. Asset & State Management
+- Implementar fallback automático para armazenamento em nuvem quando o `localStorage` atingir o limite (já iniciado, expandir para projetos e rascunhos).
+- Otimizar o gerenciamento de blobs de vídeo no IndexedDB para evitar vazamentos de memória.
 
-## User-Facing Changes
-- **Status Dashboard**: A dedicated area in "Integrações" or "Nuvem" to view system health, worker status, and current storage usage.
-- **Session Recovery**: Automated "Resume Project" prompts when a user returns to a tool they didn't finish using.
+### 4. Technical Documentation
+- Criar `api-reference.md` documentando todos os endpoints de servidor.
+- Documentar o fluxo de handoff entre ferramentas (`ViralBatch` -> `CleanerIA`).
+- Documentar a integração com o worker GPU ProPainter.
 
 ## Technical Details
-- **Backend**: TanStack Start v1 (React 19) + Supabase.
-- **Workers**: External Python/GPU workers for AI tasks (HMAC signed).
-- **Storage**: IndexedDB for local drafts, Supabase for cloud persistence.
+- **Middleware**: Uso sistemático de `attachSupabaseAuth` e `requireSupabaseAuth`.
+- **Validation**: Zod para tipagem estática e validação em runtime.
+- **RLS**: Uso de `auth.uid()` em todas as políticas `USING`.
+- **Storage**: Limpeza automática de arquivos temporários na VPS após o processamento.
