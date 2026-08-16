@@ -93,6 +93,19 @@ const MODES: ModeDef[] = [
     icon: Sparkle,
     badge: Wand2,
   },
+  {
+    id: "external",
+    label: "VaiViral",
+    hint: "dashboard",
+    brand: "VaiViral",
+    mark: "VV",
+    tagline: "plataforma completa",
+    headline: "Painel de Controle",
+    description: "Gerencie seus vídeos, templates e automações.",
+    chips: [],
+    icon: Sparkle,
+    badge: Sparkle,
+  },
 ];
 
 interface Props {
