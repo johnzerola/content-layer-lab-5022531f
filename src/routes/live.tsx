@@ -509,6 +509,63 @@ function LivePage() {
             )}
           </div>
 
+          <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
+            <div className="flex items-center justify-between">
+              <p className="mono-label">PublicaÃ§Ãµes</p>
+              {loadingPosts && <Loader2 className="size-3 animate-spin text-muted-foreground" />}
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="rounded-xl border border-border bg-surface-2 p-2">
+                <span className="block text-lg font-bold text-primary">{postStats.published}</span>
+                <span className="font-mono text-[9px] uppercase text-muted-foreground">feitas</span>
+              </div>
+              <div className="rounded-xl border border-border bg-surface-2 p-2">
+                <span className="block text-lg font-bold text-amber-400">{postStats.pending}</span>
+                <span className="font-mono text-[9px] uppercase text-muted-foreground">aguardando</span>
+              </div>
+            </div>
+            
+            {posts.length > 0 ? (
+              <ul className="max-h-48 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {posts.slice(0, 10).map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-2 rounded-lg border border-border/50 bg-surface-2/50 px-2 py-1.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-mono text-[10px] text-foreground">
+                        {new Date(p.scheduled_at).toLocaleTimeString("pt-BR", { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    <span className={`shrink-0 rounded-full border px-1.5 py-0.5 font-mono text-[8px] uppercase ${
+                      p.status === 'publicado' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400' :
+                      p.status === 'falhou' ? 'border-red-500/30 bg-red-500/10 text-red-400' :
+                      'border-amber-500/30 bg-amber-500/10 text-amber-400'
+                    }`}>
+                      {STATUS_LABEL[p.status] ?? p.status}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="py-2 text-center font-mono text-[10px] text-muted-foreground">nenhum agendamento</p>
+            )}
+          </div>
+              <button
+                onClick={() => void start()}
+                disabled={busy}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
+              >
+                {busy ? <Loader2 className="size-4 animate-spin" /> : <Radio className="size-4" />}{" "}
+                monitorar
+              </button>
+            ) : (
+              <button
+                onClick={stop}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold transition hover:bg-surface-2"
+              >
+                <Square className="size-4" /> parar
+              </button>
+            )}
+          </div>
+
           <div className="rounded-2xl border border-border bg-surface p-4 text-sm text-muted-foreground">
             <p className="mono-label mb-2">como funciona</p>
             <ol className="list-decimal space-y-1 pl-4">
