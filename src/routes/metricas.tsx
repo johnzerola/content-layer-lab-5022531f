@@ -13,8 +13,7 @@ import {
   TrendingUp,
   Instagram,
   Youtube,
-  PlaySquare,
-  ArrowUpRight
+  PlaySquare
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -27,8 +26,6 @@ import {
   LineChart,
   Line
 } from 'recharts';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { AppShell } from '@/components/AppShell';
 
 export const Route = createFileRoute('/metricas' as any)({
@@ -49,19 +46,25 @@ function MetricsPage() {
     }
   });
 
-  const totalViews = metrics.reduce((acc, m) => acc + (m.views || 0), 0);
-  const totalLikes = metrics.reduce((acc, m) => acc + (m.likes || 0), 0);
-  const totalEngagement = metrics.reduce((acc, m) => acc + (m.likes || 0) + (m.shares || 0) + (m.saves || 0), 0);
+  const totalViews = metrics.reduce((acc: number, m: PostInsight) => acc + (m.views || 0), 0);
+  const totalLikes = metrics.reduce((acc: number, m: PostInsight) => acc + (m.likes || 0), 0);
+  const totalEngagement = metrics.reduce((acc: number, m: PostInsight) => acc + (m.likes || 0) + (m.shares || 0) + (m.saves || 0), 0);
 
   // Data for platform comparison
   const platformData = [
-    { name: 'Instagram', views: metrics.filter(m => m.platform === 'instagram').reduce((acc, m) => acc + (m.views || 0), 0) },
-    { name: 'TikTok', views: metrics.filter(m => m.platform === 'tiktok').reduce((acc, m) => acc + (m.views || 0), 0) },
-    { name: 'YouTube', views: metrics.filter(m => m.platform === 'youtube').reduce((acc, m) => acc + (m.views || 0), 0) },
+    { name: 'Instagram', views: metrics.filter((m: PostInsight) => m.platform === 'instagram').reduce((acc: number, m: PostInsight) => acc + (m.views || 0), 0) },
+    { name: 'TikTok', views: metrics.filter((m: PostInsight) => m.platform === 'tiktok').reduce((acc: number, m: PostInsight) => acc + (m.views || 0), 0) },
+    { name: 'YouTube', views: metrics.filter((m: PostInsight) => m.platform === 'youtube').reduce((acc: number, m: PostInsight) => acc + (m.views || 0), 0) },
   ].filter(p => p.views > 0);
 
   return (
-    <AppShell>
+    <AppShell 
+      mode="external" 
+      onMode={() => {}} 
+      count={0} 
+      onLibrary={() => {}} 
+      onCloud={() => {}}
+    >
       <div className="p-6 space-y-8 max-w-7xl mx-auto">
         <div className="flex justify-between items-center">
           <div>
@@ -183,7 +186,7 @@ function MetricsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/50">
-                    {metrics.map((m) => (
+                    {metrics.map((m: PostInsight) => (
                       <tr key={m.id} className="hover:bg-white/5 transition-colors">
                         <td className="px-4 py-4 font-medium max-w-[200px] truncate">
                           {m.post_title}
