@@ -154,7 +154,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
 
         <nav className="flex flex-col gap-1 px-3">
           {open && <p className="mono-label px-2 pb-2 pt-3">Ferramentas</p>}
-          {MODES.map((m) => {
+          {MODES.filter(m => m.id !== "external").map((m) => {
             const active = m.id === mode;
             return (
               <button
@@ -279,7 +279,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <div className="flex rounded-xl border border-border bg-surface-2 p-0.5 md:hidden">
-                {MODES.map((m) => (
+                {MODES.filter(m => m.id !== "external").map((m) => (
                   <button
                     key={m.id}
                     onClick={() => onMode(m.id)}
@@ -300,7 +300,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
         </header>
 
         <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
-          {mode !== "clip" && mode !== "lote" && mode !== "limpar" && mode !== "limpar-ia" ? null : (
+          {mode === "external" ? null : (
             <section
               key={current.id}
               className="mb-6 overflow-hidden rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5 shadow-[var(--shadow-panel)] sm:p-6"
