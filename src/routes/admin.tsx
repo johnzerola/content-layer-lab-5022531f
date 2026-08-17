@@ -1,7 +1,7 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Shield, UserPlus, ShieldAlert, Check, Loader2, RotateCcw } from "lucide-react";
+import { Shield, ShieldAlert, Check, Loader2, RotateCcw } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { AppShell } from "@/components/AppShell";
 import { listUsers, setUserRole } from "@/lib/admin.functions";
@@ -13,21 +13,6 @@ export const Route = createFileRoute("/admin")({
     const user = await currentUser();
     if (!user) throw redirect({ to: "/" });
   },
-  errorComponent: ({ error }) => {
-    if (error.message.includes("Unauthorized")) {
-      return (
-        <div className="flex min-h-dvh flex-col items-center justify-center p-4">
-          <div className="max-w-md text-center space-y-4">
-            <ShieldAlert className="size-12 text-destructive mx-auto" />
-            <h1 className="text-2xl font-bold text-foreground">Acesso Restrito</h1>
-            <p className="text-muted-foreground">Você precisa de privilégios de administrador para acessar esta página.</p>
-            <Button onClick={() => window.location.href = "/"}>Voltar para o Início</Button>
-          </div>
-        </div>
-      );
-    }
-    return <div className="p-8 text-foreground">Erro: {error.message}</div>;
-  },
   component: AdminPage,
 });
 
@@ -35,19 +20,24 @@ function AdminPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [unauthorized, setUnauthorized] = useState(false);
   
   const fetchUsers = useServerFn(listUsers);
   const updateRole = useServerFn(setUserRole);
 
   const refresh = async () => {
     setLoading(true);
+    setUnauthorized(false);
     try {
       const data = await fetchUsers();
-      console.log("Admin loaded users:", data);
       setUsers(data as any[]);
     } catch (e: any) {
       console.error("Admin load error:", e);
-      toast.error(e.message || "Falha ao carregar usuários");
+      if (e.message?.includes("Unauthorized")) {
+        setUnauthorized(true);
+      } else {
+        toast.error(e.message || "Falha ao carregar usuários");
+      }
     } finally {
       setLoading(false);
     }
@@ -69,6 +59,21 @@ function AdminPage() {
       setBusyId(null);
     }
   };
+
+  if (unauthorized) {
+    return (
+      <AppShell mode="external" onMode={() => {}} count={0} onLibrary={() => {}} onCloud={() => {}}>
+        <div className="flex min-h-[60vh] flex-col items-center justify-center p-4">
+          <div className="max-w-md text-center space-y-4">
+            <ShieldAlert className="size-12 text-destructive mx-auto" />
+            <h1 className="text-2xl font-bold text-foreground">Acesso Restrito</h1>
+            <p className="text-muted-foreground">Você precisa de privilégios de administrador para acessar esta página.</p>
+            <Button onClick={() => window.location.href = "/"}>Voltar para o Início</Button>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
