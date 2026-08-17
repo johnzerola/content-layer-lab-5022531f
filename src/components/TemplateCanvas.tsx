@@ -186,7 +186,7 @@ export function TemplateCanvas({
     };
     v.addEventListener("loadedmetadata", onLoop);
     v.addEventListener("timeupdate", onLoop);
-    void v.play().catch(() => undefined);
+    v.play().catch(e => console.warn("Auto-play blocked or failed:", e));
     videoEl.current = v;
     if (videoRef) videoRef.current = v;
     return () => {

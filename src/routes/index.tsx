@@ -359,7 +359,8 @@ function Home() {
 
   /** Salva/atualiza o template na biblioteca e devolve a versão salva. */
   const commit = useCallback((t: Template, note?: string): Template => {
-    if (note === "approved_plan") return t;
+    if (note === "approved_plan" || (note && note.includes("approved_plan"))) return t;
+
 
     const res = commitTemplate(templatesRef.current, t, note);
     templatesRef.current = res.list;
