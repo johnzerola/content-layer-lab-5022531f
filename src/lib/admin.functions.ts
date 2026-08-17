@@ -8,18 +8,17 @@ export const listUsers = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     
-    // Check if the caller is an admin
-    const { data: isAdmin } = await context.supabase.rpc('has_role', { 
+    // Check if the caller is an admin using RPC
+    const { data: isAdmin, error: rpcError } = await context.supabase.rpc('has_role', { 
       _user_id: context.userId, 
       _role: 'admin' 
     });
 
-    if (!isAdmin) {
+    if (rpcError || !isAdmin) {
       throw new Error("Unauthorized: Only admins can list users.");
     }
 
-    // In a real scenario, we might list from auth.users via admin client
-    // Since we don't store profiles yet, we'll return a placeholder or list from a table if exists
+    // List users from user_roles
     const { data: users, error } = await supabaseAdmin
       .from('user_roles')
       .select('user_id, role');
@@ -38,12 +37,12 @@ export const setUserRole = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     // Check if the caller is an admin
-    const { data: isAdmin } = await context.supabase.rpc('has_role', { 
+    const { data: isAdmin, error: rpcError } = await context.supabase.rpc('has_role', { 
       _user_id: context.userId, 
       _role: 'admin' 
     });
 
-    if (!isAdmin) {
+    if (rpcError || !isAdmin) {
       throw new Error("Unauthorized: Only admins can manage roles.");
     }
 
@@ -51,9 +50,10 @@ export const setUserRole = createServerFn({ method: "POST" })
       .from('user_roles')
       .upsert({ 
         user_id: data.targetUserId, 
-        role: data.role 
+        role: data.role as any
       }, { onConflict: 'user_id, role' });
 
     if (error) throw error;
     return { success: true };
   });
+
