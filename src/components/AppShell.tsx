@@ -165,28 +165,31 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
 
         <nav className="flex flex-col gap-1 px-3">
           {open && <p className="mono-label px-2 pb-2 pt-3">Ferramentas</p>}
-          {MODES.filter(m => m.id !== "external").map((m) => {
+          {MODES.map((m) => {
             const active = m.id === mode;
-  useEffect(() => {
-    // Fix for SSR 'window is not defined' error in components that might be using it in initial state or render
-    if (typeof window === 'undefined') return;
-  }, []);
+            const isExternal = ["/live", "/biblioteca", "/agenda", "/integracoes", "/armazenamento", "/metricas", "/admin"].some(path =>
+              typeof window !== "undefined" && window.location.pathname.startsWith(path)
+            );
 
-  return (
+            // Se estiver em uma rota externa/fixa, desativa o destaque visual das ferramentas de lote
+            const visuallyActive = active && !isExternal;
+
               <button
                 key={m.id}
                 onClick={() => onMode(m.id)}
                 title={m.brand}
                 aria-current={active ? "page" : undefined}
                 className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
-                  active
+                  visuallyActive
+
                     ? "bg-accent text-accent-foreground ring-1 ring-primary/30"
                     : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
                 }`}
               >
                 <span
                   className={`grid size-7 shrink-0 place-items-center rounded-lg border transition ${
-                    active
+                    visuallyActive
+
                       ? "border-primary/40 bg-primary/15 text-primary"
                       : "border-border bg-surface-2 text-muted-foreground group-hover:text-foreground"
                   }`}
