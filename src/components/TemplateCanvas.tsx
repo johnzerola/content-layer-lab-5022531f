@@ -186,7 +186,14 @@ export function TemplateCanvas({
     };
     v.addEventListener("loadedmetadata", onLoop);
     v.addEventListener("timeupdate", onLoop);
-    v.play().catch(e => console.warn("Auto-play blocked or failed:", e));
+    const promise = v.play();
+    if (promise !== undefined) {
+      promise.catch((e) => {
+        if (e.name !== "NotAllowedError") {
+          console.warn("Auto-play blocked or failed:", e);
+        }
+      });
+    }
     videoEl.current = v;
     if (videoRef) videoRef.current = v;
     return () => {

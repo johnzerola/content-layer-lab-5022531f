@@ -338,12 +338,19 @@ export function VideoStudio({
     const v = videoRef.current;
     if (!v) return;
     if (v.paused) {
-      if (v.readyState === 0) v.load();
+      if (v.readyState < 2) v.load();
       if (v.currentTime < start || v.currentTime > end) v.currentTime = start;
-      v.play().then(() => setPlaying(true)).catch(e => {
-        console.error("Erro ao dar play no estúdio:", e);
-        toast.error("Erro ao reproduzir o vídeo.");
-      });
+      const promise = v.play();
+      if (promise !== undefined) {
+        promise
+          .then(() => setPlaying(true))
+          .catch((e) => {
+            console.error("Erro ao dar play no estúdio:", e);
+            if (e.name !== "AbortError") {
+              toast.error("Erro ao reproduzir o vídeo.");
+            }
+          });
+      }
     } else {
       v.pause();
       setPlaying(false);
