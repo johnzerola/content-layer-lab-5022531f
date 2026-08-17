@@ -309,9 +309,15 @@ export function VideoStudio({
     if (!v) return;
     let raf = 0;
     const tick = () => {
-      if (v.currentTime >= end - 0.03) {
-        if (loop) v.currentTime = start;
-        else if (!v.paused) v.pause();
+      // Usamos uma margem um pouco maior (0.1s) para o loop ser mais fluido
+      if (v.currentTime >= end - 0.1) {
+        if (loop) {
+          v.currentTime = start;
+          // Se estiver pausado e for loop, não força o play aqui para evitar loops infinitos de erros
+        } else if (!v.paused) {
+          v.pause();
+          setPlaying(false);
+        }
       }
       setTime(v.currentTime);
       raf = requestAnimationFrame(tick);
@@ -338,12 +344,19 @@ export function VideoStudio({
     const v = videoRef.current;
     if (!v) return;
     if (v.paused) {
-      if (v.readyState === 0) v.load();
+      if (v.readyState < 2) v.load();
       if (v.currentTime < start || v.currentTime > end) v.currentTime = start;
-      v.play().then(() => setPlaying(true)).catch(e => {
-        console.error("Erro ao dar play no estúdio:", e);
-        toast.error("Erro ao reproduzir o vídeo.");
-      });
+      const promise = v.play();
+      if (promise !== undefined) {
+        promise
+          .then(() => setPlaying(true))
+          .catch((e) => {
+            console.error("Erro ao dar play no estúdio:", e);
+            if (e.name !== "AbortError") {
+              toast.error("Erro ao reproduzir o vídeo.");
+            }
+          });
+      }
     } else {
       v.pause();
       setPlaying(false);

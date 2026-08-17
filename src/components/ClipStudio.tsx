@@ -131,14 +131,28 @@ function ClipCard({
       setPlaying(false);
       return;
     }
-    // Forçar o carregamento do recurso caso esteja em estado de erro ou não carregado
-    if (v.readyState === 0) v.load();
     
-    v.currentTime = start;
-    v.play().then(() => setPlaying(true)).catch(e => {
-      console.error("Erro ao dar play no clipe:", e);
-      toast.error("Não foi possível reproduzir o vídeo.");
-    });
+    // Forçar recarregamento se necessário
+    if (v.readyState < 2) {
+      v.load();
+    }
+    
+    // Garantir que o tempo está no início do clipe
+    if (Math.abs(v.currentTime - start) > 0.5) {
+      v.currentTime = start;
+    }
+    
+    const promise = v.play();
+    if (promise !== undefined) {
+      promise
+        .then(() => setPlaying(true))
+        .catch((e) => {
+          console.error("Erro ao dar play no clipe:", e);
+          if (e.name !== "AbortError") {
+            toast.error("Não foi possível reproduzir o vídeo.");
+          }
+        });
+    }
   };
 
 
