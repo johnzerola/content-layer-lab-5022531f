@@ -79,6 +79,8 @@ export const Route = createFileRoute("/api/public/media-proxy")({
           status: 200,
           headers: {
             "content-type": type.startsWith("video/") ? type : "video/mp4",
+            "content-disposition": "inline",
+            "x-content-type-options": "nosniff",
             "cache-control": "no-store",
             ...(len ? { "content-length": String(len) } : {}),
           },
