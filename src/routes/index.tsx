@@ -91,13 +91,13 @@ import { Toaster } from "@/components/ui/sonner";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "VaiViral â€” Editor de vídeos em lote para Reels, TikTok e Shorts" },
+      { title: "VaiViral — Editor de vídeos em lote para Reels, TikTok e Shorts" },
       {
         name: "description",
         content:
           "Editor visual estilo Canva para vídeos verticais. Crie templates reutilizáveis, importe centenas de vídeos, aplique legendas karaokê, variações antiduplicidade e baixe tudo pronto.",
       },
-      { property: "og:title", content: "VaiViral â€” Editor de vídeos em lote 9:16" },
+      { property: "og:title", content: "VaiViral — Editor de vídeos em lote 9:16" },
       {
         property: "og:description",
         content:
@@ -153,7 +153,7 @@ interface Item {
   /** estado da análise automática de legenda/marca d'água */
   detectStatus?: "analisando" | "ok" | "vazio" | "erro" | undefined;
   detectMsg?: string | undefined;
-  /** URL do vídeo já limpo pela GPU (CleanerIA) â€” vira a fonte do render */
+  /** URL do vídeo já limpo pela GPU (CleanerIA) — vira a fonte do render */
   result_url?: string | null | undefined;
 
   error?: string | undefined;
@@ -191,7 +191,7 @@ function stripBranding(t: Template): Template {
   };
 }
 
-/** Modo "limpar": vídeo cheio, sem marca e sem legenda nova â€” só as áreas de limpeza.
+/** Modo "limpar": vídeo cheio, sem marca e sem legenda nova — só as áreas de limpeza.
  *  Com as dimensões da fonte, o quadro assume a orientação real (sem zoom nem barras). */
 function cleanOnly(t: Template, src?: { w: number; h: number }): Template {
   const b = stripBranding(t);
@@ -659,7 +659,7 @@ function Home() {
       const linked = (snap.items ?? []).filter((i) => i.sourceUrl);
       const missing = (snap.items ?? []).length - linked.length;
       if (missing > 0) {
-        toast.warning(`${missing} vídeo(s) vieram de arquivos locais â€” reenvie-os manualmente.`);
+        toast.warning(`${missing} vídeo(s) vieram de arquivos locais — reenvie-os manualmente.`);
       }
       for (const it of linked) {
         try {
@@ -708,7 +708,7 @@ function Home() {
           minScore: clipMinScore,
         });
         if (!clips.length) {
-          setLinkMsg("nenhum trecho atingiu o score mínimo â€” reduza a intensidade do score");
+          setLinkMsg("nenhum trecho atingiu o score mínimo — reduza a intensidade do score");
           return;
         }
         const created: Item[] = clips.map((c) => ({
@@ -1008,7 +1008,7 @@ function Home() {
           if (runMode === "limpar-ia") {
             if (!item.result_url) {
               throw new Error(
-                "Este vídeo ainda não foi limpo pela IA. Marque as áreas e clique em â€œEnviar para GPUâ€ antes de processar.",
+                "Este vídeo ainda não foi limpo pela IA. Marque as áreas e clique em “Enviar para GPUâ€ antes de processar.",
               );
             }
             setItems((p) =>
@@ -1041,7 +1041,7 @@ function Home() {
                   x.id === id
                     ? {
                         ...x,
-                        capStatus: "transcrevendoâ€¦",
+                        capStatus: "transcrevendo…",
                         capError: false,
                         stage: "transcrevendo áudio",
                       }
@@ -1199,7 +1199,7 @@ function Home() {
               setItems((p) =>
                 p.map((x) =>
                   x.id === id
-                    ? { ...x, status: "processando", progress: 0, stage: "nova tentativaâ€¦" }
+                    ? { ...x, status: "processando", progress: 0, stage: "nova tentativa…" }
                     : x,
                 ),
               );
@@ -1302,11 +1302,11 @@ function Home() {
     if (!it) return;
     setDetecting(true);
     setSuggestions([]);
-    setDetectMsg("analisando quadrosâ€¦");
+    setDetectMsg("analisando quadros…");
     try {
       const found = await detectOverlays(it.file, {
         clip: it.clip,
-        onProgress: (d, t) => setDetectMsg(`analisando quadros ${d}/${t}â€¦`),
+        onProgress: (d, t) => setDetectMsg(`analisando quadros ${d}/${t}…`),
       });
       const regions = found.map((f) => makeCleanupRegion(f));
       setItems((p) =>
@@ -1320,7 +1320,7 @@ function Home() {
         setDetectMsg(`${regions.length} área(s) aplicada(s) automaticamente`);
       } else {
         setSuggestions(safeZones().map((z) => makeCleanupRegion(z)));
-        setDetectMsg("nada fixo encontrado â€” use as zonas sugeridas ou marque manualmente");
+        setDetectMsg("nada fixo encontrado — use as zonas sugeridas ou marque manualmente");
       }
     } catch (err) {
       setSuggestions([]);
@@ -1457,7 +1457,7 @@ function Home() {
               <p className="text-warn">este navegador não gera MP4</p>
               <p>
                 a saída sairá em WebM, que o Instagram e o TikTok recusam. Abra o VaiViral no Chrome
-                ou Edge atualizados (desktop) para exportar MP4 H.264 â€” ou converta os arquivos
+                ou Edge atualizados (desktop) para exportar MP4 H.264 — ou converta os arquivos
                 antes de publicar.
               </p>
             </div>
@@ -1543,7 +1543,7 @@ function Home() {
                 Remover legenda queimada, marca d'água e textos
               </p>
               <p className="font-mono text-[11px] text-muted-foreground">
-                marque as áreas sobre o quadro no preview â€” clonar vizinho, borrão, mosaico ou tarja
+                marque as áreas sobre o quadro no preview — clonar vizinho, borrão, mosaico ou tarja
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1586,9 +1586,9 @@ function Home() {
           <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
             <div>
               <p className="mono-label">Só cortes</p>
-              <p className="text-lg font-semibold">Vídeo longo â†’ clipes prontos</p>
+              <p className="text-lg font-semibold">Vídeo longo → clipes prontos</p>
               <p className="font-mono text-[11px] text-muted-foreground">
-                sem marca, sem headline â€” só recorte, proporção e anti-duplicidade
+                sem marca, sem headline — só recorte, proporção e anti-duplicidade
               </p>
             </div>
             <select
@@ -1706,7 +1706,7 @@ function Home() {
                       />
                     ) : (
                       <div className="grid h-52 place-items-center rounded-xl border border-border text-xs text-muted-foreground">
-                        carregando quadroâ€¦
+                        carregando quadro…
                       </div>
                     )}
                     <div className="space-y-2 pt-1">
@@ -1769,7 +1769,7 @@ function Home() {
                         detecting={detecting || selected.detectStatus === "analisando"}
                         detectMsg={
                           selected.detectStatus === "analisando"
-                            ? (selected.detectMsg ?? "analisando quadrosâ€¦")
+                            ? (selected.detectMsg ?? "analisando quadros…")
                             : (detectMsg ?? selected.detectMsg)
                         }
                         perVideo={mode === "limpar"}
@@ -1811,7 +1811,7 @@ function Home() {
                               : orientationOf(selected.w, selected.h) === "square"
                                 ? "quadrado"
                                 : "vertical"}{" "}
-                            · {selected.w}Ã—{selected.h}
+                            · {selected.w}×{selected.h}
                           </span>
                         ) : null}
                       </p>
@@ -1986,7 +1986,7 @@ function Home() {
               <div className="space-y-3 border-t border-border pt-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <Button onClick={() => void processAll()} disabled={running}>
-                    <Play className="size-4" /> {running ? "Processandoâ€¦" : "Processar em lote"}
+                    <Play className="size-4" /> {running ? "Processando…" : "Processar em lote"}
                   </Button>
                   {running && (
                     <>
@@ -2009,7 +2009,7 @@ function Home() {
                     disabled={readyCount === 0 || zipping}
                   >
                     <FileArchive className="size-4" />{" "}
-                    {zipping ? "Compactandoâ€¦" : `Baixar ZIP (${readyCount})`}
+                    {zipping ? "Compactando…" : `Baixar ZIP (${readyCount})`}
                   </Button>
                   {readyCount > 0 && (
                     <Button
@@ -2097,13 +2097,13 @@ function Home() {
                   </div>
                 )}
 
-                {/* entrega â€” cada ferramenta tem a sua própria saída */}
+                {/* entrega — cada ferramenta tem a sua própria saída */}
                 <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="mono-label">{flow.export.title}</p>
                     <span className="font-mono text-[10px] text-muted-foreground">
                       {flow.export.platforms
-                        ? `${platforms.length} formato${platforms.length > 1 ? "s" : ""} Ã— ${Math.max(1, flow.export.variants ? variants : 1)} variação${flow.export.variants && variants > 1 ? "ões" : ""} = ${platforms.length * Math.max(1, flow.export.variants ? variants : 1)} arquivos por vídeo`
+                        ? `${platforms.length} formato${platforms.length > 1 ? "s" : ""} × ${Math.max(1, flow.export.variants ? variants : 1)} variação${flow.export.variants && variants > 1 ? "ões" : ""} = ${platforms.length * Math.max(1, flow.export.variants ? variants : 1)} arquivos por vídeo`
                         : "1 arquivo por vídeo · resolução e proporção originais"}
                     </span>
                   </div>
@@ -2223,7 +2223,7 @@ function Home() {
                           onClick={() => void makeCaptions(selected)}
                         >
                           <Captions className="mr-1 size-4" />
-                          {capBusyId === selected.id ? "Transcrevendoâ€¦" : "Gerar legendas"}
+                          {capBusyId === selected.id ? "Transcrevendo…" : "Gerar legendas"}
                         </Button>
                       </div>
                     </div>
@@ -2437,7 +2437,7 @@ function Home() {
 
                     <p className="mt-1 font-mono text-[11px] text-muted-foreground">
                       {selected.clip
-                        ? `trecho ${formatTime(selected.clip.start)}â€“${formatTime(selected.clip.end)}${
+                        ? `trecho ${formatTime(selected.clip.start)}–${formatTime(selected.clip.end)}${
                             selected.score ? ` · score ${selected.score}` : ""
                           }`
                         : "analisa áudio e movimento e separa os melhores trechos do vídeo longo"}
@@ -2552,8 +2552,8 @@ function Home() {
                         {it.file.name}
                       </p>
                       <p className="font-mono text-[11px] text-muted-foreground">
-                        {it.w && it.h ? `${it.w}Ã—${it.h}` : "â€¦"} ·{" "}
-                        {it.duration ? `${it.duration.toFixed(0)}s` : "â€¦"}
+                        {it.w && it.h ? `${it.w}×${it.h}` : "…"} ·{" "}
+                        {it.duration ? `${it.duration.toFixed(0)}s` : "…"}
                         {it.clip ? ` · corte ${formatTime(it.clip.start)}` : ""}
                         {it.score ? ` · ${it.score}` : ""}
                         {hasPreEdit(it.preEdit) ? " · editado" : ""}
@@ -2584,11 +2584,11 @@ function Home() {
                           }`}
                         >
                           {it.detectStatus === "analisando"
-                            ? (it.detectMsg ?? "analisandoâ€¦")
+                            ? (it.detectMsg ?? "analisando…")
                             : it.detectStatus === "ok"
                               ? `${(it.regions ?? []).length} área(s) detectada(s)`
                               : it.detectStatus === "vazio"
-                                ? "nada encontrado â€” marque manual"
+                                ? "nada encontrado — marque manual"
                                 : `falha na análise`}
                         </p>
                       )}
@@ -2758,7 +2758,7 @@ function Home() {
               // Trigger single-item schedule modal or mark for auto-schedule
               setScheduleOpen(true);
             } else {
-              toast.success("Edição aplicada â€” vale no preview e na exportação");
+              toast.success("Edição aplicada — vale no preview e na exportação");
             }
           }}
         />

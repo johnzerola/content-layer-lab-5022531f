@@ -35,13 +35,13 @@ export const Route = createFileRoute("/live")({
   component: LivePage,
   head: () => ({
     meta: [
-      { title: "Monitora Live â€” cortes automáticos de lives do X" },
+      { title: "Monitora Live — cortes automáticos de lives do X" },
       {
         name: "description",
         content:
           "Monitore transmissões públicas do X, Kick, TikTok ou HLS direto, gere cortes automáticos pontuados por energia de fala e edite cada corte antes de baixar.",
       },
-      { property: "og:title", content: "Monitora Live â€” cortes automáticos de lives" },
+      { property: "og:title", content: "Monitora Live — cortes automáticos de lives" },
       {
         property: "og:description",
         content: "Acompanhe uma live do X e receba cortes prontos, com score e editor de recorte.",
@@ -236,7 +236,7 @@ function LivePage() {
     if (res.live && res.hls && !clipperRef.current && runningRef.current) {
       setStatus("ao-vivo");
       await startCapture(res.hls);
-      toast.success("Live encontrada â€” cortando automaticamente.");
+      toast.success("Live encontrada — cortando automaticamente.");
     } else if (!res.live) {
       setStatus(runningRef.current ? "procurando" : "parado");
     }
