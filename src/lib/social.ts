@@ -1,4 +1,4 @@
-﻿/** Contas sociais conectadas e fila de publicaÃ§Ãµes agendadas (Lovable Cloud). */
+﻿/** Contas sociais conectadas e fila de publicações agendadas (Lovable Cloud). */
 import { supabase } from "@/integrations/supabase/client";
 import { currentUser } from "@/lib/cloud";
 import type { LinkAccountResult } from "@/lib/social-linking.server";
@@ -78,12 +78,12 @@ export async function removeAccount(id: string) {
   if (error) throw error;
 }
 
-/* ---------------------------- vÃ­deo no storage --------------------------- */
+/* ---------------------------- vídeo no storage --------------------------- */
 
 /** Sobe o MP4 para o bucket privado e devolve caminho + link assinado (7 dias). */
 export async function uploadPostVideo(file: File | Blob, fileName: string) {
   const user = await currentUser();
-  if (!user) throw new Error("FaÃ§a login para enviar o vÃ­deo.");
+  if (!user) throw new Error("Faça login para enviar o vídeo.");
   const safe = fileName.replace(/[^\w.-]+/g, "_");
   const path = `${user.id}/${Date.now()}-${safe}`;
   const { error } = await supabase.storage.from("posts").upload(path, file, {
@@ -110,7 +110,7 @@ export type NewPost = {
 
 export async function schedulePost(p: NewPost) {
   const user = await currentUser();
-  if (!user) throw new Error("FaÃ§a login para agendar.");
+  if (!user) throw new Error("Faça login para agendar.");
   if (!p.accountId) throw new Error("Selecione uma conta conectada para publicar.");
   if (!p.consent) throw new Error("Confirme o consentimento para enviar este video a rede social.");
 

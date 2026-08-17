@@ -35,13 +35,13 @@ export const Route = createFileRoute("/live")({
   component: LivePage,
   head: () => ({
     meta: [
-      { title: "Monitora Live â€” cortes automÃ¡ticos de lives do X" },
+      { title: "Monitora Live — cortes automáticos de lives do X" },
       {
         name: "description",
         content:
-          "Monitore transmissÃµes pÃºblicas do X, Kick, TikTok ou HLS direto, gere cortes automÃ¡ticos pontuados por energia de fala e edite cada corte antes de baixar.",
+          "Monitore transmissões públicas do X, Kick, TikTok ou HLS direto, gere cortes automáticos pontuados por energia de fala e edite cada corte antes de baixar.",
       },
-      { property: "og:title", content: "Monitora Live â€” cortes automÃ¡ticos de lives" },
+      { property: "og:title", content: "Monitora Live — cortes automáticos de lives" },
       {
         property: "og:description",
         content: "Acompanhe uma live do X e receba cortes prontos, com score e editor de recorte.",
@@ -180,7 +180,7 @@ function LivePage() {
 
   function editInCorteIA(selected: LiveClip[]) {
     if (!selected.length) {
-      toast.info("Nenhum corte atingiu o score atual. Reduza o score mÃ­nimo ou escolha um corte.");
+      toast.info("Nenhum corte atingiu o score atual. Reduza o score mínimo ou escolha um corte.");
       return;
     }
     sendItemsToTool(
@@ -214,7 +214,7 @@ function LivePage() {
       const capture = (video as HTMLVideoElement & { captureStream?: () => MediaStream })
         .captureStream;
       if (!capture) {
-        toast.error("Este navegador nÃ£o permite gravar a live (use Chrome ou Edge).");
+        toast.error("Este navegador não permite gravar a live (use Chrome ou Edge).");
         return;
       }
       const stream = capture.call(video);
@@ -236,7 +236,7 @@ function LivePage() {
     if (res.live && res.hls && !clipperRef.current && runningRef.current) {
       setStatus("ao-vivo");
       await startCapture(res.hls);
-      toast.success("Live encontrada â€” cortando automaticamente.");
+      toast.success("Live encontrada — cortando automaticamente.");
     } else if (!res.live) {
       setStatus(runningRef.current ? "procurando" : "parado");
     }
@@ -340,8 +340,8 @@ function LivePage() {
                 <Radio className="size-3.5" />
                 {info?.title ??
                   (info?.handle
-                    ? `${info.platform === "kick" ? "Kick" : info.platform === "tiktok" ? "TikTok" : "X"} Â· @${info.handle}`
-                    : "aguardando transmissÃ£o")}
+                    ? `${info.platform === "kick" ? "Kick" : info.platform === "tiktok" ? "TikTok" : "X"} · @${info.handle}`
+                    : "aguardando transmissão")}
               </span>
               <button
                 onClick={() => clipperRef.current?.cutNow()}
@@ -416,8 +416,8 @@ function LivePage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{c.title}</p>
                       <p className="font-mono text-[11px] text-muted-foreground">
-                        {fmt(c.at)} Â·{" "}
-                        {Math.round((c.trim?.end ?? c.duration) - (c.trim?.start ?? 0))}s Ãºteis
+                        {fmt(c.at)} ·{" "}
+                        {Math.round((c.trim?.end ?? c.duration) - (c.trim?.start ?? 0))}s úteis
                       </p>
                     </div>
                   </div>
@@ -463,7 +463,7 @@ function LivePage() {
 
         <aside className="space-y-4">
           <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
-            <p className="mono-label">TransmissÃ£o</p>
+            <p className="mono-label">Transmissão</p>
             <input
               value={target}
               onChange={(e) => setTarget(e.target.value)}
@@ -471,7 +471,7 @@ function LivePage() {
               className="w-full rounded-xl border border-border bg-surface-2 px-3 py-2 text-sm outline-none focus:border-primary/50"
             />
             <label className="block text-sm">
-              <span className="mono-label">duraÃ§Ã£o do corte: {clipLen}s</span>
+              <span className="mono-label">duração do corte: {clipLen}s</span>
               <input
                 type="range"
                 min={15}
@@ -483,7 +483,7 @@ function LivePage() {
               />
             </label>
             <label className="block text-sm">
-              <span className="mono-label">score mÃ­nimo recomendado: {minScore}</span>
+              <span className="mono-label">score mínimo recomendado: {minScore}</span>
               <input
                 type="range"
                 min={40}
@@ -528,7 +528,7 @@ function LivePage() {
 
           <div className="space-y-3 rounded-2xl border border-border bg-surface p-4">
             <div className="flex items-center justify-between">
-              <p className="mono-label">PublicaÃ§Ãµes</p>
+              <p className="mono-label">Publicações</p>
               {loadingPosts && <Loader2 className="size-3 animate-spin text-muted-foreground" />}
             </div>
             <div className="grid grid-cols-2 gap-2 text-center">
@@ -569,9 +569,9 @@ function LivePage() {
           <div className="rounded-2xl border border-border bg-surface p-4 text-sm text-muted-foreground">
             <p className="mono-label mb-2">como funciona</p>
             <ol className="list-decimal space-y-1 pl-4">
-              <li>O sistema procura live pÃºblica no X, Kick, TikTok ou HLS direto.</li>
-              <li>Ao encontrar, comeÃ§a a gravar e fecha um corte a cada {clipLen}s.</li>
-              <li>Fala, ruÃ­do, pausas, ritmo e comeÃ§o/fim limpos formam o score.</li>
+              <li>O sistema procura live pública no X, Kick, TikTok ou HLS direto.</li>
+              <li>Ao encontrar, começa a gravar e fecha um corte a cada {clipLen}s.</li>
+              <li>Fala, ruído, pausas, ritmo e começo/fim limpos formam o score.</li>
               <li>
                 Os melhores cortes seguem para o CorteIA, onde podem ser ajustados e exportados.
               </li>
