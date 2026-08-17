@@ -91,17 +91,17 @@ import { Toaster } from "@/components/ui/sonner";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "VaiViral â€” Editor de vÃ­deos em lote para Reels, TikTok e Shorts" },
+      { title: "VaiViral â€” Editor de vídeos em lote para Reels, TikTok e Shorts" },
       {
         name: "description",
         content:
-          "Editor visual estilo Canva para vÃ­deos verticais. Crie templates reutilizÃ¡veis, importe centenas de vÃ­deos, aplique legendas karaokÃª, variaÃ§Ãµes antiduplicidade e baixe tudo pronto.",
+          "Editor visual estilo Canva para vídeos verticais. Crie templates reutilizáveis, importe centenas de vídeos, aplique legendas karaokê, variações antiduplicidade e baixe tudo pronto.",
       },
-      { property: "og:title", content: "VaiViral â€” Editor de vÃ­deos em lote 9:16" },
+      { property: "og:title", content: "VaiViral â€” Editor de vídeos em lote 9:16" },
       {
         property: "og:description",
         content:
-          "Template visual estilo Canva, importaÃ§Ã£o em massa, anti-duplicidade e download de todos os vÃ­deos prontos.",
+          "Template visual estilo Canva, importação em massa, anti-duplicidade e download de todos os vídeos prontos.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -115,7 +115,7 @@ type Status = "pendente" | "na fila" | "processando" | "pronto" | "erro";
 interface Item {
   id: string;
   file: File;
-  /** link de origem quando o vÃ­deo veio por URL (permite retomar o projeto na nuvem) */
+  /** link de origem quando o vídeo veio por URL (permite retomar o projeto na nuvem) */
   sourceUrl?: string | undefined;
   poster: string | null;
   w: number;
@@ -126,34 +126,34 @@ interface Item {
   offsetY: number;
   autoFrameSource?: string | undefined;
   clip?: { start: number; end: number } | undefined;
-  /** prÃ©-ediÃ§Ã£o feita no EstÃºdio (recorte, giro, cor) */
+  /** pré-edição feita no Estúdio (recorte, giro, cor) */
   preEdit?: PreEdit | undefined;
   score?: number | undefined;
-  /** tÃ­tulo sugerido pelo algoritmo de cortes */
+  /** título sugerido pelo algoritmo de cortes */
   clipTitle?: string | undefined;
-  /** motivo/descriÃ§Ã£o do corte */
+  /** motivo/descrição do corte */
   clipReason?: string | undefined;
-  /** rÃ³tulos detectados no trecho */
+  /** rótulos detectados no trecho */
   clipTags?: string[] | undefined;
   status: Status;
   progress: number;
-  /** etapa atual legÃ­vel (transcriÃ§Ã£o, render de cada variaÃ§Ã£o, etc.) */
+  /** etapa atual legível (transcrição, render de cada variação, etc.) */
   stage?: string | undefined;
   stepIndex?: number | undefined;
   stepTotal?: number | undefined;
   blob?: Blob | undefined;
   ext?: string | undefined;
-  /** todas as variaÃ§Ãµes geradas deste vÃ­deo */
+  /** todas as variações geradas deste vídeo */
   outputs?: { blob: Blob; ext: string; label: string }[] | undefined;
   captions?: CaptionCue[] | undefined;
   capStatus?: string | undefined;
   capError?: boolean | undefined;
-  /** Ã¡reas de limpeza detectadas/ajustadas para ESTE vÃ­deo (modo LimpaVÃ­deo) */
+  /** áreas de limpeza detectadas/ajustadas para ESTE vídeo (modo LimpaVídeo) */
   regions?: CleanupRegion[] | undefined;
-  /** estado da anÃ¡lise automÃ¡tica de legenda/marca d'Ã¡gua */
+  /** estado da análise automática de legenda/marca d'água */
   detectStatus?: "analisando" | "ok" | "vazio" | "erro" | undefined;
   detectMsg?: string | undefined;
-  /** URL do vÃ­deo jÃ¡ limpo pela GPU (CleanerIA) â€” vira a fonte do render */
+  /** URL do vídeo já limpo pela GPU (CleanerIA) â€” vira a fonte do render */
   result_url?: string | null | undefined;
 
   error?: string | undefined;
@@ -165,7 +165,7 @@ interface QueueCtrl {
   aborts: Map<string, AbortController>;
 }
 
-/** Modo "sÃ³ cortes": remove toda a marca e usa o vÃ­deo cheio no quadro. */
+/** Modo "só cortes": remove toda a marca e usa o vídeo cheio no quadro. */
 function stripBranding(t: Template): Template {
   const off = <T extends { visible: boolean }>(l: T): T => ({ ...l, visible: false });
   return {
@@ -191,8 +191,8 @@ function stripBranding(t: Template): Template {
   };
 }
 
-/** Modo "limpar": vÃ­deo cheio, sem marca e sem legenda nova â€” sÃ³ as Ã¡reas de limpeza.
- *  Com as dimensÃµes da fonte, o quadro assume a orientaÃ§Ã£o real (sem zoom nem barras). */
+/** Modo "limpar": vídeo cheio, sem marca e sem legenda nova â€” só as áreas de limpeza.
+ *  Com as dimensões da fonte, o quadro assume a orientação real (sem zoom nem barras). */
 function cleanOnly(t: Template, src?: { w: number; h: number }): Template {
   const b = stripBranding(t);
   const base: Template = {
@@ -216,7 +216,7 @@ function cleanOnly(t: Template, src?: { w: number; h: number }): Template {
   return src?.w && src?.h ? fitCanvasToSource(base, src.w, src.h) : base;
 }
 
-/** Lembra qual template estava ativo entre sessÃµes. */
+/** Lembra qual template estava ativo entre sessões. */
 const ACTIVE_KEY = "vv.active-template";
 
 function Home() {
@@ -236,7 +236,7 @@ function Home() {
   const [savedFlash, setSavedFlash] = useState(false);
   const [webmWarn, setWebmWarn] = useState(false);
   useEffect(() => setWebmWarn(outputIsWebm()), []);
-  // fallback: se o localStorage encher, os templates vÃ£o para a nuvem
+  // fallback: se o localStorage encher, os templates vão para a nuvem
   useEffect(() => {
     let lastAt = 0;
     enableCloudQuotaFallback((ok, msg, historyOnly) => {
@@ -294,8 +294,8 @@ function Home() {
   const [running, setRunning] = useState(false);
   const [paused, setPaused] = useState(false);
   const [zipping, setZipping] = useState(false);
-  // Canvas, decoder e encoder disputam a mesma thread/GPU. Dois vÃ­deos em
-  // paralelo frequentemente deixam ambos presos em 0% em mÃ¡quinas comuns.
+  // Canvas, decoder e encoder disputam a mesma thread/GPU. Dois vídeos em
+  // paralelo frequentemente deixam ambos presos em 0% em máquinas comuns.
   const [concurrency, setConcurrency] = useState(1);
   const [bitrate, setBitrate] = useState(10);
   const [autoBitrate, setAutoBitrate] = useState(true);
@@ -320,17 +320,17 @@ function Home() {
 
   const [capLang, setCapLang] = useState("pt");
   const [capBusyId, setCapBusyId] = useState<string | null>(null);
-  // transcreve automaticamente no lote quando a legenda estÃ¡ ativa
+  // transcreve automaticamente no lote quando a legenda está ativa
   const [autoCap, setAutoCap] = useState(true);
   const [detecting, setDetecting] = useState(false);
   const [detectMsg, setDetectMsg] = useState<string | undefined>(undefined);
   const [suggestions, setSuggestions] = useState<CleanupRegion[]>([]);
   const [compare, setCompare] = useState(false);
-  /** mini editor de enquadramento direto na prÃ©via */
+  /** mini editor de enquadramento direto na prévia */
   const [cropTune, setCropTune] = useState(false);
   const previewVideoRef = useRef<HTMLVideoElement | null>(null);
 
-  // as transcriÃ§Ãµes rodam em fila (uma por vez) mesmo com render paralelo
+  // as transcrições rodam em fila (uma por vez) mesmo com render paralelo
   const capChain = useRef<Promise<unknown>>(Promise.resolve());
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -357,7 +357,7 @@ function Home() {
   const templatesRef = useRef<Template[]>([]);
   templatesRef.current = templates;
 
-  /** Salva/atualiza o template na biblioteca e devolve a versÃ£o salva. */
+  /** Salva/atualiza o template na biblioteca e devolve a versão salva. */
   const commit = useCallback((t: Template, note?: string): Template => {
     const res = commitTemplate(templatesRef.current, t, note);
     templatesRef.current = res.list;
@@ -539,7 +539,7 @@ function Home() {
     [addVideos],
   );
 
-  /** Remove um item da fila deixando um "desfazer" disponÃ­vel por alguns segundos. */
+  /** Remove um item da fila deixando um "desfazer" disponível por alguns segundos. */
   const removeItemWithUndo = useCallback(
     (id: string) => {
       const mode = modeRef.current;
@@ -550,7 +550,7 @@ function Home() {
         backup = p[index];
         return p.filter((x) => x.id !== id);
       });
-      undoable(`"${backup?.file.name ?? "vÃ­deo"}" removido da fila`, () => {
+      undoable(`"${backup?.file.name ?? "vídeo"}" removido da fila`, () => {
         if (!backup) return;
         const restored = backup;
         setItemsIn(mode, (p) => {
@@ -564,7 +564,7 @@ function Home() {
     [setItemsIn],
   );
 
-  /** Recebe vÃ­deos enviados por outra ferramenta (ex.: Monitora Live) sem reimportar. */
+  /** Recebe vídeos enviados por outra ferramenta (ex.: Monitora Live) sem reimportar. */
   useEffect(() => {
     const pending = takePendingTool();
     const tool: HandoffTool = pending ?? "lote";
@@ -573,22 +573,22 @@ function Home() {
       modeRef.current = tool;
       setMode(tool);
       void addVideos(handoff.map((item) => item.file), { handoff }, tool);
-      toast.success(`${handoff.length} vÃ­deo(s) recebido(s) de outra ferramenta`);
+      toast.success(`${handoff.length} vídeo(s) recebido(s) de outra ferramenta`);
     }
   }, [addVideos]);
 
-  /** Importa um vÃ­deo apenas colando o link (baixa pelo servidor, sem upload). */
+  /** Importa um vídeo apenas colando o link (baixa pelo servidor, sem upload). */
   const importFromLink = useCallback(async () => {
     const url = linkUrl.trim();
     if (!url || linkBusy) return;
     setLinkBusy(true);
     setLinkBlocked(false);
-    setLinkMsg("procurando o vÃ­deo...");
+    setLinkMsg("procurando o vídeo...");
     try {
       const res = await resolveVideoLink({ data: { url } });
       if (!res.ok || !res.videoUrl || !res.proxyUrl) {
         setLinkBlocked(Boolean(res.blocked));
-        setLinkMsg(res.message ?? "nÃ£o encontrei o vÃ­deo nesse link");
+        setLinkMsg(res.message ?? "não encontrei o vídeo nesse link");
         return;
       }
       setLinkMsg(`baixando de ${res.source ?? "origem"}...`);
@@ -620,7 +620,7 @@ function Home() {
     }
   }, [linkUrl, linkBusy, addVideos]);
 
-  /** Snapshot do projeto atual (metadados; o vÃ­deo volta pelo link de origem). */
+  /** Snapshot do projeto atual (metadados; o vídeo volta pelo link de origem). */
   const buildSnapshot = useCallback((): ProjectSnapshot => {
     const m = modeRef.current;
     const list = queuesRef.current[m] ?? [];
@@ -641,7 +641,7 @@ function Home() {
     };
   }, [active.id, platforms, variants, concurrency, bitrate, autoBitrate, smartFrame, capLang]);
 
-  /** Restaura um projeto da nuvem: rebaixa os vÃ­deos que vieram por link. */
+  /** Restaura um projeto da nuvem: rebaixa os vídeos que vieram por link. */
   const restoreSnapshot = useCallback(
     async (snap: ProjectSnapshot) => {
       const st = snap.settings ?? {};
@@ -659,14 +659,14 @@ function Home() {
       const linked = (snap.items ?? []).filter((i) => i.sourceUrl);
       const missing = (snap.items ?? []).length - linked.length;
       if (missing > 0) {
-        toast.warning(`${missing} vÃ­deo(s) vieram de arquivos locais â€” reenvie-os manualmente.`);
+        toast.warning(`${missing} vídeo(s) vieram de arquivos locais â€” reenvie-os manualmente.`);
       }
       for (const it of linked) {
         try {
           const resolved = await resolveVideoLink({ data: { url: it.sourceUrl! } });
-          if (!resolved.ok || !resolved.proxyUrl) throw new Error("origem indisponÃ­vel");
+          if (!resolved.ok || !resolved.proxyUrl) throw new Error("origem indisponível");
           const dl = await fetch(resolved.proxyUrl);
-          if (!dl.ok) throw new Error("origem indisponÃ­vel");
+          if (!dl.ok) throw new Error("origem indisponível");
           const blob = await dl.blob();
           const file = new File([blob], it.name, { type: blob.type || guessMime(it.name) });
           await addVideos([file], { sourceUrl: it.sourceUrl! });
@@ -687,7 +687,7 @@ function Home() {
             ),
           );
         } catch {
-          toast.error(`NÃ£o consegui rebaixar "${it.name}".`);
+          toast.error(`Não consegui rebaixar "${it.name}".`);
         }
       }
       setCloudOpen(false);
@@ -695,7 +695,7 @@ function Home() {
     [addVideos, setItems, templates],
   );
 
-  /** Clipagem automÃ¡tica: quebra um vÃ­deo longo nos melhores trechos. */
+  /** Clipagem automática: quebra um vídeo longo nos melhores trechos. */
   const autoClip = useCallback(
     async (item: Item) => {
       if (clipBusy) return;
@@ -708,7 +708,7 @@ function Home() {
           minScore: clipMinScore,
         });
         if (!clips.length) {
-          setLinkMsg("nenhum trecho atingiu o score mÃ­nimo â€” reduza a intensidade do score");
+          setLinkMsg("nenhum trecho atingiu o score mínimo â€” reduza a intensidade do score");
           return;
         }
         const created: Item[] = clips.map((c) => ({
@@ -732,18 +732,18 @@ function Home() {
         }));
         setItems((prev) =>
           modeRef.current === "clip"
-            ? // no estÃºdio o vÃ­deo longo continua na lista para novas geraÃ§Ãµes
+            ? // no estúdio o vídeo longo continua na lista para novas gerações
               [...prev.filter((p) => !(p.clip && p.file === item.file)), ...created]
             : [...prev.filter((p) => p.id !== item.id), ...created],
         );
         setSelectedId(created[0]?.id ?? null);
-        // miniatura no inÃ­cio de cada corte
+        // miniatura no início de cada corte
         for (const c of created) {
           try {
             const meta = await grabPoster(item.file, (c.clip?.start ?? 0) + 0.5);
             setItems((prev) => prev.map((p) => (p.id === c.id ? { ...p, poster: meta.url } : p)));
           } catch {
-            /* mantÃ©m a miniatura do vÃ­deo original */
+            /* mantém a miniatura do vídeo original */
           }
         }
       } catch (err) {
@@ -755,14 +755,14 @@ function Home() {
     [clipBusy, clipMinLen, clipMaxLen, clipMax, clipMinScore, setItems, setSelectedId],
   );
 
-  /** Transcreve o Ã¡udio e gera legendas com tempo por palavra. */
+  /** Transcreve o áudio e gera legendas com tempo por palavra. */
   const makeCaptions = useCallback(
     async (item: Item) => {
       if (capBusyId) return;
       setCapBusyId(item.id);
       setItems((p) =>
         p.map((x) =>
-          x.id === item.id ? { ...x, capStatus: "ouvindo o Ã¡udio...", capError: false } : x,
+          x.id === item.id ? { ...x, capStatus: "ouvindo o áudio...", capError: false } : x,
         ),
       );
       try {
@@ -783,7 +783,7 @@ function Home() {
                   ...x,
                   captions: cues,
                   capError: false,
-                  capStatus: `${cues.length} blocos Â· ${cues.reduce((n, c) => n + c.words.length, 0)} palavras`,
+                  capStatus: `${cues.length} blocos · ${cues.reduce((n, c) => n + c.words.length, 0)} palavras`,
                 }
               : x,
           ),
@@ -821,13 +821,13 @@ function Home() {
     [active],
   );
 
-  // reflete a anti-duplicidade no preview em tempo real (mesma seed usada na exportaÃ§Ã£o)
+  // reflete a anti-duplicidade no preview em tempo real (mesma seed usada na exportação)
   const variantIdx = Math.min(previewVariant, Math.max(0, variants - 1));
   const previewVariation = selected ? variationOf(selected, variantIdx) : null;
 
   const capStyle = active.captions ?? defaultCaptions();
 
-  // sem transcriÃ§Ã£o ainda? mostra legenda de exemplo pra ver o estilo na prÃ©via
+  // sem transcrição ainda? mostra legenda de exemplo pra ver o estilo na prévia
   const previewCues = useMemo(() => {
     if (selected?.captions?.length) return selected.captions;
     if (!capStyle.visible) return undefined;
@@ -858,7 +858,7 @@ function Home() {
     return { start, end: start + effDur };
   }, [previewVariation, selected?.duration, selected?.clip?.start, selected?.clip?.end]);
 
-  // placa de fundo real (mediana temporal) usada no preview do LimpaVÃ­deo
+  // placa de fundo real (mediana temporal) usada no preview do LimpaVídeo
   const [previewPlate, setPreviewPlate] = useState<{
     canvas: HTMLCanvasElement;
     ok: Set<string>;
@@ -967,7 +967,7 @@ function Home() {
         if (!item) continue;
         const ac = new AbortController();
         ctrl.aborts.set(id, ac);
-        // central de atividade: um trabalho por vÃ­deo, com etapas cronometradas
+        // central de atividade: um trabalho por vídeo, com etapas cronometradas
         startJob({
           id,
           tool: runMode as any,
@@ -1002,21 +1002,21 @@ function Home() {
           const outputs: { blob: Blob; ext: string; label: string }[] = [];
           let step = 0;
 
-          // CleanerIA: o render precisa partir do vÃ­deo jÃ¡ reconstruÃ­do pela GPU,
-          // senÃ£o a legenda original volta a aparecer na exportaÃ§Ã£o.
+          // CleanerIA: o render precisa partir do vídeo já reconstruído pela GPU,
+          // senão a legenda original volta a aparecer na exportação.
           let sourceFile = item.file;
           if (runMode === "limpar-ia") {
             if (!item.result_url) {
               throw new Error(
-                "Este vÃ­deo ainda nÃ£o foi limpo pela IA. Marque as Ã¡reas e clique em â€œEnviar para GPUâ€ antes de processar.",
+                "Este vídeo ainda não foi limpo pela IA. Marque as áreas e clique em â€œEnviar para GPUâ€ antes de processar.",
               );
             }
             setItems((p) =>
-              p.map((x) => (x.id === id ? { ...x, stage: "baixando vÃ­deo limpo" } : x)),
+              p.map((x) => (x.id === id ? { ...x, stage: "baixando vídeo limpo" } : x)),
             );
-            updateJob(id, { stage: "baixando vÃ­deo limpo" });
+            updateJob(id, { stage: "baixando vídeo limpo" });
             const res = await fetch(item.result_url, { signal: ac.signal });
-            if (!res.ok) throw new Error("NÃ£o consegui baixar o vÃ­deo limpo da GPU.");
+            if (!res.ok) throw new Error("Não consegui baixar o vídeo limpo da GPU.");
             const cleaned = await res.blob();
             sourceFile = new File([cleaned], item.file.name, {
               type: cleaned.type || "video/mp4",
@@ -1030,7 +1030,7 @@ function Home() {
                 ? cleanOnly(active)
                 : active;
 
-          // transcreve na hora do processamento, para queimar a legenda no vÃ­deo
+          // transcreve na hora do processamento, para queimar a legenda no vídeo
           let cues = item.captions;
           const wantCaptions = (active.captions ?? defaultCaptions()).visible;
           if (autoCap && wantCaptions && !cues?.length) {
@@ -1043,12 +1043,12 @@ function Home() {
                         ...x,
                         capStatus: "transcrevendoâ€¦",
                         capError: false,
-                        stage: "transcrevendo Ã¡udio",
+                        stage: "transcrevendo áudio",
                       }
                     : x,
                 ),
               );
-              updateJob(id, { stage: "transcrevendo Ã¡udio" });
+              updateJob(id, { stage: "transcrevendo áudio" });
               return generateCaptions(item.file, {
                 clip: item.clip,
                 language: capLang || undefined,
@@ -1080,7 +1080,7 @@ function Home() {
                 );
               }
             } catch (err) {
-              // sem legenda o vÃ­deo ainda Ã© exportado normalmente
+              // sem legenda o vídeo ainda é exportado normalmente
               const msg = String((err as Error)?.message ?? err);
               setItems((p) =>
                 p.map((x) => (x.id === id ? { ...x, capStatus: msg, capError: true } : x)),
@@ -1088,7 +1088,7 @@ function Home() {
             }
           }
 
-          // LimpaVÃ­deo: recupera o fundo real por mediana temporal antes de renderizar
+          // LimpaVídeo: recupera o fundo real por mediana temporal antes de renderizar
           const itemRegions = item.regions?.length ? item.regions : (active.cleanup ?? []);
           let plate: Awaited<ReturnType<typeof buildBackgroundPlate>> = null;
           if (runMode === "limpar" && itemRegions.length) {
@@ -1107,23 +1107,23 @@ function Home() {
           }
 
           for (const plat of outs) {
-            // cada plataforma recebe a resoluÃ§Ã£o/fps/bitrate recomendados
-            // no modo "limpar" o quadro segue a orientaÃ§Ã£o real do vÃ­deo (sem recorte)
+            // cada plataforma recebe a resolução/fps/bitrate recomendados
+            // no modo "limpar" o quadro segue a orientação real do vídeo (sem recorte)
             const tpl =
               runMode === "limpar"
                 ? {
                     ...cleanOnly(active, { w: item.w, h: item.h }),
-                    // cada vÃ­deo usa as Ã¡reas detectadas para ele; sem detecÃ§Ã£o, usa as do template
+                    // cada vídeo usa as áreas detectadas para ele; sem detecção, usa as do template
                     cleanup: itemRegions,
                   }
                 : runMode === "limpar-ia"
-                  ? // a limpeza jÃ¡ foi feita na GPU: sÃ³ reembala mantendo proporÃ§Ã£o original
+                  ? // a limpeza já foi feita na GPU: só reembala mantendo proporção original
                     { ...cleanOnly(active, { w: item.w, h: item.h }), cleanup: [] }
                   : applyRatio(baseTpl, plat.w, plat.h);
 
             for (let k = 0; k < n; k++) {
               const at = step;
-              const stageLabel = `render ${at + 1}/${total}${outs.length > 1 ? ` Â· ${plat.short}` : ""}${n > 1 ? ` Â· v${k + 1}` : ""}`;
+              const stageLabel = `render ${at + 1}/${total}${outs.length > 1 ? ` · ${plat.short}` : ""}${n > 1 ? ` · v${k + 1}` : ""}`;
               setItems((prev) =>
                 prev.map((x) =>
                   x.id === id
@@ -1184,7 +1184,7 @@ function Home() {
           );
         };
 
-        // atÃ© 2 tentativas por vÃ­deo: uma falha isolada nÃ£o derruba o lote
+        // até 2 tentativas por vídeo: uma falha isolada não derruba o lote
         try {
           let lastErr: unknown = null;
           for (let attempt = 1; attempt <= 2; attempt++) {
@@ -1296,7 +1296,7 @@ function Home() {
     if (ids.length) void processAll(ids);
   };
 
-  /** Re-analisa o vÃ­deo selecionado e grava as Ã¡reas encontradas NELE. */
+  /** Re-analisa o vídeo selecionado e grava as áreas encontradas NELE. */
   const runDetect = async () => {
     const it = itemsRef.current.find((x) => x.id === selectedId);
     if (!it) return;
@@ -1317,20 +1317,20 @@ function Home() {
         ),
       );
       if (regions.length) {
-        setDetectMsg(`${regions.length} Ã¡rea(s) aplicada(s) automaticamente`);
+        setDetectMsg(`${regions.length} área(s) aplicada(s) automaticamente`);
       } else {
         setSuggestions(safeZones().map((z) => makeCleanupRegion(z)));
         setDetectMsg("nada fixo encontrado â€” use as zonas sugeridas ou marque manualmente");
       }
     } catch (err) {
       setSuggestions([]);
-      setDetectMsg(`falha na detecÃ§Ã£o: ${String((err as Error)?.message ?? err)}`);
+      setDetectMsg(`falha na detecção: ${String((err as Error)?.message ?? err)}`);
     } finally {
       setDetecting(false);
     }
   };
 
-  /** Ã¡reas de limpeza do vÃ­deo selecionado (fallback: as do template) */
+  /** áreas de limpeza do vídeo selecionado (fallback: as do template) */
   const cleanupRegions: CleanupRegion[] =
     mode === "limpar" ? (selected?.regions ?? active.cleanup ?? []) : (active.cleanup ?? []);
   const setCleanupRegions = (regions: CleanupRegion[]) => {
@@ -1347,15 +1347,15 @@ function Home() {
         ...x,
         regions: regions.map((r) => ({ ...r, id: crypto.randomUUID() })),
         detectStatus: "ok" as const,
-        detectMsg: `${regions.length} Ã¡rea(s) do vÃ­deo modelo`,
+        detectMsg: `${regions.length} área(s) do vídeo modelo`,
       })),
     );
-    toast.success(`Ãreas aplicadas em ${items.length} vÃ­deo(s).`);
+    toast.success(`Áreas aplicadas em ${items.length} vídeo(s).`);
   };
 
   const readyCount = items.filter((i) => i.status === "pronto").length;
   const errorCount = items.filter((i) => i.status === "erro").length;
-  // progresso global do lote: soma do progresso de cada arquivo em andamento/concluÃ­do
+  // progresso global do lote: soma do progresso de cada arquivo em andamento/concluído
   const batchItems = items.filter((i) => i.status !== "pendente");
   const batchDone = batchItems.filter((i) => i.status === "pronto" || i.status === "erro").length;
   const batchProgress = batchItems.length
@@ -1454,9 +1454,9 @@ function Home() {
           <div className="flex items-start gap-3 rounded-xl border border-warn/50 bg-warn/10 p-4">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" />
             <div className="font-mono text-[11px] leading-relaxed text-muted-foreground">
-              <p className="text-warn">este navegador nÃ£o gera MP4</p>
+              <p className="text-warn">este navegador não gera MP4</p>
               <p>
-                a saÃ­da sairÃ¡ em WebM, que o Instagram e o TikTok recusam. Abra o VaiViral no Chrome
+                a saída sairá em WebM, que o Instagram e o TikTok recusam. Abra o VaiViral no Chrome
                 ou Edge atualizados (desktop) para exportar MP4 H.264 â€” ou converta os arquivos
                 antes de publicar.
               </p>
@@ -1471,15 +1471,15 @@ function Home() {
               <p className="text-lg font-semibold">{active.name}</p>
               <p className="font-mono text-[11px] text-muted-foreground">
                 v{active.version ?? 1}
-                {templates.some((t) => t.id === active.id) ? "" : " Â· nÃ£o salvo"}
+                {templates.some((t) => t.id === active.id) ? "" : " · não salvo"}
                 {savedFlash && <span className="ml-2 text-primary">â— salvo</span>}
               </p>
             </div>
             {autoScheduleConfig && (
               <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
-                <p className="mono-label text-primary">Agendamento AutomÃ¡tico Ativo</p>
+                <p className="mono-label text-primary">Agendamento Automático Ativo</p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Os vÃ­deos serÃ£o agendados apÃ³s o processamento.
+                  Os vídeos serão agendados após o processamento.
                 </p>
                 <button
                   className="mt-2 font-mono text-[10px] text-muted-foreground underline"
@@ -1504,7 +1504,7 @@ function Home() {
                   </option>
                   {templates.map((t) => (
                     <option key={t.id} value={t.id}>
-                      {t.name} Â· v{t.version ?? 1}
+                      {t.name} · v{t.version ?? 1}
                     </option>
                   ))}
                 </select>
@@ -1528,7 +1528,7 @@ function Home() {
               </Button>
 
               <Button variant="outline" onClick={() => commit(active, "salvo manualmente")}>
-                <Save className="size-4" /> Salvar versÃ£o
+                <Save className="size-4" /> Salvar versão
               </Button>
               <Button onClick={() => setEditing(true)}>
                 <Pencil className="size-4" /> Editar template
@@ -1538,17 +1538,17 @@ function Home() {
         ) : mode === "limpar" ? (
           <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
             <div>
-              <p className="mono-label">Limpar vÃ­deo</p>
+              <p className="mono-label">Limpar vídeo</p>
               <p className="text-lg font-semibold">
-                Remover legenda queimada, marca d'Ã¡gua e textos
+                Remover legenda queimada, marca d'água e textos
               </p>
               <p className="font-mono text-[11px] text-muted-foreground">
-                marque as Ã¡reas sobre o quadro no preview â€” clonar vizinho, borrÃ£o, mosaico ou tarja
+                marque as áreas sobre o quadro no preview â€” clonar vizinho, borrão, mosaico ou tarja
               </p>
             </div>
             <div className="flex items-center gap-2">
               <span className="rounded-full border border-border px-3 py-1 font-mono text-[11px] text-muted-foreground">
-                {(active.cleanup ?? []).length} Ã¡rea{(active.cleanup ?? []).length === 1 ? "" : "s"}
+                {(active.cleanup ?? []).length} área{(active.cleanup ?? []).length === 1 ? "" : "s"}
               </span>
               <select
                 className="rounded-lg border border-border bg-surface-2 px-3 py-2 text-sm"
@@ -1570,9 +1570,9 @@ function Home() {
           <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
             <div>
               <p className="mono-label">AI Video Cleaner</p>
-              <p className="text-lg font-semibold">RemoÃ§Ã£o Profissional com ProPainter (GPU)</p>
+              <p className="text-lg font-semibold">Remoção Profissional com ProPainter (GPU)</p>
               <p className="font-mono text-[11px] text-muted-foreground">
-                reconstruÃ§Ã£o temporal avanÃ§ada utilizando frames vizinhos para restaurar o fundo
+                reconstrução temporal avançada utilizando frames vizinhos para restaurar o fundo
                 original
               </p>
             </div>
@@ -1585,10 +1585,10 @@ function Home() {
         ) : (
           <section className="panel flex flex-wrap items-center justify-between gap-4 p-5">
             <div>
-              <p className="mono-label">SÃ³ cortes</p>
-              <p className="text-lg font-semibold">VÃ­deo longo â†’ clipes prontos</p>
+              <p className="mono-label">Só cortes</p>
+              <p className="text-lg font-semibold">Vídeo longo â†’ clipes prontos</p>
               <p className="font-mono text-[11px] text-muted-foreground">
-                sem marca, sem headline â€” sÃ³ recorte, proporÃ§Ã£o e anti-duplicidade
+                sem marca, sem headline â€” só recorte, proporção e anti-duplicidade
               </p>
             </div>
             <select
@@ -1670,7 +1670,7 @@ function Home() {
                   <span className="step-num mr-2">03</span>Preview & ajuste individual
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Reposicione o enquadramento quando o corte automÃ¡tico errar.
+                  Reposicione o enquadramento quando o corte automático errar.
                 </p>
               </div>
               {mode === "limpar-ia" && selected ? (
@@ -1713,7 +1713,7 @@ function Home() {
                       {mode === "lote" && (
                         <input
                           className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                          placeholder="Headline sÃ³ deste vÃ­deo (opcional)"
+                          placeholder="Headline só deste vídeo (opcional)"
                           value={selected.headline}
                           onChange={(e) =>
                             setItems((p) =>
@@ -1811,7 +1811,7 @@ function Home() {
                               : orientationOf(selected.w, selected.h) === "square"
                                 ? "quadrado"
                                 : "vertical"}{" "}
-                            Â· {selected.w}Ã—{selected.h}
+                            · {selected.w}Ã—{selected.h}
                           </span>
                         ) : null}
                       </p>
@@ -1846,7 +1846,7 @@ function Home() {
                           >
                             {Array.from({ length: variants }, (_, k) => (
                               <option key={k} value={k}>
-                                prÃ©via da variaÃ§Ã£o v{k + 1}
+                                prévia da variação v{k + 1}
                               </option>
                             ))}
                           </select>
@@ -1856,7 +1856,7 @@ function Home() {
                     {compare ? (
                       <BeforeAfterSlider
                         beforeLabel="original"
-                        afterLabel={`limpo${variants > 1 ? ` Â· v${variantIdx + 1}` : ""}`}
+                        afterLabel={`limpo${variants > 1 ? ` · v${variantIdx + 1}` : ""}`}
                         before={
                           <TemplateCanvas
                             template={{ ...previewTemplate, cleanup: [] }}
@@ -1924,7 +1924,7 @@ function Home() {
                         )}
                       </div>
                     )}
-                    {/* estilo rÃ¡pido de legenda direto na prÃ©via */}
+                    {/* estilo rápido de legenda direto na prévia */}
                     <div className="flex flex-wrap items-center gap-1">
                       <button
                         type="button"
@@ -1967,20 +1967,20 @@ function Home() {
                     </div>
                     {previewVariation && (
                       <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
-                        {variants > 1 ? `v${variantIdx + 1} Â· ` : ""}
+                        {variants > 1 ? `v${variantIdx + 1} · ` : ""}
                         {describeVariation(previewVariation)}
                         {previewCues?.length
                           ? selected.captions?.length
-                            ? " Â· legendas reais"
-                            : " Â· legenda de exemplo (gere a transcriÃ§Ã£o)"
+                            ? " · legendas reais"
+                            : " · legenda de exemplo (gere a transcrição)"
                           : ""}
-                        {" Â· idÃªntico ao arquivo exportado"}
+                        {" · idêntico ao arquivo exportado"}
                       </p>
                     )}
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">Selecione um vÃ­deo na lista.</p>
+                <p className="text-sm text-muted-foreground">Selecione um vídeo na lista.</p>
               )}
 
               <div className="space-y-3 border-t border-border pt-4">
@@ -2016,7 +2016,7 @@ function Home() {
                       className="bg-primary text-primary-foreground hover:bg-primary/90"
                       onClick={() => setScheduleOpen(true)}
                     >
-                      <CalendarClock className="size-4 mr-2" /> Fazer agendamento automÃ¡tico
+                      <CalendarClock className="size-4 mr-2" /> Fazer agendamento automático
                     </Button>
                   )}
                   {fsAccessSupported() && (
@@ -2036,7 +2036,7 @@ function Home() {
                     <div className="flex items-center justify-between gap-2">
                       <p className="mono-label">Progresso do lote</p>
                       <p className="font-mono text-[11px] text-muted-foreground">
-                        {batchDone}/{batchItems.length} arquivos Â· {Math.round(batchProgress * 100)}
+                        {batchDone}/{batchItems.length} arquivos · {Math.round(batchProgress * 100)}
                         %
                       </p>
                     </div>
@@ -2049,11 +2049,11 @@ function Home() {
                     {activeItem && (
                       <>
                         <p className="truncate font-mono text-[11px] text-muted-foreground">
-                          {activeItem.file.name} Â· {activeItem.stage ?? "processando"}
+                          {activeItem.file.name} · {activeItem.stage ?? "processando"}
                           {activeItem.stepTotal
                             ? ` (etapa ${activeItem.stepIndex}/${activeItem.stepTotal})`
                             : ""}
-                          {` Â· ${Math.round(activeItem.progress * 100)}%`}
+                          {` · ${Math.round(activeItem.progress * 100)}%`}
                         </p>
                         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                           <div
@@ -2066,11 +2066,11 @@ function Home() {
                   </div>
                 )}
 
-                {/* relatÃ³rio do lote */}
+                {/* relatório do lote */}
                 {report && !running && (
                   <div className="space-y-1 rounded-xl border border-border bg-surface-2 p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="mono-label">RelatÃ³rio do lote</p>
+                      <p className="mono-label">Relatório do lote</p>
                       <button
                         type="button"
                         onClick={() => setReport(null)}
@@ -2080,7 +2080,7 @@ function Home() {
                       </button>
                     </div>
                     <p className="font-mono text-[11px] text-muted-foreground">
-                      {report.ok} vÃ­deo(s) exportado(s) Â· {report.fail} com erro Â· {report.seconds}s
+                      {report.ok} vídeo(s) exportado(s) · {report.fail} com erro · {report.seconds}s
                     </p>
                     {report.fails.length > 0 && (
                       <ul className="max-h-24 space-y-0.5 overflow-auto">
@@ -2097,14 +2097,14 @@ function Home() {
                   </div>
                 )}
 
-                {/* entrega â€” cada ferramenta tem a sua prÃ³pria saÃ­da */}
+                {/* entrega â€” cada ferramenta tem a sua própria saída */}
                 <div className="space-y-2 rounded-xl border border-border bg-surface-2 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <p className="mono-label">{flow.export.title}</p>
                     <span className="font-mono text-[10px] text-muted-foreground">
                       {flow.export.platforms
-                        ? `${platforms.length} formato${platforms.length > 1 ? "s" : ""} Ã— ${Math.max(1, flow.export.variants ? variants : 1)} variaÃ§Ã£o${flow.export.variants && variants > 1 ? "Ãµes" : ""} = ${platforms.length * Math.max(1, flow.export.variants ? variants : 1)} arquivos por vÃ­deo`
-                        : "1 arquivo por vÃ­deo Â· resoluÃ§Ã£o e proporÃ§Ã£o originais"}
+                        ? `${platforms.length} formato${platforms.length > 1 ? "s" : ""} Ã— ${Math.max(1, flow.export.variants ? variants : 1)} variação${flow.export.variants && variants > 1 ? "ões" : ""} = ${platforms.length * Math.max(1, flow.export.variants ? variants : 1)} arquivos por vídeo`
+                        : "1 arquivo por vídeo · resolução e proporção originais"}
                     </span>
                   </div>
                   <div className={`flex-wrap gap-2 ${flow.export.platforms ? "flex" : "hidden"}`}>
@@ -2176,7 +2176,7 @@ function Home() {
                   <label
                     className={`items-center gap-2 ${flow.export.variants ? "flex" : "hidden"}`}
                   >
-                    variaÃ§Ãµes
+                    variações
                     <input
                       type="range"
                       min={1}
@@ -2186,7 +2186,7 @@ function Home() {
                       onChange={(e) => setVariants(Number(e.target.value))}
                       className="w-24 accent-[var(--primary)]"
                     />
-                    {variants}x por vÃ­deo
+                    {variants}x por vídeo
                   </label>
                   <label className="flex items-center gap-2">
                     <input
@@ -2197,14 +2197,14 @@ function Home() {
                     />
                     <Sparkles className="size-3" /> enquadramento inteligente
                   </label>
-                  <span>{webCodecsSupported() ? "MP4 H.264 Â· WebCodecs" : "WebM (fallback)"}</span>
+                  <span>{webCodecsSupported() ? "MP4 H.264 · WebCodecs" : "WebM (fallback)"}</span>
                   {eta && <span className="text-primary">â— restam ~{eta}</span>}
                 </div>
 
                 {selected && mode !== "limpar" && (
                   <div className="rounded-xl border border-border bg-surface-2 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="mono-label">Legendas automÃ¡ticas</p>
+                      <p className="mono-label">Legendas automáticas</p>
                       <div className="flex items-center gap-2">
                         <select
                           value={capLang}
@@ -2293,7 +2293,7 @@ function Home() {
 
                     {!!selected.captions?.length && (
                       <div className="mt-3 border-t border-border pt-3">
-                        <p className="mono-label mb-2">Timeline Â· ajuste palavra por palavra</p>
+                        <p className="mono-label mb-2">Timeline · ajuste palavra por palavra</p>
                         <CaptionTimeline
                           file={selected.file}
                           cues={selected.captions}
@@ -2323,7 +2323,7 @@ function Home() {
                           }
                           className="size-4 accent-[var(--primary)]"
                         />
-                        exibir no vÃ­deo
+                        exibir no vídeo
                       </label>
                     </div>
                     <label className="mt-2 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
@@ -2358,7 +2358,7 @@ function Home() {
                 {selected && mode !== "limpar" && (
                   <div className="rounded-xl border border-border bg-surface-2 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="mono-label">Cortes automÃ¡ticos</p>
+                      <p className="mono-label">Cortes automáticos</p>
                       <Button
                         size="sm"
                         variant="outline"
@@ -2371,7 +2371,7 @@ function Home() {
                     </div>
                     <div className="mt-2 grid gap-2 sm:grid-cols-2">
                       <label className="font-mono text-[11px] text-muted-foreground">
-                        duraÃ§Ã£o mÃ­nima Â· {clipMinLen}s
+                        duração mínima · {clipMinLen}s
                         <input
                           type="range"
                           min={5}
@@ -2387,7 +2387,7 @@ function Home() {
                         />
                       </label>
                       <label className="font-mono text-[11px] text-muted-foreground">
-                        duraÃ§Ã£o mÃ¡xima Â· {clipMaxLen}s
+                        duração máxima · {clipMaxLen}s
                         <input
                           type="range"
                           min={5}
@@ -2403,7 +2403,7 @@ function Home() {
                         />
                       </label>
                       <label className="font-mono text-[11px] text-muted-foreground">
-                        quantidade de cortes Â· atÃ© {clipMax}
+                        quantidade de cortes · até {clipMax}
                         <input
                           type="range"
                           min={1}
@@ -2415,7 +2415,7 @@ function Home() {
                         />
                       </label>
                       <label className="font-mono text-[11px] text-muted-foreground">
-                        intensidade do score Â· {clipMinScore}
+                        intensidade do score · {clipMinScore}
                         <input
                           type="range"
                           min={0}
@@ -2427,7 +2427,7 @@ function Home() {
                         />
                         <span className="block text-[10px] opacity-70">
                           {clipMinScore >= 80
-                            ? "sÃ³ os trechos mais fortes"
+                            ? "só os trechos mais fortes"
                             : clipMinScore >= 60
                               ? "equilibrado"
                               : "aceita quase tudo"}
@@ -2438,9 +2438,9 @@ function Home() {
                     <p className="mt-1 font-mono text-[11px] text-muted-foreground">
                       {selected.clip
                         ? `trecho ${formatTime(selected.clip.start)}â€“${formatTime(selected.clip.end)}${
-                            selected.score ? ` Â· score ${selected.score}` : ""
+                            selected.score ? ` · score ${selected.score}` : ""
                           }`
-                        : "analisa Ã¡udio e movimento e separa os melhores trechos do vÃ­deo longo"}
+                        : "analisa áudio e movimento e separa os melhores trechos do vídeo longo"}
                     </p>
                   </div>
                 )}
@@ -2455,31 +2455,31 @@ function Home() {
                         onChange={(e) => setAntiDup({ auto: e.target.checked })}
                         className="accent-[var(--primary)]"
                       />
-                      {antiDup.auto ? "randomizar por vÃ­deo" : "manual (valor exato)"}
+                      {antiDup.auto ? "randomizar por vídeo" : "manual (valor exato)"}
                     </label>
                   </div>
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     {(
                       [
                         ["brightness", "brilho", 0.15, "pct"],
-                        ["saturation", "saturaÃ§Ã£o", 0.2, "pct"],
+                        ["saturation", "saturação", 0.2, "pct"],
                         ["zoom", "zoom", 0.12, "pct"],
-                        ["trim", "corte inÃ­cio/fim", 1, "s"],
-                        ["noise", "ruÃ­do", 0.12, "pct"],
-                        ["rotate", "rotaÃ§Ã£o", 1.5, "deg"],
+                        ["trim", "corte início/fim", 1, "s"],
+                        ["noise", "ruído", 0.12, "pct"],
+                        ["rotate", "rotação", 1.5, "deg"],
                         ["border", "moldura", 40, "px"],
-                        ["pitch", "tom do Ã¡udio", 60, "cents"],
-                        ["eq", "equalizaÃ§Ã£o", 4, "db"],
+                        ["pitch", "tom do áudio", 60, "cents"],
+                        ["eq", "equalização", 4, "db"],
                       ] as const
                     ).map(([key, label, max, unit]) => (
                       <label key={key} className="font-mono text-[11px] text-muted-foreground">
-                        {label} Â·{" "}
+                        {label} ·{" "}
                         {unit === "pct"
                           ? `${(antiDup[key] * 100).toFixed(0)}%`
                           : unit === "s"
                             ? `${antiDup[key].toFixed(2)}s`
                             : unit === "deg"
-                              ? `${antiDup[key].toFixed(2)}Â°`
+                              ? `${antiDup[key].toFixed(2)}°`
                               : unit === "px"
                                 ? `${Math.round(antiDup[key])}px`
                                 : unit === "db"
@@ -2508,7 +2508,7 @@ function Home() {
                   </label>
                   {selected && (
                     <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                      este vÃ­deo: {describeVariation(variationOf(selected))}
+                      este vídeo: {describeVariation(variationOf(selected))}
                     </p>
                   )}
                 </div>
@@ -2517,7 +2517,7 @@ function Home() {
 
             <section className="panel flex max-h-[70vh] flex-col p-5">
               <div className="mb-3 flex items-center justify-between">
-                <p className="font-semibold">VÃ­deos ({items.length})</p>
+                <p className="font-semibold">Vídeos ({items.length})</p>
                 <button
                   className="font-mono text-xs text-destructive"
                   onClick={() => {
@@ -2552,11 +2552,11 @@ function Home() {
                         {it.file.name}
                       </p>
                       <p className="font-mono text-[11px] text-muted-foreground">
-                        {it.w && it.h ? `${it.w}Ã—${it.h}` : "â€¦"} Â·{" "}
+                        {it.w && it.h ? `${it.w}Ã—${it.h}` : "â€¦"} ·{" "}
                         {it.duration ? `${it.duration.toFixed(0)}s` : "â€¦"}
-                        {it.clip ? ` Â· corte ${formatTime(it.clip.start)}` : ""}
-                        {it.score ? ` Â· ${it.score}` : ""}
-                        {hasPreEdit(it.preEdit) ? " Â· editado" : ""}
+                        {it.clip ? ` · corte ${formatTime(it.clip.start)}` : ""}
+                        {it.score ? ` · ${it.score}` : ""}
+                        {hasPreEdit(it.preEdit) ? " · editado" : ""}
                       </p>
                       <p
                         className={`font-mono text-[11px] ${
@@ -2571,7 +2571,7 @@ function Home() {
                       >
                         â— {it.status}
                         {it.status === "processando" ? ` ${Math.round(it.progress * 100)}%` : ""}
-                        {it.stage && it.status !== "pendente" ? ` Â· ${it.stage}` : ""}
+                        {it.stage && it.status !== "pendente" ? ` · ${it.stage}` : ""}
                       </p>
                       {mode === "limpar" && it.detectStatus && (
                         <p
@@ -2586,10 +2586,10 @@ function Home() {
                           {it.detectStatus === "analisando"
                             ? (it.detectMsg ?? "analisandoâ€¦")
                             : it.detectStatus === "ok"
-                              ? `${(it.regions ?? []).length} Ã¡rea(s) detectada(s)`
+                              ? `${(it.regions ?? []).length} área(s) detectada(s)`
                               : it.detectStatus === "vazio"
                                 ? "nada encontrado â€” marque manual"
-                                : `falha na anÃ¡lise`}
+                                : `falha na análise`}
                         </p>
                       )}
                       {(it.status === "processando" || it.status === "na fila") && (
@@ -2607,7 +2607,7 @@ function Home() {
                         tabIndex={0}
                         title={
                           (it.outputs?.length ?? 1) > 1
-                            ? `baixar ${it.outputs!.length} variaÃ§Ãµes`
+                            ? `baixar ${it.outputs!.length} variações`
                             : "baixar"
                         }
                         onClick={(e) => {
@@ -2641,7 +2641,7 @@ function Home() {
                     <span
                       role="button"
                       tabIndex={0}
-                      title="Editar vÃ­deo (cortar, enquadrar, cor)"
+                      title="Editar vídeo (cortar, enquadrar, cor)"
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedId(it.id);
@@ -2758,7 +2758,7 @@ function Home() {
               // Trigger single-item schedule modal or mark for auto-schedule
               setScheduleOpen(true);
             } else {
-              toast.success("EdiÃ§Ã£o aplicada â€” vale no preview e na exportaÃ§Ã£o");
+              toast.success("Edição aplicada â€” vale no preview e na exportação");
             }
           }}
         />
@@ -2780,7 +2780,7 @@ function Home() {
         onOpenChange={setScheduleOpen}
         onAutoConfig={(config) => {
           setAutoScheduleConfig(config);
-          toast.success("Agendamento automÃ¡tico configurado para este lote.");
+          toast.success("Agendamento automático configurado para este lote.");
         }}
         onComplete={() => {
           setReport(null);

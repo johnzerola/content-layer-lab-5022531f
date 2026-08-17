@@ -927,14 +927,14 @@ export function CleanerIAStudio({ item, onComplete }: Props) {
                 on: cropClean,
                 set: setCropClean,
                 title: "Legenda por recorte limpo",
-                hint: "Remove legendas dinÃ¢micas reenquadrando como no teste aprovado",
+                hint: "Remove legendas dinâmicas reenquadrando como no teste aprovado",
               },
               {
                 key: "enh",
                 on: enhanceOutput,
                 set: setEnhanceOutput,
                 title: "Melhorar qualidade",
-                hint: "Exporta em HQ com nitidez reforÃ§ada apÃ³s limpar o vÃ­deo",
+                hint: "Exporta em HQ com nitidez reforçada após limpar o vídeo",
               },
             ].map((o) => (
               <label key={o.key} className="flex cursor-pointer items-start gap-2 text-xs">

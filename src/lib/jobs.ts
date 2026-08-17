@@ -148,7 +148,7 @@ export async function finishJob(id: string, stage = "pronto", result?: { blob: B
 
   if (action && action.type === "schedule" && job.status !== "pronto" && result) {
     try {
-      updateJob(id, { stage: "enviando vÃ­deo..." });
+      updateJob(id, { stage: "enviando vídeo..." });
       const { uploadPostVideo, schedulePost } = await import("@/lib/social");
       const { path, url } = await uploadPostVideo(result.blob, result.fileName);
       
