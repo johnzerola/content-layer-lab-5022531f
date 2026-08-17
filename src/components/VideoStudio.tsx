@@ -309,9 +309,15 @@ export function VideoStudio({
     if (!v) return;
     let raf = 0;
     const tick = () => {
-      if (v.currentTime >= end - 0.03) {
-        if (loop) v.currentTime = start;
-        else if (!v.paused) v.pause();
+      // Usamos uma margem um pouco maior (0.1s) para o loop ser mais fluido
+      if (v.currentTime >= end - 0.1) {
+        if (loop) {
+          v.currentTime = start;
+          // Se estiver pausado e for loop, não força o play aqui para evitar loops infinitos de erros
+        } else if (!v.paused) {
+          v.pause();
+          setPlaying(false);
+        }
       }
       setTime(v.currentTime);
       raf = requestAnimationFrame(tick);
