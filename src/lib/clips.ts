@@ -5,11 +5,11 @@
  * momentos de alta retenção e histórias completas.
  *
  * Pipeline:
- *  1. Análise Narrativa: Detecção de ganchos (início impactante) e resoluções.
- *  2. Segmentação Inteligente: Identificação de frases e pausas naturais para evitar cortes secos.
- *  3. Face Tracking & Saliência: Foca na ação e nas expressões faciais.
- *  4. Score Viral: Pesa ganchos, picos de energia, densidade de fala e palavras-chave.
- *  5. Destaques Automáticos: Extrai highlights com base em picos de curiosidade e roteiro.
+ *  1. Análise Narrativa Profissional: Detecção de ganchos (início impactante), retenção de roteiro e resoluções emocionais.
+ *  2. Segmentação Inteligente V2: Identificação de frases, pausas naturais e picos de curiosidade para evitar cortes secos.
+ *  3. Face Tracking & Saliência Dinâmica: Foca na ação, nas expressões faciais e enquadra o sujeito mais importante da cena.
+ *  4. Score Viral Adaptativo: Pesa ganchos, picos de energia sonora, densidade de fala e presença de palavras-chave virais.
+ *  5. Extração de Highlights: Identifica momentos de "ouro" com base em picos de engajamento preditivo e estrutura de storytelling.
  */
 
 export interface Clip {
@@ -230,17 +230,17 @@ export interface ClipSignals {
  */
 export function scoreClipSignals(signals: ClipSignals) {
   const fit = (value: number) => Math.max(0, Math.min(1, value));
-  const speechFit = fit(1 - Math.abs(signals.density - 0.72) / 0.72);
+  // OpusClip prioriza fala rápida e ganchos constantes
+  const speechFit = fit(1 - Math.abs(signals.density - 0.78) / 0.78);
   const quality =
-    fit(signals.hook) * 0.28 + // Gancho é o principal fator de viralização
-    fit(signals.energy) * 0.12 +
-    fit(signals.dynamics) * 0.1 +
-    speechFit * 0.18 + // Densidade de fala para retenção
-    fit(signals.motion) * 0.08 +
-    fit(signals.clarity) * 0.08 +
-    fit(signals.cadence) * 0.12 + // Cadência narrativa
-    fit(signals.edgeQuality) * 0.04 +
-    fit(signals.lenFit) * 0.08;
+    fit(signals.hook) * 0.35 + // Gancho é VIDA em vídeos curtos
+    fit(signals.energy) * 0.10 +
+    fit(signals.dynamics) * 0.12 +
+    speechFit * 0.20 + // Densidade de fala agressiva para retenção
+    fit(signals.motion) * 0.05 +
+    fit(signals.clarity) * 0.05 +
+    fit(signals.cadence) * 0.10 + // Ritmo de corte
+    fit(signals.edgeQuality) * 0.03;
   return {
     raw: quality,
     score: Math.round(Math.max(12, Math.min(99, 15 + quality * 84))),

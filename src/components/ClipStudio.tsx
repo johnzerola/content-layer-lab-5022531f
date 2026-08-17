@@ -162,8 +162,10 @@ function ClipCard({
   return (
     <div
       onClick={onSelect}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-surface-2 transition ${
-        active ? "border-primary" : "border-border hover:border-primary/40"
+      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-surface-2 transition-all duration-300 ${
+        active 
+          ? "border-primary shadow-[0_0_20px_-5px_rgba(34,197,94,0.3)] ring-1 ring-primary/50" 
+          : "border-border hover:border-primary/40 hover:shadow-lg"
       }`}
     >
       <div className="relative aspect-[9/16] bg-black">
@@ -223,11 +225,12 @@ function ClipCard({
 
         {/* score grande no canto, como no OpusClip */}
         {typeof item.score === "number" && (
-          <div className="absolute bottom-12 right-2 flex flex-col items-end gap-1">
-            <div className="rounded-lg bg-primary px-2.5 py-1 text-2xl font-black leading-none text-primary-foreground shadow-xl ring-1 ring-white/20">
+          <div className="absolute bottom-12 right-2 flex flex-col items-end gap-1 scale-90 sm:scale-100 origin-bottom-right">
+            <div className="flex items-baseline gap-0.5 rounded-lg bg-primary px-2.5 py-1 text-2xl font-black leading-none text-primary-foreground shadow-[0_4px_12px_rgba(34,197,94,0.4)] ring-1 ring-white/20">
               {item.score}
+              <span className="text-[10px] opacity-80">/99</span>
             </div>
-            <div className="rounded bg-black/60 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-tighter text-white/90 backdrop-blur-sm">
+            <div className="rounded bg-black/70 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white/90 backdrop-blur-md border border-white/10">
               Viral Score
             </div>
           </div>
@@ -302,20 +305,22 @@ function ClipCard({
       </div>
 
       {/* título + descrição + baixar, no modelo da referência */}
-      <div className="flex flex-1 flex-col gap-2 p-3">
+      <div className="flex flex-1 flex-col gap-2 p-4">
         <div className="flex items-start justify-between gap-2">
-          <p className="line-clamp-2 text-sm font-semibold leading-snug">
+          <p className="line-clamp-2 text-sm font-bold leading-tight tracking-tight text-foreground">
             {item.clipTitle?.replace(/ · #\d+$/, "") ?? item.file.name}
           </p>
           {typeof item.score === "number" && <ScoreBadge score={item.score} />}
         </div>
         {item.clipReason && (
-          <p
-            className="line-clamp-2 text-[11px] leading-relaxed text-muted-foreground"
-            title={item.clipReason}
-          >
-            {item.clipReason}
-          </p>
+          <div className="relative rounded-lg bg-surface-3/50 p-2 border border-border/40">
+            <p
+              className="line-clamp-3 text-[11px] leading-relaxed text-muted-foreground italic"
+              title={item.clipReason}
+            >
+              "{item.clipReason}"
+            </p>
+          </div>
         )}
         {item.clipTags && item.clipTags.length > 0 && (
           <div className="flex flex-wrap gap-1">
@@ -409,10 +414,10 @@ function SelectedClip({
       onDrop={onDrop}
       onDragEnd={onDragEnd}
       onClick={onSelect}
-      className={`group relative w-36 shrink-0 cursor-move overflow-hidden rounded-lg border bg-surface-2 transition ${
-        active ? "border-primary" : "border-border hover:border-primary/40"
-      } ${dragging ? "opacity-40" : "opacity-100"} ${
-        dragOver ? "ring-2 ring-primary ring-offset-2 ring-offset-background" : ""
+      className={`group relative w-40 shrink-0 cursor-move overflow-hidden rounded-xl border bg-surface-2 transition-all duration-300 ${
+        active ? "border-primary ring-2 ring-primary/30" : "border-border hover:border-primary/40"
+      } ${dragging ? "opacity-30 scale-95" : "opacity-100"} ${
+        dragOver ? "ring-2 ring-primary ring-offset-4 ring-offset-background translate-x-1" : ""
       }`}
     >
       <div className="absolute left-0 top-0 z-10 rounded-br-md bg-background/80 p-1 backdrop-blur">
@@ -691,14 +696,17 @@ export function ClipStudio(props: Props) {
           </div>
 
           {validPicked.length > 0 && (
-            <div className="rounded-xl border border-border bg-surface-2 p-3">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="mono-label">selecionados para exportar · {validPicked.length}</p>
+            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 shadow-inner">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="size-2 rounded-full bg-primary animate-pulse" />
+                  <p className="mono-label text-primary font-bold">Fila de Sequenciamento · {validPicked.length} clipes</p>
+                </div>
                 <button
-                  className="font-mono text-[11px] text-muted-foreground hover:text-foreground"
+                  className="rounded-full bg-surface-3 px-3 py-1 font-mono text-[10px] text-muted-foreground hover:bg-destructive hover:text-white transition-colors"
                   onClick={() => setPicked([])}
                 >
-                  limpar
+                  limpar fila
                 </button>
               </div>
               <div className="flex gap-2 overflow-x-auto pb-1">
