@@ -196,7 +196,8 @@ function AgendaPage() {
 
   return (
     <AppShell
-      mode={mode}
+      mode="lote"
+
       onMode={setMode}
       count={jobs.length}
       onLibrary={() => setLibOpen(true)}

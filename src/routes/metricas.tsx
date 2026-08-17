@@ -77,7 +77,8 @@ function MetricsPage() {
 
   return (
     <AppShell 
-      mode="external" 
+      mode="lote" 
+
       onMode={() => {}} 
       count={0} 
       onLibrary={() => {}} 

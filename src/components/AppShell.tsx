@@ -167,26 +167,30 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
           {open && <p className="mono-label px-2 pb-2 pt-3">Ferramentas</p>}
           {MODES.filter(m => m.id !== "external").map((m) => {
             const active = m.id === mode;
-  useEffect(() => {
-    // Fix for SSR 'window is not defined' error in components that might be using it in initial state or render
-    if (typeof window === 'undefined') return;
-  }, []);
+            const isExternal = ["/live", "/biblioteca", "/agenda", "/integracoes", "/armazenamento", "/metricas", "/admin"].some(path =>
+              typeof window !== "undefined" && window.location.pathname.startsWith(path)
+            );
 
-  return (
+            // Se estiver em uma rota externa/fixa, desativa o destaque visual das ferramentas de lote
+            const visuallyActive = active && !isExternal;
+            return (
               <button
+
                 key={m.id}
                 onClick={() => onMode(m.id)}
                 title={m.brand}
                 aria-current={active ? "page" : undefined}
                 className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
-                  active
+                  visuallyActive
+
                     ? "bg-accent text-accent-foreground ring-1 ring-primary/30"
                     : "text-muted-foreground hover:bg-surface-2 hover:text-foreground"
                 }`}
               >
                 <span
                   className={`grid size-7 shrink-0 place-items-center rounded-lg border transition ${
-                    active
+                    visuallyActive
+
                       ? "border-primary/40 bg-primary/15 text-primary"
                       : "border-border bg-surface-2 text-muted-foreground group-hover:text-foreground"
                   }`}
@@ -333,7 +337,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
         </header>
 
         <div className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6">
-          {mode === "external" || (typeof window !== "undefined" && ["/live", "/biblioteca", "/agenda", "/integracoes", "/armazenamento", "/metricas"].includes(window.location.pathname)) ? null : (
+          {mode === "external" || (typeof window !== "undefined" && ["/live", "/biblioteca", "/agenda", "/integracoes", "/armazenamento", "/metricas", "/admin"].includes(window.location.pathname)) ? null : (
             <section
               key={current.id}
               className="mb-6 overflow-hidden rounded-2xl border border-border/70 bg-[var(--gradient-surface)] p-5 shadow-[var(--shadow-panel)] sm:p-6"
