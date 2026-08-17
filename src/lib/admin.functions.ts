@@ -56,4 +56,3 @@ export const setUserRole = createServerFn({ method: "POST" })
     if (error) throw error;
     return { success: true };
   });
-
