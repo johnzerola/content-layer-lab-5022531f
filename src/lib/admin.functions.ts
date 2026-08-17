@@ -8,7 +8,6 @@ export const listUsers = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     
-    // Check if the caller is an admin using RPC
     const { data: isAdmin, error: rpcError } = await context.supabase.rpc('has_role', { 
       _user_id: context.userId, 
       _role: 'admin' 
@@ -18,7 +17,6 @@ export const listUsers = createServerFn({ method: "GET" })
       throw new Error("Unauthorized: Only admins can list users.");
     }
 
-    // List users from user_roles
     const { data: users, error } = await supabaseAdmin
       .from('user_roles')
       .select('user_id, role');
@@ -36,7 +34,6 @@ export const setUserRole = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Check if the caller is an admin
     const { data: isAdmin, error: rpcError } = await context.supabase.rpc('has_role', { 
       _user_id: context.userId, 
       _role: 'admin' 
@@ -50,9 +47,10 @@ export const setUserRole = createServerFn({ method: "POST" })
       .from('user_roles')
       .upsert({ 
         user_id: data.targetUserId, 
-        role: data.role as any
+        role: data.role
       }, { onConflict: 'user_id, role' });
 
     if (error) throw error;
     return { success: true };
   });
+
