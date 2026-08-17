@@ -18,20 +18,32 @@ export const Route = createFileRoute("/api/public/media-proxy")({
         if (!ticket) return new Response("invalid or expired ticket", { status: 401 });
         const initialTarget = safeRemoteUrl(ticket.url);
         if (!initialTarget) return new Response("url not allowed", { status: 400 });
+
         let target: URL = initialTarget;
-        const headers = new Headers(ticket.headers);
-        if (!headers.has("user-agent")) {
-          headers.set(
+        const requestHeaders = new Headers(ticket.headers);
+        
+        // Repassa o header Range do navegador para o upstream
+        const browserRange = request.headers.get("range");
+        if (browserRange) {
+          requestHeaders.set("range", browserRange);
+        }
+
+        if (!requestHeaders.has("user-agent")) {
+          requestHeaders.set(
             "user-agent",
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
           );
         }
-        headers.set("accept", "video/*,application/octet-stream;q=0.9,*/*;q=0.5");
-        if (!headers.has("referer")) headers.set("referer", `${target.protocol}//${target.host}/`);
+        requestHeaders.set("accept", "video/*,application/octet-stream;q=0.9,*/*;q=0.5");
+        if (!requestHeaders.has("referer")) requestHeaders.set("referer", `${target.protocol}//${target.host}/`);
 
         let upstream: Response | null = null;
         for (let redirect = 0; redirect <= 5; redirect += 1) {
-          upstream = await fetch(target.toString(), { headers, redirect: "manual" }).catch(() => null);
+          upstream = await fetch(target.toString(), { 
+            headers: requestHeaders, 
+            redirect: "manual" 
+          }).catch(() => null);
+          
           if (!upstream || !REDIRECT_CODES.has(upstream.status)) break;
           const location: string | null = upstream.headers.get("location");
           const next: URL | null = location
@@ -42,46 +54,33 @@ export const Route = createFileRoute("/api/public/media-proxy")({
           if (redirect === 5) return new Response("too many redirects", { status: 502 });
         }
 
-        if (!upstream || !upstream.ok || !upstream.body) {
+        if (!upstream || !upstream.body) {
           return new Response("upstream error", { status: 502 });
         }
 
         const type = upstream.headers.get("content-type") ?? "";
-        if (!/^(video\/|application\/octet-stream|binary\/)/i.test(type)) {
+        if (upstream.ok && !/^(video\/|application\/octet-stream|binary\/|audio\/)/i.test(type)) {
           return new Response("not a video", { status: 415 });
         }
-        const len = Number(upstream.headers.get("content-length") ?? 0);
-        if (len > MAX_BYTES) return new Response("file too large", { status: 413 });
 
-        const reader = upstream.body.getReader();
-        let received = 0;
-        const limitedBody = new ReadableStream<Uint8Array>({
-          async pull(controller) {
-            const chunk = await reader.read();
-            if (chunk.done) {
-              controller.close();
-              return;
-            }
-            received += chunk.value.byteLength;
-            if (received > MAX_BYTES) {
-              await reader.cancel("file too large");
-              controller.error(new Error("file too large"));
-              return;
-            }
-            controller.enqueue(chunk.value);
-          },
-          cancel(reason) {
-            return reader.cancel(reason);
-          },
+        const responseHeaders = new Headers();
+        responseHeaders.set("content-type", type.startsWith("video/") || type.startsWith("audio/") ? type : "video/mp4");
+        responseHeaders.set("content-disposition", "inline");
+        responseHeaders.set("x-content-type-options", "nosniff");
+        responseHeaders.set("cache-control", "no-store");
+        responseHeaders.set("accept-ranges", "bytes");
+
+        // Repassa headers de conteúdo do upstream (Range, Length, etc)
+        ["content-length", "content-range", "accept-ranges"].forEach(h => {
+          const val = upstream!.headers.get(h);
+          if (val) responseHeaders.set(h, val);
         });
 
-        return new Response(limitedBody, {
-          status: 200,
-          headers: {
-            "content-type": type.startsWith("video/") ? type : "video/mp4",
-            "cache-control": "no-store",
-            ...(len ? { "content-length": String(len) } : {}),
-          },
+        // Retorna o status original (pode ser 206 Partial Content)
+        return new Response(upstream.body, {
+          status: upstream.status,
+          statusText: upstream.statusText,
+          headers: responseHeaders,
         });
       },
     },

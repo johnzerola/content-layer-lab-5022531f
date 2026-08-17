@@ -94,7 +94,7 @@ export function serviceToken(scope: ServiceTokenScope, ttlSeconds = 60): string 
 export function mediaProxyTicket(url: string, headers: MediaHeaders = {}, ttlSeconds = 10 * 60) {
   const safeHeaders = Object.fromEntries(
     Object.entries(headers).filter(
-      ([key, value]) => ["user-agent", "referer", "origin"].includes(key.toLowerCase()) && value.length <= 1000,
+      ([key, value]) => ["user-agent", "referer", "origin", "range"].includes(key.toLowerCase()) && value.length <= 1000,
     ),
   );
   const payload = Buffer.from(
@@ -149,7 +149,7 @@ export function verifyMediaProxyTicket(ticket: string | null): {
     const headers = Object.fromEntries(
       Object.entries(parsed.headers as Record<string, unknown>).filter(
         ([key, value]) =>
-          ["user-agent", "referer", "origin"].includes(key.toLowerCase()) &&
+          ["user-agent", "referer", "origin", "range"].includes(key.toLowerCase()) &&
           typeof value === "string" &&
           value.length <= 1000,
       ),
