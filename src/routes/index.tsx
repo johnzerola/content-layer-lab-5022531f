@@ -1008,7 +1008,7 @@ function Home() {
           if (runMode === "limpar-ia") {
             if (!item.result_url) {
               throw new Error(
-                "Este vídeo ainda não foi limpo pela IA. Marque as áreas e clique em “Enviar para GPUâ€ antes de processar.",
+                "Este vídeo ainda não foi limpo pela IA. Marque as áreas e clique em “Enviar para GPU” antes de processar.",
               );
             }
             setItems((p) =>
