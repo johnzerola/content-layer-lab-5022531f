@@ -165,7 +165,7 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
 
         <nav className="flex flex-col gap-1 px-3">
           {open && <p className="mono-label px-2 pb-2 pt-3">Ferramentas</p>}
-          {MODES.map((m) => {
+          {MODES.filter(m => m.id !== "external").map((m) => {
             const active = m.id === mode;
             const isExternal = ["/live", "/biblioteca", "/agenda", "/integracoes", "/armazenamento", "/metricas", "/admin"].some(path =>
               typeof window !== "undefined" && window.location.pathname.startsWith(path)
@@ -173,8 +173,9 @@ export function AppShell({ mode, onMode, count, counts, onLibrary, onCloud, chil
 
             // Se estiver em uma rota externa/fixa, desativa o destaque visual das ferramentas de lote
             const visuallyActive = active && !isExternal;
-
+            return (
               <button
+
                 key={m.id}
                 onClick={() => onMode(m.id)}
                 title={m.brand}
