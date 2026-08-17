@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { formatTime } from "@/lib/clips";
+import { toast } from "sonner";
+
 
 export interface ClipItem {
   id: string;
@@ -129,10 +131,16 @@ function ClipCard({
       setPlaying(false);
       return;
     }
+    // Forçar o carregamento do recurso caso esteja em estado de erro ou não carregado
+    if (v.readyState === 0) v.load();
+    
     v.currentTime = start;
-    void v.play();
-    setPlaying(true);
+    v.play().then(() => setPlaying(true)).catch(e => {
+      console.error("Erro ao dar play no clipe:", e);
+      toast.error("Não foi possível reproduzir o vídeo.");
+    });
   };
+
 
   const [pos, setPos] = useState(0);
   const len = Math.max(0.1, end - start);

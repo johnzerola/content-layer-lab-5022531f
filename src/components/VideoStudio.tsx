@@ -338,14 +338,18 @@ export function VideoStudio({
     const v = videoRef.current;
     if (!v) return;
     if (v.paused) {
+      if (v.readyState === 0) v.load();
       if (v.currentTime < start || v.currentTime > end) v.currentTime = start;
-      void v.play();
-      setPlaying(true);
+      v.play().then(() => setPlaying(true)).catch(e => {
+        console.error("Erro ao dar play no estúdio:", e);
+        toast.error("Erro ao reproduzir o vídeo.");
+      });
     } else {
       v.pause();
       setPlaying(false);
     }
   }, [start, end]);
+
 
   const step = (frames: number) => seek(Math.min(end, Math.max(start, time + frames / 30)));
 
