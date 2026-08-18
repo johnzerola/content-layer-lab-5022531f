@@ -94,6 +94,62 @@ function ScoreBadge({ score }: { score: number }) {
   );
 }
 
+/**
+ * Cria a URL apenas dentro do efeito. Isso é importante no modo estrito do
+ * React: uma URL criada durante o render pode ser revogada pelo ciclo de
+ * verificação e continuar presa ao elemento de vídeo.
+ */
+function useMediaObjectUrl(file: File) {
+  const [url, setUrl] = useState("");
+
+  useEffect(() => {
+    const nextUrl = URL.createObjectURL(file);
+    setUrl(nextUrl);
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [file]);
+
+  return url;
+}
+
+function waitForMediaEvent(video: HTMLVideoElement, event: "loadedmetadata" | "loadeddata" | "seeked") {
+  return new Promise<void>((resolve, reject) => {
+    const done = () => {
+      cleanup();
+      resolve();
+    };
+    const failed = () => {
+      cleanup();
+      reject(video.error ?? new Error("Falha ao carregar a mídia"));
+    };
+    const cleanup = () => {
+      video.removeEventListener(event, done);
+      video.removeEventListener("error", failed);
+      window.clearTimeout(timer);
+    };
+    const timer = window.setTimeout(failed, 15000);
+    video.addEventListener(event, done, { once: true });
+    video.addEventListener("error", failed, { once: true });
+  });
+}
+
+async function prepareClipPlayback(video: HTMLVideoElement, start: number, end: number) {
+  if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
+    if (video.networkState === HTMLMediaElement.NETWORK_EMPTY) video.load();
+    await waitForMediaEvent(video, "loadedmetadata");
+  }
+
+  const mediaEnd = Number.isFinite(video.duration) ? video.duration : end;
+  const from = Math.max(0, Math.min(start, Math.max(0, mediaEnd - 0.05)));
+  if (!Number.isFinite(video.currentTime) || Math.abs(video.currentTime - from) > 0.15) {
+    video.currentTime = from;
+    await waitForMediaEvent(video, "seeked");
+  }
+
+  if (video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+    await waitForMediaEvent(video, "loadeddata");
+  }
+}
+
 function ClipCard({
   item,
   index,
@@ -117,8 +173,7 @@ function ClipCard({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
-  const url = useMemo(() => URL.createObjectURL(item.file), [item.file]);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  const url = useMediaObjectUrl(item.file);
 
   const start = item.clip?.start ?? 0;
   const end = item.clip?.end ?? item.duration;
@@ -133,34 +188,7 @@ function ClipCard({
     }
 
     try {
-      // espera os metadados antes de buscar o início do corte
-      if (v.readyState < 1) {
-        if (v.networkState === v.NETWORK_EMPTY) v.load();
-        await new Promise<void>((resolve, reject) => {
-          const ok = () => {
-            cleanup();
-            resolve();
-          };
-          const bad = () => {
-            cleanup();
-            reject(new Error("load"));
-          };
-          const cleanup = () => {
-            v.removeEventListener("loadedmetadata", ok);
-            v.removeEventListener("error", bad);
-            window.clearTimeout(timer);
-          };
-          const timer = window.setTimeout(bad, 12000);
-          v.addEventListener("loadedmetadata", ok, { once: true });
-          v.addEventListener("error", bad, { once: true });
-        });
-      }
-
-      const from = Math.max(0, Math.min(start, Math.max(0, (v.duration || end) - 0.1)));
-      if (!Number.isFinite(v.currentTime) || v.currentTime < from - 0.3 || v.currentTime >= end - 0.05) {
-        v.currentTime = from;
-      }
-
+      await prepareClipPlayback(v, start, end);
       await v.play();
       setPlaying(true);
     } catch (e) {
@@ -188,7 +216,8 @@ function ClipCard({
       <div className="relative aspect-[9/16] bg-black">
         <video
           ref={videoRef}
-          src={url}
+          src={url || undefined}
+          preload="metadata"
           muted
           playsInline
           poster={item.poster ?? undefined}
@@ -404,13 +433,12 @@ function SelectedClip({
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
-  const url = useMemo(() => URL.createObjectURL(item.file), [item.file]);
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  const url = useMediaObjectUrl(item.file);
 
   const start = item.clip?.start ?? 0;
   const end = item.clip?.end ?? item.duration;
 
-  const toggle = () => {
+  const toggle = async () => {
     const v = videoRef.current;
     if (!v) return;
     if (playing) {
@@ -418,9 +446,16 @@ function SelectedClip({
       setPlaying(false);
       return;
     }
-    if (v.currentTime < start || v.currentTime >= end) v.currentTime = start;
-    void v.play();
-    setPlaying(true);
+    try {
+      await prepareClipPlayback(v, start, end);
+      await v.play();
+      setPlaying(true);
+    } catch (error) {
+      if ((error as Error)?.name === "AbortError") return;
+      console.error("Erro ao reproduzir clipe selecionado:", error);
+      toast.error("Não foi possível reproduzir o vídeo.");
+      setPlaying(false);
+    }
   };
 
   return (
@@ -443,7 +478,8 @@ function SelectedClip({
       <div className="relative aspect-[9/16] bg-black">
         <video
           ref={videoRef}
-          src={url}
+          src={url || undefined}
+          preload="metadata"
           muted
           playsInline
           poster={item.poster ?? undefined}
