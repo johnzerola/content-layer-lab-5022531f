@@ -2558,7 +2558,11 @@ function Home() {
                       </p>
                       <p className="font-mono text-[11px] text-muted-foreground">
                         {it.w && it.h ? `${it.w}×${it.h}` : "…"} ·{" "}
-                        {it.duration ? `${it.duration.toFixed(0)}s` : "…"}
+                        {it.clip
+                          ? `${Math.max(0, it.clip.end - it.clip.start).toFixed(0)}s`
+                          : it.duration
+                            ? `${it.duration.toFixed(0)}s`
+                            : "…"}
                         {it.clip ? ` · corte ${formatTime(it.clip.start)}` : ""}
                         {it.score ? ` · ${it.score}` : ""}
                         {hasPreEdit(it.preEdit) ? " · editado" : ""}
