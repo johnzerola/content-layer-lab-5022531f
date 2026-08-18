@@ -123,7 +123,7 @@ function ClipCard({
   const start = item.clip?.start ?? 0;
   const end = item.clip?.end ?? item.duration;
 
-  const play = () => {
+  const play = async () => {
     const v = videoRef.current;
     if (!v) return;
     if (playing) {
@@ -131,27 +131,44 @@ function ClipCard({
       setPlaying(false);
       return;
     }
-    
-    // Forçar recarregamento se necessário
-    if (v.readyState < 2) {
-      v.load();
-    }
-    
-    // Garantir que o tempo está no início do clipe
-    if (Math.abs(v.currentTime - start) > 0.5) {
-      v.currentTime = start;
-    }
-    
-    const promise = v.play();
-    if (promise !== undefined) {
-      promise
-        .then(() => setPlaying(true))
-        .catch((e) => {
-          console.error("Erro ao dar play no clipe:", e);
-          if (e.name !== "AbortError") {
-            toast.error("Não foi possível reproduzir o vídeo.");
-          }
+
+    try {
+      // espera os metadados antes de buscar o início do corte
+      if (v.readyState < 1) {
+        if (v.networkState === v.NETWORK_EMPTY) v.load();
+        await new Promise<void>((resolve, reject) => {
+          const ok = () => {
+            cleanup();
+            resolve();
+          };
+          const bad = () => {
+            cleanup();
+            reject(new Error("load"));
+          };
+          const cleanup = () => {
+            v.removeEventListener("loadedmetadata", ok);
+            v.removeEventListener("error", bad);
+            window.clearTimeout(timer);
+          };
+          const timer = window.setTimeout(bad, 12000);
+          v.addEventListener("loadedmetadata", ok, { once: true });
+          v.addEventListener("error", bad, { once: true });
         });
+      }
+
+      const from = Math.max(0, Math.min(start, Math.max(0, (v.duration || end) - 0.1)));
+      if (!Number.isFinite(v.currentTime) || v.currentTime < from - 0.3 || v.currentTime >= end - 0.05) {
+        v.currentTime = from;
+      }
+
+      await v.play();
+      setPlaying(true);
+    } catch (e) {
+      const err = e as Error;
+      if (err?.name === "AbortError") return;
+      console.error("Erro ao dar play no clipe:", err);
+      toast.error("Não foi possível reproduzir o vídeo.");
+      setPlaying(false);
     }
   };
 
