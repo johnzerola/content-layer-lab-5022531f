@@ -720,7 +720,9 @@ function Home() {
           poster: item.poster,
           w: item.w,
           h: item.h,
-          duration: c.end - c.start,
+          // mantém a duração real do arquivo — o recorte vive em `clip`,
+          // assim o editor e o preview enxergam a mídia inteira e conseguem buscar o trecho
+          duration: item.duration || c.end,
           headline: item.headline,
           offsetX: item.offsetX,
           offsetY: item.offsetY,
