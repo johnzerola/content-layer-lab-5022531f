@@ -366,104 +366,133 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
   const sweet = (minLen + maxLen) / 2;
   const cands: Candidate[] = [];
 
-  for (const len of lens) {
-    for (let s0 = 0; s0 + len <= duration; s0 += step) {
-      // alinha às fronteiras de fala para não cortar no meio da frase
-      const s = nearest(starts, s0, 1.2);
-      const e = Math.min(duration, nearest(ends, s + len, 1.5));
-      const realLen = e - s;
-      if (realLen < minLen * 0.85 || realLen > maxLen * 1.15) continue;
+  /** mede um trecho já delimitado e devolve o candidato pontuado */
+  const measure = (s: number, e: number, text?: TranscriptWindow): Candidate | null => {
+    const realLen = e - s;
+    if (realLen < minLen * 0.85 || realLen > maxLen * 1.15) return null;
 
-      let sum = 0;
-      let peak = 0;
-      let low = Infinity;
-      let mot = 0;
-      let voiced = 0;
-      let n = 0;
-      let hook = 0;
-      let openingVoiced = 0;
-      let closingVoiced = 0;
-      let edgeSamples = 0;
-      let transitions = 0;
-      let previousSpeech: boolean | null = null;
-      for (let t = s; t < e; t += step) {
-        const a = at(rms, t, duration) / loudRef;
-        const m = at(motion, t, duration) / motionRef;
-        const speaking = speechAt(t);
-        sum += a;
-        mot += m;
-        peak = Math.max(peak, a);
-        low = Math.min(low, a);
-        if (speaking) voiced++;
-        if (t - s < 3) hook = Math.max(hook, a);
-        if (t - s < 2) {
-          edgeSamples++;
-          if (speaking) openingVoiced++;
-        }
-        if (e - t <= 2 && speaking) closingVoiced++;
-        if (previousSpeech !== null && previousSpeech !== speaking) transitions++;
-        previousSpeech = speaking;
-        n++;
+    let sum = 0;
+    let peak = 0;
+    let low = Infinity;
+    let mot = 0;
+    let voiced = 0;
+    let n = 0;
+    let hook = 0;
+    let openingVoiced = 0;
+    let closingVoiced = 0;
+    let edgeSamples = 0;
+    let transitions = 0;
+    let previousSpeech: boolean | null = null;
+    for (let t = s; t < e; t += step) {
+      const a = at(rms, t, duration) / loudRef;
+      const m = at(motion, t, duration) / motionRef;
+      const speaking = speechAt(t);
+      sum += a;
+      mot += m;
+      peak = Math.max(peak, a);
+      low = Math.min(low, a);
+      if (speaking) voiced++;
+      if (t - s < 3) hook = Math.max(hook, a);
+      if (t - s < 2) {
+        edgeSamples++;
+        if (speaking) openingVoiced++;
       }
-      if (!n) continue;
-      const energy = Math.min(1, sum / n);
-      const dynamics = Math.min(1, Math.max(0, peak - (low === Infinity ? 0 : low)));
-      const motionAvg = Math.min(1, mot / n);
-      const density = voiced / n;
-      const lenFit = 1 - Math.min(1, Math.abs(realLen - sweet) / Math.max(1, maxLen));
-      const expectedTransitions = Math.max(1, realLen / 5);
-      const cadence = Math.max(
-        0,
-        Math.min(1, 1 - Math.abs(transitions - expectedTransitions) / (expectedTransitions * 1.8)),
-      );
-      const edgeQuality = Math.max(
-        0,
-        Math.min(
-          1,
-          (openingVoiced / Math.max(1, edgeSamples) + closingVoiced / Math.max(1, edgeSamples)) / 2,
-        ),
-      );
-      // OpusClip evita o começo "de aquecimento" do vídeo
-      const posBonus = s / duration < 0.05 ? 0.85 : 1;
+      if (e - t <= 2 && speaking) closingVoiced++;
+      if (previousSpeech !== null && previousSpeech !== speaking) transitions++;
+      previousSpeech = speaking;
+      n++;
+    }
+    if (!n) return null;
+    const energy = Math.min(1, sum / n);
+    const dynamics = Math.min(1, Math.max(0, peak - (low === Infinity ? 0 : low)));
+    const motionAvg = Math.min(1, mot / n);
+    const density = voiced / n;
+    const lenFit = 1 - Math.min(1, Math.abs(realLen - sweet) / Math.max(1, maxLen));
+    const expectedTransitions = Math.max(1, realLen / 5);
+    const cadence = Math.max(
+      0,
+      Math.min(1, 1 - Math.abs(transitions - expectedTransitions) / (expectedTransitions * 1.8)),
+    );
+    const edgeQuality = text
+      ? 1 // fronteira de frase real: corte sempre limpo
+      : Math.max(
+          0,
+          Math.min(
+            1,
+            (openingVoiced / Math.max(1, edgeSamples) + closingVoiced / Math.max(1, edgeSamples)) / 2,
+          ),
+        );
+    // OpusClip evita o começo "de aquecimento" do vídeo
+    const posBonus = s / duration < 0.05 ? 0.85 : 1;
 
-      const scored = scoreClipSignals({
-        hook,
-        energy,
-        dynamics,
-        motion: motionAvg,
-        density,
-        clarity: globalClarity,
-        cadence,
-        edgeQuality,
-        lenFit,
-      });
-      const raw = scored.raw * posBonus;
+    const scored = scoreClipSignals({
+      hook,
+      energy,
+      dynamics,
+      motion: motionAvg,
+      density,
+      clarity: globalClarity,
+      cadence,
+      edgeQuality,
+      lenFit,
+    });
+    // com transcrição, o SENTIDO manda mais que a energia
+    const blended = text ? scored.raw * 0.45 + text.text_score * 0.55 : scored.raw;
+    const raw = blended * posBonus;
 
-      const tags: string[] = [];
-      if (hook > 0.65) tags.push("gancho");
-      if (peak > 0.9) tags.push("pico");
-      if (motionAvg > 0.55) tags.push("reação");
-      if (density > 0.75) tags.push("fala contínua");
-      if (globalClarity > 0.62) tags.push("fala clara");
-      if (cadence > 0.58) tags.push("bom ritmo");
-      if (edgeQuality > 0.68) tags.push("corte limpo");
+    const tags: string[] = [];
+    if (hook > 0.65) tags.push("gancho");
+    if (peak > 0.9) tags.push("pico");
+    if (motionAvg > 0.55) tags.push("reação");
+    if (density > 0.75) tags.push("fala contínua");
+    if (globalClarity > 0.62) tags.push("fala clara");
+    if (cadence > 0.58) tags.push("bom ritmo");
+    if (edgeQuality > 0.68 && !text) tags.push("corte limpo");
+    if (text) {
+      tags.push("baseado na fala");
+      for (const t of text.tags) if (!tags.includes(t)) tags.push(t);
+    }
 
-      cands.push({
-        start: s,
-        end: e,
-        raw,
-        hook,
-        energy,
-        dynamics,
-        motion: motionAvg,
-        density,
-        clarity: globalClarity,
-        cadence,
-        edgeQuality,
-        tags,
-      });
+    return {
+      start: s,
+      end: e,
+      raw,
+      hook,
+      energy,
+      dynamics,
+      motion: motionAvg,
+      density,
+      clarity: globalClarity,
+      cadence,
+      edgeQuality,
+      tags,
+      ...(text ? { text: text.text } : {}),
+    };
+  };
+
+  const windows = opts.transcript?.length
+    ? transcriptWindows(opts.transcript, minLen, maxLen)
+    : [];
+
+  if (windows.length) {
+    for (const w of windows) {
+      const c = measure(w.start, Math.min(duration, w.end), w);
+      if (c) cands.push(c);
     }
   }
+
+  if (!cands.length) {
+    for (const len of lens) {
+      for (let s0 = 0; s0 + len <= duration; s0 += step) {
+        // alinha às fronteiras de fala para não cortar no meio da frase
+        const s = nearest(starts, s0, 1.2);
+        const e = Math.min(duration, nearest(ends, s + len, 1.5));
+        const c = measure(s, e);
+        if (c) cands.push(c);
+      }
+    }
+  }
+
 
   if (!cands.length) {
     return [
