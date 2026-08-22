@@ -761,7 +761,9 @@ export function ClipStudio(props: Props) {
               );
             })}
           </div>
+          </div>
         )}
+
       </section>
 
       {clips.length > 0 && (
