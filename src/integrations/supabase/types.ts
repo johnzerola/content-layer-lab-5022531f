@@ -119,6 +119,47 @@ export type Database = {
         }
         Relationships: []
       }
+      clip_outcomes: {
+        Row: {
+          clip_seconds: number
+          created_at: string
+          id: string
+          post_id: string | null
+          predicted_score: number
+          source: string
+          tags: string[]
+          user_id: string
+        }
+        Insert: {
+          clip_seconds?: number
+          created_at?: string
+          id?: string
+          post_id?: string | null
+          predicted_score?: number
+          source?: string
+          tags?: string[]
+          user_id: string
+        }
+        Update: {
+          clip_seconds?: number
+          created_at?: string
+          id?: string
+          post_id?: string | null
+          predicted_score?: number
+          source?: string
+          tags?: string[]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clip_outcomes_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "scheduled_posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       exports: {
         Row: {
           bytes: number
