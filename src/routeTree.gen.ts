@@ -31,7 +31,7 @@ import { Route as ApiPublicCleanerCallbackRouteImport } from './routes/api/publi
 import { Route as ApiPublicCleanerUploadRouteImport } from './routes/api/public/cleaner-upload'
 import { Route as ApiPublicHlsProxyRouteImport } from './routes/api/public/hls-proxy'
 import { Route as ApiPublicMediaProxyRouteImport } from './routes/api/public/media-proxy'
-import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integracoes.instagram.callback'
+import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integracoes_.instagram.callback'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
 
 const IndexRoute = IndexRouteImport.update({
@@ -150,9 +150,9 @@ const ApiPublicMediaProxyRoute = ApiPublicMediaProxyRouteImport.update({
 } as any)
 const IntegracoesInstagramCallbackRoute =
   IntegracoesInstagramCallbackRouteImport.update({
-    id: '/instagram/callback',
-    path: '/instagram/callback',
-    getParentRoute: () => IntegracoesRoute,
+    id: '/integracoes_/instagram/callback',
+    path: '/integracoes/instagram/callback',
+    getParentRoute: () => rootRouteImport,
   } as any)
 const ApiPublicHooksPublishDueRoute =
   ApiPublicHooksPublishDueRouteImport.update({
@@ -168,7 +168,7 @@ export interface FileRoutesByFullPath {
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
   '/conta': typeof ContaRoute
-  '/integracoes': typeof IntegracoesRouteWithChildren
+  '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
@@ -194,7 +194,7 @@ export interface FileRoutesByTo {
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
   '/conta': typeof ContaRoute
-  '/integracoes': typeof IntegracoesRouteWithChildren
+  '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
@@ -221,7 +221,7 @@ export interface FileRoutesById {
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
   '/conta': typeof ContaRoute
-  '/integracoes': typeof IntegracoesRouteWithChildren
+  '/integracoes': typeof IntegracoesRoute
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
@@ -237,7 +237,7 @@ export interface FileRoutesById {
   '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
-  '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
+  '/integracoes_/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
 export interface FileRouteTypes {
@@ -317,7 +317,7 @@ export interface FileRouteTypes {
     | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
-    | '/integracoes/instagram/callback'
+    | '/integracoes_/instagram/callback'
     | '/api/public/hooks/publish-due'
   fileRoutesById: FileRoutesById
 }
@@ -328,7 +328,7 @@ export interface RootRouteChildren {
   ArmazenamentoRoute: typeof ArmazenamentoRoute
   BibliotecaRoute: typeof BibliotecaRoute
   ContaRoute: typeof ContaRoute
-  IntegracoesRoute: typeof IntegracoesRouteWithChildren
+  IntegracoesRoute: typeof IntegracoesRoute
   LimparIaRoute: typeof LimparIaRoute
   LiveRoute: typeof LiveRoute
   McpRoute: typeof McpRoute
@@ -344,6 +344,7 @@ export interface RootRouteChildren {
   ApiPublicCleanerUploadRoute: typeof ApiPublicCleanerUploadRoute
   ApiPublicHlsProxyRoute: typeof ApiPublicHlsProxyRoute
   ApiPublicMediaProxyRoute: typeof ApiPublicMediaProxyRoute
+  IntegracoesInstagramCallbackRoute: typeof IntegracoesInstagramCallbackRoute
   ApiPublicHooksPublishDueRoute: typeof ApiPublicHooksPublishDueRoute
 }
 
@@ -503,12 +504,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMediaProxyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/integracoes/instagram/callback': {
-      id: '/integracoes/instagram/callback'
-      path: '/instagram/callback'
+    '/integracoes_/instagram/callback': {
+      id: '/integracoes_/instagram/callback'
+      path: '/integracoes/instagram/callback'
       fullPath: '/integracoes/instagram/callback'
       preLoaderRoute: typeof IntegracoesInstagramCallbackRouteImport
-      parentRoute: typeof IntegracoesRoute
+      parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/publish-due': {
       id: '/api/public/hooks/publish-due'
@@ -520,18 +521,6 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface IntegracoesRouteChildren {
-  IntegracoesInstagramCallbackRoute: typeof IntegracoesInstagramCallbackRoute
-}
-
-const IntegracoesRouteChildren: IntegracoesRouteChildren = {
-  IntegracoesInstagramCallbackRoute: IntegracoesInstagramCallbackRoute,
-}
-
-const IntegracoesRouteWithChildren = IntegracoesRoute._addFileChildren(
-  IntegracoesRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -539,7 +528,7 @@ const rootRouteChildren: RootRouteChildren = {
   ArmazenamentoRoute: ArmazenamentoRoute,
   BibliotecaRoute: BibliotecaRoute,
   ContaRoute: ContaRoute,
-  IntegracoesRoute: IntegracoesRouteWithChildren,
+  IntegracoesRoute: IntegracoesRoute,
   LimparIaRoute: LimparIaRoute,
   LiveRoute: LiveRoute,
   McpRoute: McpRoute,
@@ -556,6 +545,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCleanerUploadRoute: ApiPublicCleanerUploadRoute,
   ApiPublicHlsProxyRoute: ApiPublicHlsProxyRoute,
   ApiPublicMediaProxyRoute: ApiPublicMediaProxyRoute,
+  IntegracoesInstagramCallbackRoute: IntegracoesInstagramCallbackRoute,
   ApiPublicHooksPublishDueRoute: ApiPublicHooksPublishDueRoute,
 }
 export const routeTree = rootRouteImport

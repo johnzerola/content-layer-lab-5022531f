@@ -12,7 +12,7 @@ const callbackSearch = z.object({
   error_description: z.string().optional(),
 });
 
-export const Route = createFileRoute("/integracoes/instagram/callback")({
+export const Route = createFileRoute("/integracoes_/instagram/callback")({
   validateSearch: callbackSearch,
   component: InstagramOAuthCallback,
 });
