@@ -74,6 +74,7 @@ import { webCodecsSupported } from "@/lib/encode";
 import { defaultAntiDup, describeVariation, makeVariation } from "@/lib/variation";
 import { autoFrame } from "@/lib/autoframe";
 import { findClips, formatTime } from "@/lib/clips";
+import { cuesToSentences, speechKeepSegments, zoomKeys, type Sentence } from "@/lib/transcript-clips";
 import { resolveVideoLink } from "@/lib/import.functions";
 import { downloadAsZip, fsAccessSupported, saveToFolder } from "@/lib/zip";
 import { cuesToSrt, cuesToText, demoCues, generateCaptions, type CaptionCue } from "@/lib/captions";
@@ -710,18 +711,54 @@ function Home() {
     async (item: Item) => {
       if (clipBusy) return;
       setClipBusy(true);
+      setClipStage(null);
       try {
+        // 1) transcrição: é ela que define frases completas, título e silêncios
+        let sentences: Sentence[] = [];
+        if (clipUseTranscript) {
+          try {
+            setClipStage("transcrevendo a fala…");
+            const cues = await generateCaptions(item.file, {
+              onProgress: (p) =>
+                setClipStage(`transcrevendo a fala… ${Math.round((p.done / Math.max(1, p.total)) * 100)}%`),
+            });
+            sentences = cuesToSentences(cues);
+          } catch (err) {
+            // sem transcrição o motor volta para energia/movimento
+            console.warn("transcrição indisponível para clipagem", err);
+            setLinkMsg(
+              `sem transcrição (${String((err as Error)?.message ?? err).slice(0, 90)}) — cortando por áudio e movimento`,
+            );
+          }
+        }
+
+        setClipStage(sentences.length ? "escolhendo os melhores trechos falados…" : "analisando áudio e movimento…");
         const clips = await findClips(item.file, {
           minLen: Math.min(clipMinLen, clipMaxLen),
           maxLen: Math.max(clipMinLen, clipMaxLen),
           max: clipMax,
           minScore: clipMinScore,
+          ...(sentences.length ? { transcript: sentences } : {}),
         });
         if (!clips.length) {
           setLinkMsg("nenhum trecho atingiu o score mínimo — reduza a intensidade do score");
           return;
         }
-        const created: Item[] = clips.map((c) => ({
+        const created: Item[] = clips.map((c) => {
+          // 2) silêncios internos e zoom dinâmico ficam na pré-edição do corte
+          const segments =
+            clipTrimSilence && sentences.length
+              ? speechKeepSegments(sentences, { start: c.start, end: c.end })
+              : [];
+          const keys =
+            clipDynamicZoom && sentences.length
+              ? zoomKeys(sentences, { start: c.start, end: c.end }, null)
+              : [];
+          const preEdit =
+            segments.length || keys.length
+              ? { ...defaultPreEdit(), segments, keys }
+              : undefined;
+          return {
           id: crypto.randomUUID(),
           file: item.file,
           poster: item.poster,
@@ -740,8 +777,10 @@ function Home() {
           clipTags: c.tags,
           status: "pendente" as Status,
           progress: 0,
+          ...(preEdit ? { preEdit } : {}),
           ...(item.autoFrameSource ? { autoFrameSource: item.autoFrameSource } : {}),
-        }));
+          };
+        });
         setItems((prev) =>
           modeRef.current === "clip"
             ? // no estúdio o vídeo longo continua na lista para novas gerações
@@ -762,9 +801,21 @@ function Home() {
         setLinkMsg(`falha na clipagem: ${String((err as Error)?.message ?? err)}`);
       } finally {
         setClipBusy(false);
+        setClipStage(null);
       }
     },
-    [clipBusy, clipMinLen, clipMaxLen, clipMax, clipMinScore, setItems, setSelectedId],
+    [
+      clipBusy,
+      clipMinLen,
+      clipMaxLen,
+      clipMax,
+      clipMinScore,
+      clipUseTranscript,
+      clipTrimSilence,
+      clipDynamicZoom,
+      setItems,
+      setSelectedId,
+    ],
   );
 
   /** Transcreve o áudio e gera legendas com tempo por palavra. */
