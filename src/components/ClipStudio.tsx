@@ -39,6 +39,12 @@ export interface ClipSettings {
   maxLen: number;
   max: number;
   minScore: number;
+  /** corta em cima da transcrição (frases completas) */
+  useTranscript: boolean;
+  /** remove silêncios dentro do próprio corte */
+  trimSilence: boolean;
+  /** zoom dinâmico ritmado pela fala */
+  dynamicZoom: boolean;
 }
 
 interface Props {
@@ -47,6 +53,8 @@ interface Props {
   settings: ClipSettings;
   onSettings: (patch: Partial<ClipSettings>) => void;
   clipBusy: boolean;
+  /** etapa atual da geração (transcrição, análise…) */
+  clipStage?: string | null | undefined;
   onGenerate: (item: ClipItem) => void;
   running: boolean;
   paused: boolean;
@@ -544,6 +552,7 @@ export function ClipStudio(props: Props) {
     clips,
     settings,
     onSettings,
+    clipStage,
     clipBusy,
     onGenerate,
     running,
@@ -696,6 +705,54 @@ export function ClipStudio(props: Props) {
                     : "aceita quase tudo"}
               </span>
             </label>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-3">
+            {(
+              [
+                {
+                  key: "useTranscript" as const,
+                  label: "Cortar pela fala (IA)",
+                  hint: "usa a transcrição para começar e terminar em frases completas",
+                },
+                {
+                  key: "trimSilence" as const,
+                  label: "Remover silêncios",
+                  hint: "acelera o ritmo tirando as pausas dentro do corte",
+                },
+                {
+                  key: "dynamicZoom" as const,
+                  label: "Zoom dinâmico",
+                  hint: "punch-in a cada nova frase, estilo OpusClip",
+                },
+              ]
+            ).map((t) => {
+              const on = settings[t.key];
+              const disabled = t.key !== "useTranscript" && !settings.useTranscript;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  disabled={disabled}
+                  onClick={() => onSettings({ [t.key]: !on } as Partial<ClipSettings>)}
+                  className={`rounded-lg border p-3 text-left transition disabled:opacity-40 ${
+                    on && !disabled
+                      ? "border-primary/60 bg-primary/10"
+                      : "border-border/60 hover:border-border"
+                  }`}
+                >
+                  <span className="flex items-center gap-2 text-xs font-semibold">
+                    <span
+                      className={`h-2 w-2 rounded-full ${on && !disabled ? "bg-primary" : "bg-muted-foreground/40"}`}
+                    />
+                    {t.label}
+                  </span>
+                  <span className="mt-1 block font-mono text-[10px] leading-snug opacity-70">
+                    {t.hint}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
       </section>
