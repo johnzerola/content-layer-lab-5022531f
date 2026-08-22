@@ -149,22 +149,29 @@ describe("publishing queue integration", () => {
       provider_account_id: null,
     });
     fixture.deps.loadConnection = async () => ({
+      id: "connection-1",
       provider: "meta",
       provider_account_id: "ig-validated",
       status: "conectado",
       expires_at: null,
     });
+    fixture.deps.loadProviderAccessToken = async () => "per-account-token";
 
     await runPublishQueue(fixture.deps, options);
 
     expect(fixture.publish).toHaveBeenCalledWith(
-      expect.objectContaining({ provider: "meta", providerAccountId: "ig-validated" }),
+      expect.objectContaining({
+        provider: "meta",
+        providerAccountId: "ig-validated",
+        providerAccessToken: "per-account-token",
+      }),
     );
   });
 
   it("never lets a pending explicit connection fall through to a global provider", async () => {
     const fixture = dependencies([duePost()], { ok: true });
     fixture.deps.loadConnection = async () => ({
+      id: "connection-1",
       provider: "pending",
       provider_account_id: null,
       status: "aguardando_configuracao",

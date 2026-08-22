@@ -4,12 +4,14 @@ import { attachSupabaseAuth } from "@/integrations/supabase/auth-attacher";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   exchangeInstagramAuthorizationCode,
+  exchangeLongLivedInstagramToken,
   fetchOAuthInstagramIdentity,
   instagramAuthorizationUrl,
   verifyInstagramOAuthState,
 } from "@/lib/meta-oauth.server";
 import { MetaLinkError, type LinkAccountResult } from "@/lib/social-linking.server";
-import { persistValidatedMetaAccount } from "@/lib/social-persistence.server";
+import { encryptSocialToken } from "@/lib/social-credentials.server";
+import { persistOAuthMetaAccount } from "@/lib/social-persistence.server";
 
 function oauthError(error: unknown): Extract<LinkAccountResult, { ok: false }> {
   if (error instanceof MetaLinkError) {
@@ -38,18 +40,25 @@ export const completeInstagramOAuth = createServerFn({ method: "POST" })
       verifyInstagramOAuthState(data.state, context.userId);
       const exchanged = await exchangeInstagramAuthorizationCode({ code: data.code });
       const identity = await fetchOAuthInstagramIdentity({ accessToken: exchanged.accessToken });
-      const configuredAccountId = process.env["META_IG_USER_ID"]?.trim();
-      if (!configuredAccountId || identity.id !== configuredAccountId || exchanged.userId !== identity.id) {
+      if (exchanged.userId !== identity.id) {
         throw new MetaLinkError(
           "META_ACCOUNT_MISMATCH",
-          "A conta escolhida não corresponde à conta Instagram configurada para publicação.",
+          "A conta retornada pela Meta não corresponde à conta autorizada.",
         );
       }
+      const longLived = await exchangeLongLivedInstagramToken({ accessToken: exchanged.accessToken });
+      const encryptedToken = encryptSocialToken(longLived.accessToken);
 
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-      const account = await persistValidatedMetaAccount(
-        (name, args) => supabaseAdmin.rpc(name, args),
-        { userId: context.userId, handle: identity.username, providerAccountId: identity.id },
+      const account = await persistOAuthMetaAccount(
+        (name: "link_meta_oauth_account", args) => supabaseAdmin.rpc(name, args),
+        {
+          userId: context.userId,
+          handle: identity.username,
+          providerAccountId: identity.id,
+          accessTokenCiphertext: encryptedToken,
+          expiresAt: longLived.expiresAt,
+        },
       );
       return { ok: true as const, account };
     } catch (error) {

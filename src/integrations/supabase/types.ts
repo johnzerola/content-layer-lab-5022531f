@@ -395,6 +395,38 @@ export type Database = {
           },
         ]
       }
+      social_connection_credentials: {
+        Row: {
+          access_token_ciphertext: string
+          connection_id: string
+          created_at: string
+          expires_at: string
+          updated_at: string
+        }
+        Insert: {
+          access_token_ciphertext: string
+          connection_id: string
+          created_at?: string
+          expires_at: string
+          updated_at?: string
+        }
+        Update: {
+          access_token_ciphertext?: string
+          connection_id?: string
+          created_at?: string
+          expires_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "social_connection_credentials_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: true
+            referencedRelation: "social_connections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       template_versions: {
         Row: {
           created_at: string
@@ -510,6 +542,26 @@ export type Database = {
       }
       link_global_meta_account: {
         Args: {
+          p_provider_account_id: string
+          p_user_id: string
+          p_username: string
+        }
+        Returns: {
+          avatar_url: string
+          created_at: string
+          display_name: string
+          id: string
+          platform: string
+          provider: string
+          provider_account_id: string
+          status: string
+          username: string
+        }[]
+      }
+      link_meta_oauth_account: {
+        Args: {
+          p_access_token_ciphertext: string
+          p_expires_at: string
           p_provider_account_id: string
           p_user_id: string
           p_username: string

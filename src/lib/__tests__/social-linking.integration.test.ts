@@ -61,6 +61,7 @@ describe("authenticated Meta linking to scheduled publishing", () => {
           provider_account_id: providerAccountId,
         };
         storedConnection = {
+          id: "connection-1",
           provider: "meta",
           provider_account_id: providerAccountId,
           status: "conectado",

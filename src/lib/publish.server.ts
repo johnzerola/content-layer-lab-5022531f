@@ -10,6 +10,7 @@ export type PublishInput = {
   platform?: string;
   provider?: SocialProvider;
   providerAccountId?: string | null;
+  providerAccessToken?: string;
   idempotencyKey?: string;
 };
 
@@ -65,7 +66,7 @@ export function activeProvider(requested?: SocialProvider): "ayrshare" | "meta" 
 }
 
 export async function publish(input: PublishInput): Promise<PublishResult> {
-  const allowedPlatforms = ["instagram", "youtube", "tiktok", "facebook"];
+  const allowedPlatforms = ["instagram", "youtube", "facebook"];
   if (input.platform && !allowedPlatforms.includes(input.platform)) {
     return {
       ok: false,
@@ -75,7 +76,9 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
     };
   }
 
-  const provider = activeProvider(input.provider);
+  const provider = input.provider === "meta" && input.providerAccessToken
+    ? "meta"
+    : activeProvider(input.provider);
   if (!provider) {
     return {
       ok: false,
@@ -103,7 +106,7 @@ export async function publish(input: PublishInput): Promise<PublishResult> {
     };
   }
 
-  if (provider === "meta" && input.providerAccountId !== process.env["META_IG_USER_ID"]) {
+  if (provider === "meta" && !input.providerAccessToken && input.providerAccountId !== process.env["META_IG_USER_ID"]) {
     return {
       ok: false,
       code: "ACCOUNT_MISMATCH",
@@ -183,7 +186,9 @@ async function publishAyrshare(input: PublishInput): Promise<PublishResult> {
 
 async function publishMeta(input: PublishInput): Promise<PublishResult> {
   const credentials = globalMetaCredentials();
-  if (!credentials) {
+  const token = input.providerAccessToken ?? credentials?.accessToken;
+  const igId = input.providerAccessToken ? input.providerAccountId : credentials?.igUserId;
+  if (!token || !igId) {
     return {
       ok: false,
       code: "AUTH_INVALID",
@@ -191,7 +196,6 @@ async function publishMeta(input: PublishInput): Promise<PublishResult> {
       error: "Credencial Meta nao configurada.",
     };
   }
-  const { accessToken: token, igUserId: igId } = credentials;
   const graphBase = metaGraphBase();
   const accountBase = `${graphBase}/${igId}`;
   const authorization = { authorization: `Bearer ${token}` };
