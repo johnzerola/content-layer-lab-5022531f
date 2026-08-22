@@ -17,7 +17,6 @@ import {
   listPosts,
   removeAccount,
   reschedulePost,
-  resolveAccountLinkUi,
   schedulePost,
   uploadPostVideo,
   type PostKind,
@@ -25,7 +24,7 @@ import {
   type SocialAccount,
 } from "@/lib/social";
 
-import { addAccount } from "@/lib/social.functions";
+import { beginInstagramOAuth } from "@/lib/meta-oauth.functions";
 import { currentUser, onAuth, type CloudUser } from "@/lib/cloud";
 import { AuthGate } from "@/components/AuthGate";
 
@@ -92,9 +91,8 @@ function AgendaPage() {
   const [posts, setPosts] = useState<ScheduledPost[]>([]);
   const [loading, setLoading] = useState(false);
   const [linkingAccount, setLinkingAccount] = useState(false);
-  const linkAccount = useServerFn(addAccount);
+  const startInstagramOAuth = useServerFn(beginInstagramOAuth);
 
-  const [handle, setHandle] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [accountId, setAccountId] = useState<string>("");
   const [kind, setKind] = useState<PostKind>("reels");
@@ -147,16 +145,12 @@ function AgendaPage() {
   async function onAddAccount() {
     setLinkingAccount(true);
     try {
-      const result = await linkAccount({ data: { username: handle } });
-      const ui = resolveAccountLinkUi(accounts, result);
-      if (!ui.ok) {
-        toast.error(ui.error);
+      const result = await startInstagramOAuth();
+      if (!result.ok) {
+        toast.error(result.error);
         return;
       }
-      setAccounts(ui.accounts);
-      setHandle("");
-      toast.success("Conta Instagram conectada.");
-      await refresh();
+      window.location.assign(result.authorizationUrl);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Não foi possível adicionar.");
     } finally {
@@ -234,21 +228,9 @@ function AgendaPage() {
               <section className="rounded-2xl border border-border/70 bg-surface/60 p-5">
                 <p className="mono-label pb-3">Contas conectadas</p>
                 <div className="flex gap-2">
-                  <div className="flex flex-1 items-center gap-2 rounded-xl border border-border bg-surface-2 px-3">
-                    <select 
-                      className="bg-transparent text-sm outline-none border-r border-border mr-1"
-                      onChange={(e) => setHandle(`@${e.target.value}`)}
-                    >
-                      <option value="instagram">Instagram</option>
-                      <option value="youtube">YouTube</option>
-                      <option value="tiktok">TikTok</option>
-                    </select>
-                    <input
-                      value={handle}
-                      onChange={(e) => setHandle(e.target.value)}
-                      placeholder="@suapagina"
-                      className="w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted-foreground"
-                    />
+                  <div className="flex flex-1 items-center gap-2 rounded-xl border border-border bg-surface-2 px-3 py-2.5 text-sm">
+                    <Instagram className="size-4 text-pink-400" />
+                    <span>Instagram</span>
                   </div>
                   <button
                     onClick={onAddAccount}
@@ -256,7 +238,7 @@ function AgendaPage() {
                     className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2.5 text-sm font-medium text-primary-foreground"
                   >
                     {linkingAccount ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-                    {linkingAccount ? "Validando…" : "Add"}
+                    {linkingAccount ? "Abrindo…" : "Add"}
                   </button>
                 </div>
 

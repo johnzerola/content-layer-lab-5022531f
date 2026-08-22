@@ -87,7 +87,6 @@ import { toast } from "sonner";
 import { AppShell } from "@/components/AppShell";
 import { ImportPanel } from "@/components/ImportPanel";
 import { FLOWS, outputName, zipName, type Mode } from "@/lib/flows";
-import { Toaster } from "@/components/ui/sonner";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -1510,7 +1509,6 @@ function Home() {
       onLibrary={() => setLibraryOpen(true)}
       onCloud={() => setCloudOpen(true)}
     >
-      <Toaster />
 
       <div className="space-y-5">
         {webmWarn && (
