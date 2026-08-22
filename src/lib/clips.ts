@@ -12,6 +12,8 @@
  *  5. Extração de Highlights: Identifica momentos de "ouro" com base em picos de engajamento preditivo e estrutura de storytelling.
  */
 
+import { titleFromText, transcriptWindows, type Sentence, type TranscriptWindow } from "./transcript-clips";
+
 export interface Clip {
   start: number;
   end: number;
@@ -23,6 +25,8 @@ export interface Clip {
   reason?: string;
   /** rótulos do que o algoritmo detectou (gancho, pico de energia, etc.) */
   tags?: string[];
+  /** transcrição do trecho, quando o corte foi guiado pela fala */
+  text?: string;
 }
 
 export interface ClipOptions {
@@ -36,6 +40,8 @@ export interface ClipOptions {
   max?: number;
   /** 0..100 — só devolve cortes com score igual ou acima */
   minScore?: number;
+  /** frases transcritas do vídeo — quando presentes, os cortes seguem o texto */
+  transcript?: Sentence[];
   onProgress?: (p: number) => void;
   signal?: AbortSignal;
 }
@@ -210,6 +216,7 @@ interface Candidate {
   cadence: number;
   edgeQuality: number;
   tags: string[];
+  text?: string;
 }
 
 export interface ClipSignals {
@@ -283,6 +290,23 @@ function describe(c: Candidate, index: number, duration: number) {
   if (c.edgeQuality > 0.75) parts.push("corte perfeito entre frases");
 
   if (!parts.length) parts.push("momento de destaque com potencial de retenção");
+
+  if (c.text) {
+    const spoken = titleFromText(c.text);
+    return {
+      title: spoken || `${title} · #${index + 1}`,
+      reason: [
+        c.tags.includes("gancho de texto") ? "abre com um gancho falado" : null,
+        c.tags.includes("pergunta e resposta") ? "pergunta e resposta completas" : null,
+        c.tags.includes("desfecho") ? "história com desfecho" : null,
+        c.tags.includes("frase completa") ? "começa e termina em frase inteira" : null,
+        ...parts,
+      ]
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(" · "),
+    };
+  }
 
   return {
     title: `${title} · #${index + 1}`,
@@ -533,6 +557,7 @@ export async function findClips(file: File, opts: ClipOptions = {}): Promise<Cli
         title: meta.title,
         reason: meta.reason,
         tags: c.tags,
+        ...(c.text ? { text: c.text } : {}),
       };
     });
 
