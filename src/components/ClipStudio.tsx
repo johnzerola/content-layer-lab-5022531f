@@ -649,7 +649,9 @@ export function ClipStudio(props: Props) {
         </div>
 
         {advanced && (
-          <div className="mt-4 grid gap-3 rounded-xl border border-border bg-surface-2 p-4 sm:grid-cols-2">
+          <div className="mt-4 space-y-3">
+          <div className="grid gap-3 rounded-xl border border-border bg-surface-2 p-4 sm:grid-cols-2">
+
             <label className="font-mono text-[11px] text-muted-foreground">
               duração mínima · {settings.minLen}s
               <input
