@@ -8,9 +8,18 @@ import {
 } from "@/lib/social-linking.server";
 import { persistValidatedMetaAccount } from "@/lib/social-persistence.server";
 
+const addAccountInputSchema = z.object({
+  username: z.string().max(64).optional().default(""),
+});
+
+export function parseAddAccountInput(data: unknown): { username: string } {
+  const parsed = addAccountInputSchema.safeParse(data);
+  return parsed.success ? parsed.data : { username: "" };
+}
+
 export const addAccount = createServerFn({ method: "POST" })
   .middleware([attachSupabaseAuth, requireSupabaseAuth])
-  .validator((data: unknown) => z.object({ username: z.string().min(1).max(64) }).parse(data))
+  .validator(parseAddAccountInput)
   .handler(async ({ data, context }) => {
     if (!linkingServerRuntimeReady()) {
       return {

@@ -1,6 +1,6 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CalendarClock, Instagram, Loader2, Plus, Trash2, UploadCloud, X, Youtube, Video } from "lucide-react";
 import { AppShell, type AppMode } from "@/components/AppShell";
@@ -95,6 +95,7 @@ function AgendaPage() {
   const linkAccount = useServerFn(addAccount);
 
   const [handle, setHandle] = useState("");
+  const handleInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [accountId, setAccountId] = useState<string>("");
   const [kind, setKind] = useState<PostKind>("reels");
@@ -145,9 +146,16 @@ function AgendaPage() {
   }, [posts]);
 
   async function onAddAccount() {
+    const username = handle.trim();
+    if (!username.replace(/^@+/, "")) {
+      handleInputRef.current?.focus();
+      toast.error("Digite o @usuário do Instagram antes de adicionar.");
+      return;
+    }
+
     setLinkingAccount(true);
     try {
-      const result = await linkAccount({ data: { username: handle } });
+      const result = await linkAccount({ data: { username } });
       const ui = resolveAccountLinkUi(accounts, result);
       if (!ui.ok) {
         toast.error(ui.error);
@@ -244,9 +252,14 @@ function AgendaPage() {
                       <option value="tiktok">TikTok</option>
                     </select>
                     <input
+                      ref={handleInputRef}
                       value={handle}
                       onChange={(e) => setHandle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void onAddAccount();
+                      }}
                       placeholder="@suapagina"
+                      aria-label="Usuário do Instagram"
                       className="w-full bg-transparent py-2.5 text-sm outline-none placeholder:text-muted-foreground"
                     />
                   </div>
