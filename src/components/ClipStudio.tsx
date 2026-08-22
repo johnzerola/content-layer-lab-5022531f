@@ -626,6 +626,11 @@ export function ClipStudio(props: Props) {
           </div>
         </div>
 
+        {clipBusy && clipStage && (
+          <p className="mt-2 font-mono text-[11px] text-primary">{clipStage}</p>
+        )}
+
+
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="mono-label mr-1">duração do clipe</span>
           {LENGTH_PRESETS.map((p) => (
