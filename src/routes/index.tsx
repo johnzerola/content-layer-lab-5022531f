@@ -315,6 +315,13 @@ function Home() {
   const [clipMaxLen, setClipMaxLen] = useState(45);
   const [clipMax, setClipMax] = useState(6);
   const [clipMinScore, setClipMinScore] = useState(60);
+  /** usa a transcrição (IA) para cortar em frases completas */
+  const [clipUseTranscript, setClipUseTranscript] = useState(true);
+  /** remove os silêncios dentro do próprio corte */
+  const [clipTrimSilence, setClipTrimSilence] = useState(true);
+  /** zoom dinâmico ritmado pela fala */
+  const [clipDynamicZoom, setClipDynamicZoom] = useState(true);
+  const [clipStage, setClipStage] = useState<string | null>(null);
   const [variants, setVariants] = useState(1);
   const [previewVariant, setPreviewVariant] = useState(0);
 
@@ -1634,13 +1641,20 @@ function Home() {
               maxLen: clipMaxLen,
               max: clipMax,
               minScore: clipMinScore,
+              useTranscript: clipUseTranscript,
+              trimSilence: clipTrimSilence,
+              dynamicZoom: clipDynamicZoom,
             }}
             onSettings={(p) => {
               if (p.minLen !== undefined) setClipMinLen(p.minLen);
               if (p.maxLen !== undefined) setClipMaxLen(p.maxLen);
               if (p.max !== undefined) setClipMax(p.max);
               if (p.minScore !== undefined) setClipMinScore(p.minScore);
+              if (p.useTranscript !== undefined) setClipUseTranscript(p.useTranscript);
+              if (p.trimSilence !== undefined) setClipTrimSilence(p.trimSilence);
+              if (p.dynamicZoom !== undefined) setClipDynamicZoom(p.dynamicZoom);
             }}
+            clipStage={clipStage}
             clipBusy={clipBusy}
             onGenerate={(it) => void autoClip(items.find((x) => x.id === it.id)!)}
             running={running}
