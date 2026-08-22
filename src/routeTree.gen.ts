@@ -31,6 +31,7 @@ import { Route as ApiPublicCleanerCallbackRouteImport } from './routes/api/publi
 import { Route as ApiPublicCleanerUploadRouteImport } from './routes/api/public/cleaner-upload'
 import { Route as ApiPublicHlsProxyRouteImport } from './routes/api/public/hls-proxy'
 import { Route as ApiPublicMediaProxyRouteImport } from './routes/api/public/media-proxy'
+import { Route as IntegracoesInstagramCallbackRouteImport } from './routes/integracoes.instagram.callback'
 import { Route as ApiPublicHooksPublishDueRouteImport } from './routes/api/public/hooks/publish-due'
 
 const IndexRoute = IndexRouteImport.update({
@@ -147,6 +148,12 @@ const ApiPublicMediaProxyRoute = ApiPublicMediaProxyRouteImport.update({
   path: '/api/public/media-proxy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const IntegracoesInstagramCallbackRoute =
+  IntegracoesInstagramCallbackRouteImport.update({
+    id: '/instagram/callback',
+    path: '/instagram/callback',
+    getParentRoute: () => IntegracoesRoute,
+  } as any)
 const ApiPublicHooksPublishDueRoute =
   ApiPublicHooksPublishDueRouteImport.update({
     id: '/api/public/hooks/publish-due',
@@ -161,7 +168,7 @@ export interface FileRoutesByFullPath {
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
   '/conta': typeof ContaRoute
-  '/integracoes': typeof IntegracoesRoute
+  '/integracoes': typeof IntegracoesRouteWithChildren
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
@@ -177,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
+  '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
 export interface FileRoutesByTo {
@@ -186,7 +194,7 @@ export interface FileRoutesByTo {
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
   '/conta': typeof ContaRoute
-  '/integracoes': typeof IntegracoesRoute
+  '/integracoes': typeof IntegracoesRouteWithChildren
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
@@ -202,6 +210,7 @@ export interface FileRoutesByTo {
   '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
+  '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
 export interface FileRoutesById {
@@ -212,7 +221,7 @@ export interface FileRoutesById {
   '/armazenamento': typeof ArmazenamentoRoute
   '/biblioteca': typeof BibliotecaRoute
   '/conta': typeof ContaRoute
-  '/integracoes': typeof IntegracoesRoute
+  '/integracoes': typeof IntegracoesRouteWithChildren
   '/limpar-ia': typeof LimparIaRoute
   '/live': typeof LiveRoute
   '/mcp': typeof McpRoute
@@ -228,6 +237,7 @@ export interface FileRoutesById {
   '/api/public/cleaner-upload': typeof ApiPublicCleanerUploadRoute
   '/api/public/hls-proxy': typeof ApiPublicHlsProxyRoute
   '/api/public/media-proxy': typeof ApiPublicMediaProxyRoute
+  '/integracoes/instagram/callback': typeof IntegracoesInstagramCallbackRoute
   '/api/public/hooks/publish-due': typeof ApiPublicHooksPublishDueRoute
 }
 export interface FileRouteTypes {
@@ -255,6 +265,7 @@ export interface FileRouteTypes {
     | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
+    | '/integracoes/instagram/callback'
     | '/api/public/hooks/publish-due'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -280,6 +291,7 @@ export interface FileRouteTypes {
     | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
+    | '/integracoes/instagram/callback'
     | '/api/public/hooks/publish-due'
   id:
     | '__root__'
@@ -305,6 +317,7 @@ export interface FileRouteTypes {
     | '/api/public/cleaner-upload'
     | '/api/public/hls-proxy'
     | '/api/public/media-proxy'
+    | '/integracoes/instagram/callback'
     | '/api/public/hooks/publish-due'
   fileRoutesById: FileRoutesById
 }
@@ -315,7 +328,7 @@ export interface RootRouteChildren {
   ArmazenamentoRoute: typeof ArmazenamentoRoute
   BibliotecaRoute: typeof BibliotecaRoute
   ContaRoute: typeof ContaRoute
-  IntegracoesRoute: typeof IntegracoesRoute
+  IntegracoesRoute: typeof IntegracoesRouteWithChildren
   LimparIaRoute: typeof LimparIaRoute
   LiveRoute: typeof LiveRoute
   McpRoute: typeof McpRoute
@@ -490,6 +503,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicMediaProxyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/integracoes/instagram/callback': {
+      id: '/integracoes/instagram/callback'
+      path: '/instagram/callback'
+      fullPath: '/integracoes/instagram/callback'
+      preLoaderRoute: typeof IntegracoesInstagramCallbackRouteImport
+      parentRoute: typeof IntegracoesRoute
+    }
     '/api/public/hooks/publish-due': {
       id: '/api/public/hooks/publish-due'
       path: '/api/public/hooks/publish-due'
@@ -500,6 +520,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface IntegracoesRouteChildren {
+  IntegracoesInstagramCallbackRoute: typeof IntegracoesInstagramCallbackRoute
+}
+
+const IntegracoesRouteChildren: IntegracoesRouteChildren = {
+  IntegracoesInstagramCallbackRoute: IntegracoesInstagramCallbackRoute,
+}
+
+const IntegracoesRouteWithChildren = IntegracoesRoute._addFileChildren(
+  IntegracoesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
@@ -507,7 +539,7 @@ const rootRouteChildren: RootRouteChildren = {
   ArmazenamentoRoute: ArmazenamentoRoute,
   BibliotecaRoute: BibliotecaRoute,
   ContaRoute: ContaRoute,
-  IntegracoesRoute: IntegracoesRoute,
+  IntegracoesRoute: IntegracoesRouteWithChildren,
   LimparIaRoute: LimparIaRoute,
   LiveRoute: LiveRoute,
   McpRoute: McpRoute,
