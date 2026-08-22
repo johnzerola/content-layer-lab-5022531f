@@ -28,6 +28,7 @@ export type PublishingAccount = {
 };
 
 export type PublishingConnection = {
+  id: string;
   provider: string;
   provider_account_id: string | null;
   status: string;
@@ -50,6 +51,7 @@ export type QueueDependencies = {
   claim: (lockId: string, limit: number, lockTimeoutSeconds: number, maxAttempts: number) => Promise<ClaimedPost[]>;
   loadAccount: (accountId: string) => Promise<PublishingAccount | null>;
   loadConnection: (accountId: string, userId: string) => Promise<PublishingConnection | null>;
+  loadProviderAccessToken?: (connection: PublishingConnection) => Promise<string | null>;
   createSignedUrl: (videoPath: string, expiresInSeconds: number) => Promise<string>;
   removeStorageObject?: (videoPath: string) => Promise<void>;
   publish: (input: PublishInput) => Promise<PublishResult>;
@@ -88,6 +90,14 @@ async function publishClaimedPost(post: ClaimedPost, deps: QueueDependencies): P
     return failure("CAPABILITY_UNAVAILABLE", "A plataforma não suporta este formato de publicação.");
   }
 
+  const selectedProvider = provider(connection?.provider ?? account.provider);
+  const providerAccessToken = selectedProvider === "meta" && connection && deps.loadProviderAccessToken
+    ? await deps.loadProviderAccessToken(connection)
+    : undefined;
+  if (selectedProvider === "meta" && deps.loadProviderAccessToken && !providerAccessToken) {
+    return failure("AUTH_INVALID", "A credencial da conexão Instagram não está disponível.");
+  }
+
   let videoUrl: string;
   if (post.video_path) {
     try {
@@ -109,8 +119,9 @@ async function publishClaimedPost(post: ClaimedPost, deps: QueueDependencies): P
     videoUrl,
     username: account.username,
     platform: account.platform,
-    provider: provider(connection?.provider ?? account.provider),
+    provider: selectedProvider,
     providerAccountId: connection?.provider_account_id ?? account.provider_account_id,
+    ...(providerAccessToken ? { providerAccessToken } : {}),
     idempotencyKey: post.id,
   });
 }

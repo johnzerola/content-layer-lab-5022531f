@@ -5,6 +5,8 @@ import { MetaLinkError, normalizeInstagramHandle } from "@/lib/social-linking.se
 const OAUTH_TTL_MS = 10 * 60 * 1000;
 const INSTAGRAM_AUTH_URL = "https://www.instagram.com/oauth/authorize";
 const INSTAGRAM_TOKEN_URL = "https://api.instagram.com/oauth/access_token";
+const INSTAGRAM_LONG_TOKEN_URL = "https://graph.instagram.com/access_token";
+const INSTAGRAM_REFRESH_TOKEN_URL = "https://graph.instagram.com/refresh_access_token";
 const INSTAGRAM_SCOPES = [
   "instagram_business_basic",
   "instagram_business_content_publish",
@@ -180,4 +182,57 @@ export async function fetchOAuthInstagramIdentity(input: {
     throw new MetaLinkError("META_RESPONSE_INVALID", "A Meta retornou uma resposta inválida.");
   }
   return { id, username: normalizeInstagramHandle(username) };
+}
+
+type InstagramLongLivedToken = { accessToken: string; expiresAt: Date };
+
+async function readLongLivedTokenResponse(
+  response: Response | null,
+  now: number,
+): Promise<InstagramLongLivedToken> {
+  if (!response || response.status >= 500 || response.status === 429) {
+    throw new MetaLinkError("META_TEMPORARY_ERROR", "A Meta está temporariamente indisponível.");
+  }
+  if (!response.ok) {
+    throw new MetaLinkError("META_AUTH_INVALID", "A autorização do Instagram é inválida.");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  const object = payload && typeof payload === "object" && !Array.isArray(payload) ? payload : null;
+  const accessToken = object && "access_token" in object && typeof object.access_token === "string"
+    ? object.access_token
+    : null;
+  const expiresIn = object && "expires_in" in object && typeof object.expires_in === "number"
+    ? object.expires_in
+    : null;
+  if (!accessToken || !expiresIn || expiresIn <= 0) {
+    throw new MetaLinkError("META_RESPONSE_INVALID", "A Meta retornou uma resposta inválida.");
+  }
+  return { accessToken, expiresAt: new Date(now + expiresIn * 1000) };
+}
+
+export async function exchangeLongLivedInstagramToken(input: {
+  accessToken: string;
+  environment?: NodeJS.ProcessEnv;
+  fetch?: typeof fetch;
+  now?: number;
+}): Promise<InstagramLongLivedToken> {
+  const configuration = oauthConfiguration(input.environment ?? process.env);
+  const url = new URL(INSTAGRAM_LONG_TOKEN_URL);
+  url.searchParams.set("grant_type", "ig_exchange_token");
+  url.searchParams.set("client_secret", configuration.appSecret);
+  url.searchParams.set("access_token", input.accessToken);
+  const response = await (input.fetch ?? fetch)(url, { method: "GET" }).catch(() => null);
+  return readLongLivedTokenResponse(response, input.now ?? Date.now());
+}
+
+export async function refreshLongLivedInstagramToken(input: {
+  accessToken: string;
+  fetch?: typeof fetch;
+  now?: number;
+}): Promise<InstagramLongLivedToken> {
+  const url = new URL(INSTAGRAM_REFRESH_TOKEN_URL);
+  url.searchParams.set("grant_type", "ig_refresh_token");
+  url.searchParams.set("access_token", input.accessToken);
+  const response = await (input.fetch ?? fetch)(url, { method: "GET" }).catch(() => null);
+  return readLongLivedTokenResponse(response, input.now ?? Date.now());
 }

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createFileRoute } from "@tanstack/react-router";
 import { requireCronAuthorization } from "@/lib/publish-auth.server";
 import { runPublishQueue, type QueueDependencies } from "@/lib/publish-queue.server";
+import { resolveMetaAccessToken } from "@/lib/social-credentials.server";
 
 const DEFAULT_MAX_ATTEMPTS = 5;
 const DEFAULT_LOCK_TIMEOUT_SECONDS = 15 * 60;
@@ -54,12 +55,36 @@ export const Route = createFileRoute("/api/public/hooks/publish-due")({
           loadConnection: async (accountId, userId) => {
             const { data, error } = await supabaseAdmin
               .from("social_connections")
-              .select("provider,provider_account_id,status,expires_at")
+              .select("id,provider,provider_account_id,status,expires_at")
               .eq("social_account_id", accountId)
               .eq("user_id", userId)
               .maybeSingle();
             if (error) throw new Error("connection lookup failed");
             return data;
+          },
+          loadProviderAccessToken: async (connection) => {
+            if (connection.provider !== "meta") return null;
+            const { data, error } = await supabaseAdmin
+              .from("social_connection_credentials")
+              .select("access_token_ciphertext,expires_at")
+              .eq("connection_id", connection.id)
+              .maybeSingle();
+            if (error || !data) return null;
+            return resolveMetaAccessToken({
+              ciphertext: data.access_token_ciphertext,
+              expiresAt: data.expires_at,
+              persistRefresh: async (ciphertext, expiresAt) => {
+                const { error: credentialError } = await supabaseAdmin
+                  .from("social_connection_credentials")
+                  .update({ access_token_ciphertext: ciphertext, expires_at: expiresAt })
+                  .eq("connection_id", connection.id);
+                const { error: connectionError } = await supabaseAdmin
+                  .from("social_connections")
+                  .update({ expires_at: expiresAt })
+                  .eq("id", connection.id);
+                if (credentialError || connectionError) throw new Error("credential refresh persistence failed");
+              },
+            });
           },
           createSignedUrl: async (videoPath, expiresInSeconds) => {
             const { data, error } = await supabaseAdmin.storage

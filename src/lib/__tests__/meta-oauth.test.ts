@@ -2,9 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createInstagramOAuthState,
   exchangeInstagramAuthorizationCode,
+  exchangeLongLivedInstagramToken,
   fetchOAuthInstagramIdentity,
   instagramAuthorizationUrl,
   verifyInstagramOAuthState,
+  refreshLongLivedInstagramToken,
 } from "@/lib/meta-oauth.server";
 
 const environment = {
@@ -70,5 +72,28 @@ describe("Instagram OAuth", () => {
       "https://graph.instagram.com/v26.0/me?fields=id,username",
       { headers: { authorization: "Bearer oauth-token" } },
     );
+  });
+
+  it("exchanges and refreshes long-lived user tokens server-side", async () => {
+    const exchangeRequest = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ access_token: "long-token", expires_in: 5_184_000 }), { status: 200 }),
+    );
+    await expect(exchangeLongLivedInstagramToken({
+      accessToken: "short-token",
+      environment,
+      fetch: exchangeRequest,
+      now: 1_000,
+    })).resolves.toEqual({ accessToken: "long-token", expiresAt: new Date(5_184_001_000) });
+    const exchangeUrl = new URL(String(exchangeRequest.mock.calls[0]?.[0]));
+    expect(exchangeUrl.origin + exchangeUrl.pathname).toBe("https://graph.instagram.com/access_token");
+    expect(exchangeUrl.searchParams.get("grant_type")).toBe("ig_exchange_token");
+
+    const refreshRequest = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(JSON.stringify({ access_token: "refreshed-token", expires_in: 5_184_000 }), { status: 200 }),
+    );
+    await expect(refreshLongLivedInstagramToken({ accessToken: "long-token", fetch: refreshRequest, now: 2_000 }))
+      .resolves.toEqual({ accessToken: "refreshed-token", expiresAt: new Date(5_184_002_000) });
+    expect(new URL(String(refreshRequest.mock.calls[0]?.[0])).searchParams.get("grant_type"))
+      .toBe("ig_refresh_token");
   });
 });
